@@ -4,26 +4,27 @@ syntax on
 filetype plugin indent on
 set t_Co=256
 
-set guifont=Monaco\ 12
+set guifont=Monaco\ 11
 let g:Powerline_symbols='fancy'
 set wildmenu wildmode=full wildchar=<Tab>
 
-set shiftwidth=2
-set tabstop=2
-" colorscheme zenburn
+set shiftwidth=4
+set tabstop=4
 " colorscheme vividchalk
 " set background=dark
 if has('gui_running')
+	set background=dark
 	colorscheme solarized
 else
-	colorscheme ir_black
+	colorscheme zenburn
 endif
 se nu
 set ruler
 
 let mapleader = ","
-set background=dark
 set incsearch
+set ignorecase
+set smartcase
 nnoremap ss <C-w>s
 nnoremap wv <C-w>v
 nnoremap <Right> <Esc>:bn<Return>
@@ -31,12 +32,17 @@ nnoremap <Left> <Esc>:bp<Return>
 nnoremap <Tab> <C-w>w
 nnoremap H  ^
 nnoremap L $
-let g:miniBufExplorerAutoStart = 1
-map <Leader>b :MBEFocus<cr>
-let g:miniBufExplBuffersNeeded = 1
+nnoremap <C-tab> 	:tabnext<CR>
+" let g:miniBufExplorerAutoStart = 1
+" map <Leader>b :MBEFocus<cr>
+" let g:miniBufExplBuffersNeeded = 1
 
 let g:ctrlp_map = '<c-p>'
 let g:ctrlp_command = 'CtrlP'
+let g:ctrlp_switch_buffer='Et'
+let g:ctrlp_use_caching = 1
+let g:ctrlp_show_hidden = 1
+let g:ctrlp_clear_cache_on_exit = 0
 
 nnoremap <Leader>z :Eval<cr>
 set guioptions -=m
@@ -72,22 +78,22 @@ au Syntax * RainbowParenthesesToggle
 nnoremap <silent><F8> :NERDTreeToggle<CR>
 nnoremap <silent><F9> :TagbarToggle<CR>
 
-let g:syntastic_check_on_open = 1
-let g:syntastic_check_on_wq = 0
-let g:syntastic_aggregate_errors = 1
-let g:syntastic_error_symbol = '✗'
-let g:syntastic_warning_symbol = '⚠'
-let g:syntastic_enable_balloons = 1
-let g:syntastic_always_populate_loc_list = 1
 
 let g:ackprg = 'ag --nogroup --nocolor --column'
+let g:paredit_electric_return=0
 
 set backspace=indent,eol,start
 autocmd BufRead, BufNewFile *.cljs setlocal filetype=clojure
-let g:paredit_electric_return=0
 
 
 let g:slime_target="tmux"
 set noswapfile
 set noerrorbells visualbell t_vb=
 autocmd GUIEnter * set visualbell t_vb=
+
+set laststatus=2
+set ttimeoutlen=50
+
+set relativenumber
+set cursorline
+set t_ut=

@@ -6,13 +6,15 @@ ZSH=$HOME/.oh-my-zsh
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 # ZSH_THEME="robbyrussell"
-# ZSH_THEME="af-magic"
+ZSH_THEME="af-magic"
 # ZSH_THEME="agnoster" 
 # ZSH_THEME="lambda"
 # ZSH_THEME="minimal"
-ZSH_THEME="ys"
+# ZSH_THEME="ys"
 # ZSH_THEME="garyblessington"
-
+# ZSH_THEME="avit"
+# ZSH_THEME="miloshadzic"
+# ZSH_THEME="norm"
 
 # Example aliases
 alias zshconfig="mate ~/.zshrc"
@@ -52,13 +54,13 @@ HIST_STAMPS="mm/dd/yyyy"
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
-plugins=(git ruby)
+plugins=(git ruby vi-mode tmux brew common-aliases github gradle lein sudo wd)
 
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
 
-export PATH="/home/tom/bin:/home/tom/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/home/tom/.rvm/bin:/home/tom/.rvm/bin:/home/tom/.oh-my-zsh"
+export PATH="/home/tom/bin:/home/tom/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/home/tom/.rvm/bin:/home/tom/.rvm/bin:/home/tom/.oh-my-zsh:/home/tom/.linuxbrew/bin:/home/tom/phantomjs-1.9.7-linux-i686/bin"
 # export MANPATH="/usr/local/man:$MANPATH"
 
 # # Preferred editor for local and remote sessions
@@ -74,9 +76,18 @@ export PATH="/home/tom/bin:/home/tom/bin:/usr/local/bin:/usr/bin:/bin:/usr/local
 # ssh
 # export SSH_KEY_PATH="~/.ssh/dsa_id"
 alias tvi='/usr/local/bin/vim'
+alias vi='vim'
 export TERM=xterm-256color
 alias tmux='tmux -2'
 alias tml='tmux list-sessions'
 alias tma='tmux attach-session -t '
 export GRADLE_HOME=~/bin/gradle-1.11
 export PATH=$GRADLE_HOME/bin:$PATH
+# if [[ $(cat /etc/resolv.conf | wc -l) == 1 ]]
+# then
+#	sudo su 
+#	echo "nameserver 208.67.222.222" >> /etc/resolv.conf
+#	echo "nameserver 208.67.220.220" >> /etc/resolv.conf
+#	exit
+# fi
+alias resolv='sudo cp ~/resolv.conf.bak /etc/resolv.conf'
