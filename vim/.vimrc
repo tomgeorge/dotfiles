@@ -8,6 +8,18 @@ Plugin 'kien/rainbow_parentheses.vim'
 Plugin 'flazz/vim-colorschemes'
 Plugin 'gregsexton/Muon'
 Plugin 'tpope/vim-fireplace'
+Plugin 'vim-airline/vim-airline'
+Plugin 'vim-airline/vim-airline-themes'
+Plugin 'guns/vim-sexp'
+Plugin 'tpope/vim-sexp-mappings-for-regular-people'
+Plugin 'tpope/vim-repeat'
+Plugin 'tpope/vim-surround'
+Plugin 'airblade/vim-gitgutter'
+Plugin 'kien/ctrlp.vim'
+Plugin 'ervandew/supertab'
+Plugin 'bling/vim-bufferline'
+Plugin 'edkolev/tmuxline.vim'
+Plugin 'majutsushi/tagbar'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
