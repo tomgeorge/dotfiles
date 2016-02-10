@@ -1,4 +1,13 @@
 set nocompatible
+filetype off
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+Plugin 'tpope/vim-fugitive'
+Plugin 'tpope/vim-classpath'
+Plugin 'kien/rainbow_parentheses.vim'
+Plugin 'flazz/vim-colorschemes'
+Plugin 'gregsexton/Muon'
+Plugin 'tpope/vim-fireplace'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
