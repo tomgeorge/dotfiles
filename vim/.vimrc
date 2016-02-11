@@ -20,6 +20,7 @@ Plugin 'ervandew/supertab'
 Plugin 'bling/vim-bufferline'
 Plugin 'edkolev/tmuxline.vim'
 Plugin 'majutsushi/tagbar'
+Plugin 'ingydotnet/yaml-vim'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
