@@ -1,8 +1,8 @@
 # Path to your oh-my-zsh installation.
 if [[ $(whoami) -eq "root" ]]; then
-	export ZSH=/home/$(whoami)/.oh-my-zsh
-else
 	export ZSH=/root/.oh-my-zsh
+else
+	export ZSH=/home/$(whoami)/.oh-my-zsh
 fi
 
 # Set name of the theme to load.
