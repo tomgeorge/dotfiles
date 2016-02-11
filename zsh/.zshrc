@@ -85,3 +85,6 @@ source $ZSH/oh-my-zsh.sh
 #
 export LEIN_ROOT=1
 alias em='emacs -nw'
+fpath=(~/.zsh/completion $fpath)
+autoload -Uz compinit && compinit -i
+
