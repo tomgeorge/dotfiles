@@ -1,5 +1,5 @@
 # Path to your oh-my-zsh installation.
-if [[ $(whoami) -eq "root" ]]; then
+if [[ $(whoami) == "root" ]]; then
 	export ZSH=/root/.oh-my-zsh
 else
 	export ZSH=/home/$(whoami)/.oh-my-zsh
@@ -92,3 +92,7 @@ alias em='emacs -nw'
 fpath=(~/.zsh/completion $fpath)
 autoload -Uz compinit && compinit -i
 
+# Install vim stuff
+if [[ ! -e ~/.vim/bundle/vim-fireplace ]]; then
+	vi +PluginInstall +qa
+fi
