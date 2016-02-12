@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 rm ~/.zshrc || true
-ln ~/dotfiles/zsh/.zshrc ~/.zshrc
+ln ~/dotfiles/zshrc ~/.zshrc
 rm ~/.tmux.conf || true
-ln ~/dotfiles/tmux/.tmux.conf ~/.tmux.conf
+ln ~/dotfiles/.tmux.conf ~/.tmux.conf
 rm ~/.vimrc || true
-ln ~/dotfiles/vim/.vimrc ~/.vimrc
+ln ~/dotfiles/.vimrc ~/.vimrc
 rm ~/.bashrc || true
-ln ~/dotfiles/bash/.bashrc ~/.bashrc
+ln ~/dotfiles/.bashrc ~/.bashrc
 rm ~/.gitconfig || true
-ln ~/dotfiles/git/.gitconfig ~/.gitconfig || true       
+ln ~/dotfiles/.gitconfig ~/.gitconfig || true       
