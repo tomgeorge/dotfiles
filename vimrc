@@ -21,6 +21,8 @@ Plugin 'bling/vim-bufferline'
 Plugin 'edkolev/tmuxline.vim'
 Plugin 'majutsushi/tagbar'
 Plugin 'ingydotnet/yaml-vim'
+Plugin 'vim-scripts/Solarized'
+Plugin 'scrooloose/nerdTree'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
@@ -92,6 +94,8 @@ let g:rbpt_colorpairs = [
 let g:rbpt_max = 16
 let g:rbpt_loadcmd_toggle = 0
 au VimEnter *.clj RainbowParenthesesToggle
+au BufEnter *.pcc set syntax=c
+au BufEnter *.pc set syntax=c
 au Syntax * RainbowParenthesesLoadRound
 au Syntax * RainbowParenthesesLoadSquare
 au Syntax * RainbowParenthesesLoadBraces
