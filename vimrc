@@ -119,3 +119,5 @@ set ttimeoutlen=50
 set relativenumber
 set cursorline
 set t_ut=
+set lazyredraw
+set ttyfast
