@@ -2,10 +2,8 @@
 rm ~/.zshrc || true
 ln ~/dotfiles/zshrc ~/.zshrc
 rm ~/.tmux.conf || true
-ln ~/dotfiles/.tmux.conf ~/.tmux.conf
+ln ~/dotfiles/tmux.conf ~/.tmux.conf
 rm ~/.vimrc || true
-ln ~/dotfiles/.vimrc ~/.vimrc
-rm ~/.bashrc || true
-ln ~/dotfiles/.bashrc ~/.bashrc
+ln ~/dotfiles/vimrc ~/.vimrc
 rm ~/.gitconfig || true
-ln ~/dotfiles/.gitconfig ~/.gitconfig || true       
+ln ~/dotfiles/gitconfig ~/.gitconfig || true       
