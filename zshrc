@@ -96,3 +96,4 @@ autoload -Uz compinit && compinit -i
 if [[ ! -e ~/.vim/bundle/vim-fireplace ]]; then
 	vi +PluginInstall +qa
 fi
+set -o vi
