@@ -23,6 +23,7 @@ Plugin 'majutsushi/tagbar'
 Plugin 'ingydotnet/yaml-vim'
 Plugin 'vim-scripts/Solarized'
 Plugin 'scrooloose/nerdTree'
+Plugin 'ekalinin/Dockerfile.vim'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
