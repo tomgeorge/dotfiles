@@ -57,7 +57,7 @@ plugins=(git tmux docker)
 
 # User configuration
 
-  export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin"
+  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin"
 # export MANPATH="/usr/local/man:$MANPATH"
 
 source $ZSH/oh-my-zsh.sh
