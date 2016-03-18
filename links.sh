@@ -6,4 +6,4 @@ ln ~/dotfiles/tmux.conf ~/.tmux.conf
 rm ~/.vimrc || true
 ln ~/dotfiles/vimrc ~/.vimrc
 rm ~/.gitconfig || true
-ln ~/dotfiles/gitconfig ~/.gitconfig || true       
+ln ~/dotfiles/gitconfig ~/.gitconfig

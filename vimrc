@@ -25,6 +25,7 @@ Plugin 'vim-scripts/Solarized'
 Plugin 'scrooloose/nerdTree'
 Plugin 'ekalinin/Dockerfile.vim'
 Plugin 'leafgarland/typescript-vim'
+Plugin 'godlygeek/csapprox'
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
