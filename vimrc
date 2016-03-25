@@ -28,6 +28,7 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'godlygeek/csapprox'
 Plugin 'pangloss/vim-javascript'
 Plugin 'othree/javascript-libraries-syntax.vim'
+Plugin 'scrooloose/syntastic'
 
 execute pathogen#infect()
 syntax on
@@ -40,6 +41,7 @@ set wildmenu wildmode=full wildchar=<Tab>
 
 set shiftwidth=4
 set tabstop=4
+set expandtab
 " colorscheme vividchalk
 " set background=dark
 if has('gui_running')
@@ -135,3 +137,16 @@ set ttyfast
 
 " javascript
 let g:used_javascript_libs = 'underscore,backbone,angularjs,angularuirouter,react,flux'
+
+" syntastic
+set statusline+=%#warningmsg#
+set statusline+=%{SyntasticStatuslineFlag()}
+set statusline+=%*
+
+let g:syntastic_always_populate_loc_list = 1
+let g:syntastic_auto_loc_list = 1
+let g:syntastic_check_on_open = 1
+let g:syntastic_check_on_wq = 0
+
+let g:syntastic_javascript_checkers = ['eslint']
+let g:syntastic_typescript_checkers = ['eslint']
