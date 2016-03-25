@@ -26,6 +26,9 @@ Plugin 'scrooloose/nerdTree'
 Plugin 'ekalinin/Dockerfile.vim'
 Plugin 'leafgarland/typescript-vim'
 Plugin 'godlygeek/csapprox'
+Plugin 'pangloss/vim-javascript'
+Plugin 'othree/javascript-libraries-syntax.vim'
+
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
@@ -128,3 +131,7 @@ set cursorline
 set t_ut=
 set lazyredraw
 set ttyfast
+
+
+" javascript
+let g:used_javascript_libs = 'underscore,backbone,angularjs,angularuirouter,react,flux'
