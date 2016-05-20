@@ -29,6 +29,7 @@ Plugin 'godlygeek/csapprox'
 Plugin 'pangloss/vim-javascript'
 Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'scrooloose/syntastic'
+Plugin 'MicahElliott/Rocannon'
 
 execute pathogen#infect()
 syntax on
@@ -103,6 +104,7 @@ let g:rbpt_max = 16
 let g:rbpt_loadcmd_toggle = 0
 au VimEnter *.clj RainbowParenthesesToggle
 au BufEnter *.pcc set syntax=c
+au BufEnter *.yml colorscheme Tomorrow-Night
 au BufEnter *.pc set syntax=c
 au Syntax * RainbowParenthesesLoadRound
 au Syntax * RainbowParenthesesLoadSquare
