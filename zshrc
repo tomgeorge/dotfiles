@@ -93,7 +93,5 @@ fpath=(~/.zsh/completion $fpath)
 autoload -Uz compinit && compinit -i
 
 # Install vim stuff
-if [[ ! -e ~/.vim/bundle/vim-fireplace ]]; then
-	vi +PluginInstall +qa
-fi
 set -o vi
+alias dl='docker ps -l -q'
