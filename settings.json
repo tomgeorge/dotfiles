@@ -1,0 +1,72 @@
+{
+    "typescript.tsdk": "./node_modules/typescript/lib",
+    "typescriptHero.resolver.insertSpaceBeforeAndAfterImportBraces": true,
+    "vim.leader": ",",
+    "vim.useCtrlKeys": true,
+    "vim.otherModesKeyBindings": [
+    ],
+    "vim.otherModesKeyBindingsNonRecursive": [
+        {
+            "before": [":"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "workbench.action.showCommands",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "before": ["leader", "z"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "workbench.action.toggleZenMode",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "before": ["leader", "w"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "workbench.action.files.save",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "before": ["tab"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "workbench.action.navigateEditorGroups",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "before": ["leader", "f"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "workbench.view.search",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "before": ["leader", "h"],
+            "after": [],
+            "commands": [
+                {
+                    "command": "editor.action.startFindReplaceAction",
+                    "args": []
+                }
+            ]
+        }
+    ],
+    "vim.useSystemClipboard": true,
+    "editor.lineNumbers": "relative"
+}
