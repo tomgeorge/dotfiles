@@ -95,3 +95,8 @@ autoload -Uz compinit && compinit -i
 # Install vim stuff
 set -o vi
 alias dl='docker ps -l -q'
+
+export NVM_DIR="/home/vagrant/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+bindkey -v
+bindkey '^R' history-incremental-search-backward
