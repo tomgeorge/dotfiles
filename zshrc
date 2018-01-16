@@ -5,6 +5,10 @@ else
 	export ZSH=/home/$(whoami)/.oh-my-zsh
 fi
 
+if type "nvim" > /dev/null; then
+    alias vi='nvim'
+fi
+
 # Set name of the theme to load.
 # Look in ~/.oh-my-zsh/themes/
 # Optionally, if you set this to "random", it'll load a random theme each
@@ -101,3 +105,4 @@ export NVM_DIR="/home/vagrant/.nvm"
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
+export PATH=/usr/local/bin/go/bin:$PATH

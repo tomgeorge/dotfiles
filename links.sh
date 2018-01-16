@@ -9,6 +9,8 @@ rm ~/.gitconfig || true
 ln ~/dotfiles/gitconfig ~/.gitconfig
 rm ~/.config/nvim/init.vim || true
 mkdir -p ~/.config/nvim
-ln ~/dotfiles/init.nvim ~/.config/nvim/init.vim 
+ln ~/dotfiles/init.vim ~/.config/nvim/init.vim 
 mkdir -p ~/.lein/profiles.clj || true
 ln ~/dotfiles/profiles.clj ~/.lein/profiles.clj
+
+source ~/.zshrc
