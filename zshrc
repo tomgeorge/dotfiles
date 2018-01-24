@@ -61,7 +61,7 @@ plugins=(git tmux docker)
 
 # User configuration
 
-  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin"
+  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin":$PATH
 # export MANPATH="/usr/local/man:$MANPATH"
 
 source $ZSH/oh-my-zsh.sh
@@ -105,4 +105,4 @@ export NVM_DIR="/home/vagrant/.nvm"
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
-export PATH=/usr/local/bin/go/bin:$PATH
+export PATH=/usr/go/bin:$PATH
