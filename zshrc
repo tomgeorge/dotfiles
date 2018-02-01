@@ -100,9 +100,10 @@ autoload -Uz compinit && compinit -i
 set -o vi
 alias dl='docker ps -l -q'
 
-export NVM_DIR="/home/vagrant/.nvm"
+export NVM_DIR="/home/$(whoami)/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
 export PATH=/usr/go/bin:$PATH
+export PATH=$PATH:/usr/local/go/bin

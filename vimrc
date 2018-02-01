@@ -31,10 +31,13 @@ Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'scrooloose/syntastic'
 Plugin 'MicahElliott/Rocannon'
 Plugin 'freitass/todo.txt-vim'
+Plugin 'clausreinke/typescript-tools.vim'
+Plugin 'jacoborus/tender.vim'
 
 execute pathogen#infect()
 syntax on
 filetype plugin indent on
+set rtp+=~/.vim/bundle/typescript-tools.vim
 set t_Co=256
 
 set guifont=Monaco\ 11
