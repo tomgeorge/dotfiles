@@ -29,7 +29,6 @@ Plugin 'godlygeek/csapprox'
 Plugin 'pangloss/vim-javascript'
 Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'scrooloose/syntastic'
-Plugin 'MicahElliott/Rocannon'
 Plugin 'freitass/todo.txt-vim'
 
 execute pathogen#infect()
