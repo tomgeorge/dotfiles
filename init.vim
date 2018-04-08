@@ -28,3 +28,4 @@ let g:terraform_completion_keys = 1
 
 " (Optional) Default: 1, enable(1)/disable(0) terraform module registry completion
 let g:terraform_registry_module_completion = 0
+tnoremap <Esc> <C-\><C-n>
