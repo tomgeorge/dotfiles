@@ -13,6 +13,7 @@ fi
 # Look in ~/.oh-my-zsh/themes/
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
+#ZSH_THEME="af-magic"
 ZSH_THEME="lambda"
 
 # Uncomment the following line to use case-sensitive completion.
@@ -61,7 +62,7 @@ plugins=(git tmux docker)
 
 # User configuration
 
-  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin":$PATH
+  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin"
 # export MANPATH="/usr/local/man:$MANPATH"
 
 source $ZSH/oh-my-zsh.sh
@@ -100,10 +101,19 @@ autoload -Uz compinit && compinit -i
 set -o vi
 alias dl='docker ps -l -q'
 
-export NVM_DIR="/home/$(whoami)/.nvm"
+export NVM_DIR=/home/$(whoami)/.nvm
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
-export PATH=/usr/go/bin:$PATH
-export PATH=$PATH:/usr/local/go/bin
+export PATH=/usr/local/bin/go/bin:$PATH
+
+    
+
+# added by travis gem
+[ -f /home/vagrant/.travis/travis.sh ] && source /home/vagrant/.travis/travis.sh
+function run_dev_container() {
+   cd ~/devbox && make
+}
+
+alias dev=run_dev_container
