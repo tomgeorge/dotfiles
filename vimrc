@@ -115,6 +115,8 @@ au Syntax * RainbowParenthesesLoadBraces
 au Syntax * RainbowParenthesesToggle
 
 nnoremap <silent><F8> :NERDTreeToggle<CR>
+nnoremap <silent><Leader>nt :NERDTreeToggle<CR>
+nnoremap <silent><Leader>tb :TagbarToggle<CR>
 nnoremap <silent><F9> :TagbarToggle<CR>
 
 
