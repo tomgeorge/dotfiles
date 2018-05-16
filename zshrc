@@ -9,6 +9,10 @@ if type "nvim" > /dev/null; then
     alias vi='nvim'
 fi
 
+if type "gpg2" > /dev/null; then
+    alias gpg='gpg2'
+fi
+
 # Set name of the theme to load.
 # Look in ~/.oh-my-zsh/themes/
 # Optionally, if you set this to "random", it'll load a random theme each
