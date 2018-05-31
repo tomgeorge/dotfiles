@@ -2,7 +2,7 @@
 if [[ $(whoami) == "root" ]]; then
 	export ZSH=/root/.oh-my-zsh
 else
-	export ZSH=/home/$(whoami)/.oh-my-zsh
+	export ZSH=~$(whoami)/.oh-my-zsh
 fi
 
 if type "nvim" > /dev/null; then
@@ -66,7 +66,7 @@ plugins=(git tmux docker)
 
 # User configuration
 
-  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/tom/.local/bin:/home/tom/bin:/home/tom/.rvm/bin:/home/tom/.linuxbrew/bin"
+  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.rvm/bin:~/.linuxbrew/bin"
 # export MANPATH="/usr/local/man:$MANPATH"
 
 source $ZSH/oh-my-zsh.sh
@@ -105,7 +105,7 @@ autoload -Uz compinit && compinit -i
 set -o vi
 alias dl='docker ps -l -q'
 
-export NVM_DIR=/home/$(whoami)/.nvm
+export NVM_DIR=~/.nvm
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 bindkey -v
 bindkey '^R' history-incremental-search-backward
@@ -115,7 +115,7 @@ export PATH=/usr/local/bin/go/bin:$PATH
     
 
 # added by travis gem
-[ -f /home/vagrant/.travis/travis.sh ] && source /home/vagrant/.travis/travis.sh
+[ -f ~/.travis/travis.sh ] && source /home/vagrant/.travis/travis.sh
 function run_dev_container() {
    cd ~/devbox && make
 }

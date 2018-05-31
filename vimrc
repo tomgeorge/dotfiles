@@ -20,7 +20,7 @@ Plugin 'ervandew/supertab'
 Plugin 'bling/vim-bufferline'
 Plugin 'edkolev/tmuxline.vim'
 Plugin 'majutsushi/tagbar'
-Plugin 'ingydotnet/yaml-vim'
+Plugin 'chase/vim-ansible-yaml'
 Plugin 'vim-scripts/Solarized'
 Plugin 'scrooloose/nerdTree'
 Plugin 'ekalinin/Dockerfile.vim'
@@ -107,7 +107,7 @@ let g:rbpt_max = 16
 let g:rbpt_loadcmd_toggle = 0
 au VimEnter *.clj RainbowParenthesesToggle
 au BufEnter *.pcc set syntax=c
-au BufEnter *.yml colorscheme Tomorrow-Night
+au BufEnter *.yml set filetype=ansible
 au BufEnter *.pc set syntax=c
 au Syntax * RainbowParenthesesLoadRound
 au Syntax * RainbowParenthesesLoadSquare
