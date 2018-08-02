@@ -43,8 +43,8 @@ set guifont=Monaco\ 11
 let g:Powerline_symbols='fancy'
 set wildmenu wildmode=full wildchar=<Tab>
 
-set shiftwidth=4
-set tabstop=4
+set shiftwidth=2
+set tabstop=2
 set expandtab
 " colorscheme vividchalk
 " set background=dark
@@ -125,6 +125,8 @@ let g:paredit_electric_return=0
 
 set backspace=indent,eol,start
 autocmd BufRead, BufNewFile *.cljs setlocal filetype=clojure
+autocmd BufRead, BufNewFile Jenkinsfile set syntax=groovy
+autocmd BufEnter, BufNewFile Jenkinsfile set syntax=groovy
 
 
 let g:slime_target="tmux"
