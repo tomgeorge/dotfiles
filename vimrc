@@ -46,6 +46,7 @@ set wildmenu wildmode=full wildchar=<Tab>
 set shiftwidth=4
 set tabstop=4
 set expandtab
+set guicursor= 
 " colorscheme vividchalk
 " set background=dark
 if has('gui_running')
