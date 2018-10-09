@@ -1,9 +1,6 @@
 # Path to your oh-my-zsh installation.
-if [[ $(whoami) == "root" ]]; then
-	export ZSH=/root/.oh-my-zsh
-else
-	export ZSH=~$(whoami)/.oh-my-zsh
-fi
+export ZSH=$HOME/.oh-my-zsh
+echo "ZSH IS $ZSH"
 
 if type "nvim" > /dev/null; then
     alias vi='nvim'
