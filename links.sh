@@ -14,4 +14,4 @@ rm ~/.lein/profiles.clj || true
 mkdir -p ~/.lein 
 ln ~/dotfiles/profiles.clj ~/.lein/profiles.clj
 
-$(which zsh) ~/.zshrc
+. ~/.zshrc
