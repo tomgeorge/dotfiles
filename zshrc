@@ -1,7 +1,5 @@
 # Path to your oh-my-zsh installation.
 export ZSH=$HOME/.oh-my-zsh
-echo "ZSH IS $ZSH"
-
 if type "nvim" > /dev/null; then
     alias vi='nvim'
 fi
