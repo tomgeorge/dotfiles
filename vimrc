@@ -46,6 +46,7 @@ set wildmenu wildmode=full wildchar=<Tab>
 set shiftwidth=2
 set tabstop=2
 set expandtab
+set guicursor= 
 " colorscheme vividchalk
 " set background=dark
 if has('gui_running')
@@ -138,7 +139,7 @@ set laststatus=2
 set ttimeoutlen=50
 
 set relativenumber
-set cursorline
+" set cursorline
 set t_ut=
 set lazyredraw
 set ttyfast
