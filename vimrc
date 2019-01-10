@@ -32,6 +32,7 @@ Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'freitass/todo.txt-vim'
 Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'jacoborus/tender.vim'
+Plugin 'arcticicestudio/nord-vim'
 
 execute pathogen#infect()
 syntax on
@@ -110,6 +111,8 @@ au VimEnter *.clj RainbowParenthesesToggle
 au BufEnter *.pcc set syntax=c
 au BufEnter *.yml set filetype=ansible
 au BufEnter *.pc set syntax=c
+au Bufenter *vagrant* set syntax=ruby
+au Bufenter *Vagrant* set syntax=ruby
 au Syntax * RainbowParenthesesLoadRound
 au Syntax * RainbowParenthesesLoadSquare
 au Syntax * RainbowParenthesesLoadBraces
