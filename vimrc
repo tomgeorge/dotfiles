@@ -33,6 +33,7 @@ Plugin 'freitass/todo.txt-vim'
 Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'jacoborus/tender.vim'
 Plugin 'arcticicestudio/nord-vim'
+Plugin 'junegunn/gv.vim'
 
 execute pathogen#infect()
 syntax on
@@ -56,7 +57,7 @@ if has('gui_running')
 	set guioptions -=m
 	set guioptions -=T
 else
-	colorscheme muon
+	colorscheme nord
 endif
 se nu
 set ruler
