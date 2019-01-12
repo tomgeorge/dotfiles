@@ -33,7 +33,7 @@ Plugin 'freitass/todo.txt-vim'
 Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'jacoborus/tender.vim'
 Plugin 'arcticicestudio/nord-vim'
-Plugin 'junegunn/gv.vim'
+Plugin 'gregsexton/gitv'
 
 execute pathogen#infect()
 syntax on
@@ -129,6 +129,7 @@ let g:ackprg = 'ag --nogroup --nocolor --column'
 let g:paredit_electric_return=0
 
 set backspace=indent,eol,start
+set smartindent
 autocmd BufRead, BufNewFile *.cljs setlocal filetype=clojure
 autocmd BufRead, BufNewFile Jenkinsfile set syntax=groovy
 autocmd BufEnter, BufNewFile Jenkinsfile set syntax=groovy
