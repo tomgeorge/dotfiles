@@ -10,7 +10,6 @@ Plugin 'radenling/vim-dispatch-neovim'
 Plugin 'clojure-vim/vim-jack-in'
 Plugin 'neomake/neomake'
 Plugin 'hashivim/vim-terraform'
-Plugin 'vim-syntastic/syntastic'
 Plugin 'juliosueiras/vim-terraform-completion'
 
 let g:deoplete#keyword_patterns = {}
@@ -18,6 +17,7 @@ let g:deoplete#keyword_patterns.clojure = '[\w!$%&*+/:<=>?@\^_~\-\.#]*'
 let g:deoplete#omni_patterns = {}
 let g:deoplete#omni_patterns.terraform = '[^ *\t"{=$]\w*'
 let g:deoplete#enable_at_startup = 1
+
 call deoplete#initialize()
 set termguicolors
 

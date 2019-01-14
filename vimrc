@@ -1,48 +1,63 @@
 set nocompatible
 filetype off
 set rtp+=~/.vim/bundle/Vundle.vim
+
 call vundle#begin()
-Plugin 'tpope/vim-fugitive'
-Plugin 'tpope/vim-classpath'
-Plugin 'kien/rainbow_parentheses.vim'
+" Colorschemes
 Plugin 'flazz/vim-colorschemes'
 Plugin 'gregsexton/Muon'
-Plugin 'tpope/vim-fireplace'
-Plugin 'vim-airline/vim-airline'
-Plugin 'vim-airline/vim-airline-themes'
-Plugin 'guns/vim-sexp'
-Plugin 'tpope/vim-sexp-mappings-for-regular-people'
-Plugin 'tpope/vim-repeat'
-Plugin 'tpope/vim-surround'
-Plugin 'airblade/vim-gitgutter'
-Plugin 'kien/ctrlp.vim'
-Plugin 'ervandew/supertab'
-Plugin 'bling/vim-bufferline'
-Plugin 'edkolev/tmuxline.vim'
-Plugin 'majutsushi/tagbar'
-Plugin 'chase/vim-ansible-yaml'
-Plugin 'vim-scripts/Solarized'
-Plugin 'scrooloose/nerdTree'
-Plugin 'ekalinin/Dockerfile.vim'
-Plugin 'leafgarland/typescript-vim'
-Plugin 'godlygeek/csapprox'
-Plugin 'pangloss/vim-javascript'
-Plugin 'othree/javascript-libraries-syntax.vim'
-" Plugin 'scrooloose/syntastic'
-Plugin 'freitass/todo.txt-vim'
-Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'jacoborus/tender.vim'
 Plugin 'arcticicestudio/nord-vim'
+
+" Skinning 
+Plugin 'vim-airline/vim-airline'
+Plugin 'vim-airline/vim-airline-themes'
+Plugin 'edkolev/tmuxline.vim'
+Plugin 'godlygeek/csapprox'
+Plugin 'kien/rainbow_parentheses.vim'
+
+" Git stuff
+Plugin 'tpope/vim-fugitive'
+Plugin 'airblade/vim-gitgutter'
 Plugin 'gregsexton/gitv'
 
-execute pathogen#infect()
+" Utilities
+Plugin 'mileszs/ack.vim'
+Plugin 'tpope/vim-repeat'
+Plugin 'tpope/vim-surround'
+Plugin 'majutsushi/tagbar'
+Plugin 'christoomey/vim-tmux-navigator'
+Plugin 'scrooloose/nerdTree'
+Plugin 'junegunn/fzf.vim'
+Plugin 'tpope/vim-commentary'
+Plugin 'tpope/vim-unimpaired'
+
+" ECMAScript-y langs
+Plugin 'leafgarland/typescript-vim'
+Plugin 'pangloss/vim-javascript'
+Plugin 'othree/javascript-libraries-syntax.vim'
+Plugin 'clausreinke/typescript-tools.vim'
+
+" JVM-based langs
+Plugin 'tpope/vim-classpath'
+Plugin 'tpope/vim-fireplace'
+Plugin 'guns/vim-sexp'
+Plugin 'tpope/vim-sexp-mappings-for-regular-people'
+
+
+Plugin 'chase/vim-ansible-yaml'
+Plugin 'ekalinin/Dockerfile.vim'
+call vundle#end()
+
 syntax on
 filetype plugin indent on
+
+let g:airline#extensions#bufferline#enabled = 1
+let g:airline#extensions#tabline#enabled = 1
 set rtp+=~/.vim/bundle/typescript-tools.vim
 set t_Co=256
 
 set guifont=Monaco\ 11
-let g:Powerline_symbols='fancy'
 set wildmenu wildmode=full wildchar=<Tab>
 
 set shiftwidth=2
@@ -165,3 +180,21 @@ let g:syntastic_check_on_wq = 0
 
 let g:syntastic_javascript_checkers = ['eslint']
 let g:syntastic_typescript_checkers = ['eslint']
+
+
+" Customize fzf colors to match your color scheme
+" let g:fzf_colors =
+" \ { 'fg':      ['fg', 'Normal'],
+"   \ 'bg':      ['bg', 'Normal'],
+"   \ 'hl':      ['fg', 'Comment'],
+"   \ 'fg+':     ['fg', 'CursorLine', 'CursorColumn', 'Normal'],
+"   \ 'bg+':     ['bg', 'CursorLine', 'CursorColumn'],
+"   \ 'hl+':     ['fg', 'Statement'],
+"   \ 'info':    ['fg', 'PreProc'],
+"   \ 'border':  ['fg', 'Ignore'],
+"   \ 'prompt':  ['fg', 'Conditional'],
+"   \ 'pointer': ['fg', 'Exception'],
+"   \ 'marker':  ['fg', 'Keyword'],
+"   \ 'spinner': ['fg', 'Label'],
+"   \ 'header':  ['fg', 'Comment'] }
+
