@@ -105,7 +105,9 @@ export NVM_DIR=~/.nvm
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
-export PATH=/usr/local/bin/go/bin:$PATH
+export PATH=/usr/local/go/bin:$PATH
+export GOPATH=~/go
+export GOBIN=$GOPATH/bin
 
     
 
