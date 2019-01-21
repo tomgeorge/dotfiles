@@ -3,11 +3,15 @@ filetype off
 set rtp+=~/.vim/bundle/Vundle.vim
 
 call vundle#begin()
-" Colorschemes
+
+" =================
+" Colorschemes {{{
+" =================
 Plugin 'flazz/vim-colorschemes'
 Plugin 'gregsexton/Muon'
 Plugin 'jacoborus/tender.vim'
 Plugin 'arcticicestudio/nord-vim'
+" }}}
 
 " Skinning 
 Plugin 'vim-airline/vim-airline'
@@ -180,6 +184,9 @@ let g:syntastic_check_on_wq = 0
 
 let g:syntastic_javascript_checkers = ['eslint']
 let g:syntastic_typescript_checkers = ['eslint']
+
+let $FZF_DEFAULT_COMMAND = 'ag --hidden --ignore .git -l -g ""'
+
 
 
 " Customize fzf colors to match your color scheme
