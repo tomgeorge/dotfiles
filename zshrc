@@ -108,6 +108,7 @@ alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy
 export PATH=/usr/local/go/bin:$PATH
 export GOPATH=~/go
 export GOBIN=$GOPATH/bin
+export PATH=$PATH:$(go env GOPATH)/bin
 
     
 
@@ -127,3 +128,12 @@ export GPG_TTY=$(tty)
 # tabtab source for sls package
 # uninstall by removing these lines or running `tabtab uninstall sls`
 [[ -f /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/sls.zsh ]] && . /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/sls.zsh
+
+# add Pulumi to the PATH
+export PATH=$PATH:$HOME/.pulumi/bin
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
