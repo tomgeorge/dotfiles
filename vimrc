@@ -17,7 +17,7 @@ Plugin 'arcticicestudio/nord-vim'
 Plugin 'vim-airline/vim-airline'
 Plugin 'vim-airline/vim-airline-themes'
 Plugin 'edkolev/tmuxline.vim'
-Plugin 'godlygeek/csapprox'
+" Plugin 'godlygeek/csapprox'
 Plugin 'kien/rainbow_parentheses.vim'
 
 " Git stuff
@@ -41,6 +41,7 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'pangloss/vim-javascript'
 Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'clausreinke/typescript-tools.vim'
+Plugin 'posva/vim-vue'
 
 " JVM-based langs
 Plugin 'tpope/vim-classpath'
@@ -48,9 +49,10 @@ Plugin 'tpope/vim-fireplace'
 Plugin 'guns/vim-sexp'
 Plugin 'tpope/vim-sexp-mappings-for-regular-people'
 
-
 Plugin 'chase/vim-ansible-yaml'
 Plugin 'ekalinin/Dockerfile.vim'
+
+Plugin 'fatih/vim-go'
 call vundle#end()
 
 syntax on
@@ -59,7 +61,7 @@ filetype plugin indent on
 let g:airline#extensions#bufferline#enabled = 1
 let g:airline#extensions#tabline#enabled = 1
 set rtp+=~/.vim/bundle/typescript-tools.vim
-set t_Co=256
+" set t_Co=256
 
 set guifont=Monaco\ 11
 set wildmenu wildmode=full wildchar=<Tab>
@@ -69,14 +71,17 @@ set tabstop=2
 set expandtab
 set guicursor= 
 " colorscheme vividchalk
-" set background=dark
 if has('gui_running')
 	set background=dark
 	colorscheme solarized
 	set guioptions -=m
 	set guioptions -=T
 else
-	colorscheme nord
+  set termguicolors
+"  set background=dark
+"  colorscheme gruvbox
+  colorscheme monochrome
+  "colorscheme nord
 endif
 se nu
 set ruler
