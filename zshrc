@@ -137,3 +137,4 @@ if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+export GO111MODULE=auto

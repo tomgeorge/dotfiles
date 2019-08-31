@@ -17,7 +17,6 @@ Plugin 'arcticicestudio/nord-vim'
 Plugin 'vim-airline/vim-airline'
 Plugin 'vim-airline/vim-airline-themes'
 Plugin 'edkolev/tmuxline.vim'
-" Plugin 'godlygeek/csapprox'
 Plugin 'kien/rainbow_parentheses.vim'
 
 " Git stuff
@@ -43,17 +42,30 @@ Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'posva/vim-vue'
 
-" JVM-based langs
-Plugin 'tpope/vim-classpath'
-Plugin 'tpope/vim-fireplace'
-Plugin 'guns/vim-sexp'
-Plugin 'tpope/vim-sexp-mappings-for-regular-people'
+" Writing
+Plugin 'junegunn/goyo.vim'
+Plugin 'junegunn/limelight.vim'
 
-Plugin 'chase/vim-ansible-yaml'
+" JVM-based langs
+"Plugin 'tpope/vim-classpath'
+"Plugin 'tpope/vim-fireplace'
+"Plugin 'guns/vim-sexp'
+"Plugin 'tpope/vim-sexp-mappings-for-regular-people'
+
+"Plugin 'chase/vim-ansible-yaml'
 Plugin 'ekalinin/Dockerfile.vim'
 
 Plugin 'fatih/vim-go'
+"Plugin 'stamblerre/gocode', {'rtp': 'vim/'}
 call vundle#end()
+call plug#begin('~/.vim/plugged')
+Plug 'autozimu/LanguageClient-neovim', {
+    \ 'branch': 'next',
+    \ 'do': 'bash install.sh',
+    \ }
+call plug#end()
+"let g:go_def_mode='gopls'
+"let g:go_info_mode='gopls'
 
 syntax on
 filetype plugin indent on
@@ -69,6 +81,7 @@ set wildmenu wildmode=full wildchar=<Tab>
 set shiftwidth=2
 set tabstop=2
 set expandtab
+set previewheight=8
 set guicursor= 
 " colorscheme vividchalk
 if has('gui_running')
@@ -80,7 +93,7 @@ else
   set termguicolors
 "  set background=dark
 "  colorscheme gruvbox
-  colorscheme monochrome
+  colorscheme Tomorrow-Night
   "colorscheme nord
 endif
 se nu
@@ -102,14 +115,14 @@ nnoremap <C-tab> 	:tabn<CR>
 " map <Leader>b :MBEFocus<cr>
 " let g:miniBufExplBuffersNeeded = 1
 
-let g:ctrlp_map = '<c-p>'
-let g:ctrlp_command = 'CtrlP'
-let g:ctrlp_switch_buffer='Et'
-let g:ctrlp_use_caching = 1
-let g:ctrlp_show_hidden = 1
-let g:ctrlp_clear_cache_on_exit = 0
+"let g:ctrlp_map = '<c-p>'
+"let g:ctrlp_command = 'CtrlP'
+"let g:ctrlp_switch_buffer='Et'
+"let g:ctrlp_use_caching = 1
+"let g:ctrlp_show_hidden = 1
+"let g:ctrlp_clear_cache_on_exit = 0
 
-nnoremap <Leader>z :Eval<cr>
+"nnoremap <Leader>z :Eval<cr>
 
 let g:rbpt_colorpairs = [
     \ ['brown',       'RoyalBlue3'],
@@ -132,21 +145,24 @@ let g:rbpt_colorpairs = [
 
 let g:rbpt_max = 16
 let g:rbpt_loadcmd_toggle = 0
-au VimEnter *.clj RainbowParenthesesToggle
-au BufEnter *.pcc set syntax=c
-au BufEnter *.yml set filetype=ansible
-au BufEnter *.pc set syntax=c
-au Bufenter *vagrant* set syntax=ruby
-au Bufenter *Vagrant* set syntax=ruby
-au Syntax * RainbowParenthesesLoadRound
-au Syntax * RainbowParenthesesLoadSquare
-au Syntax * RainbowParenthesesLoadBraces
-au Syntax * RainbowParenthesesToggle
+"au VimEnter *.clj RainbowParenthesesToggle
+"au BufEnter *.pcc set syntax=c
+"au BufEnter *.yml set filetype=ansible
+"au BufEnter *.pc set syntax=c
+"au Bufenter *vagrant* set syntax=ruby
+"au Bufenter *Vagrant* set syntax=ruby
+"au Syntax * RainbowParenthesesLoadRound
+"au Syntax * RainbowParenthesesLoadSquare
+"au Syntax * RainbowParenthesesLoadBraces
+"au Syntax * RainbowParenthesesToggle
 
 nnoremap <silent><F8> :NERDTreeToggle<CR>
 nnoremap <silent><Leader>nt :NERDTreeToggle<CR>
 nnoremap <silent><Leader>tb :TagbarToggle<CR>
 nnoremap <silent><F9> :TagbarToggle<CR>
+
+nnoremap <silent><C-Space> :call LanguageClient#textDocument_hover()<CR>
+nnoremap <silent><leader>t :call LanguageClient_contextMenu()<CR>
 
 
 let g:ackprg = 'ag --nogroup --nocolor --column'
@@ -175,7 +191,7 @@ set ttyfast
 
 
 " javascript
-let g:used_javascript_libs = 'underscore,backbone,angularjs,angularuirouter,react,flux'
+"let g:used_javascript_libs = 'underscore,backbone,angularjs,angularuirouter,react,flux'
 
 " syntastic
 set statusline+=%#warningmsg#
@@ -190,7 +206,16 @@ let g:syntastic_check_on_wq = 0
 let g:syntastic_javascript_checkers = ['eslint']
 let g:syntastic_typescript_checkers = ['eslint']
 
-let $FZF_DEFAULT_COMMAND = 'ag --hidden --ignore .git -l -g ""'
+let g:languageClient_hoverPreview = 'Auto'
+let g:go_highlight_functions = 1
+let g:go_highlight_function_calls = 1
+let g:go_highlight_fields = 1
+let g:go_highlight_extra_types = 1
+let g:go_highlight_types = 1
+
+let g:airline#extensions#tabline#enabled = 0
+
+let $FZF_DEFAULT_COMMAND = 'ag --hidden --ignore .git --ignore vendor -l -g ""'
 
 
 
