@@ -55,7 +55,8 @@ set termguicolors
  let g:LanguageClient_serverCommands = {
        \ 'go': ['gopls'],
        \ 'yaml': ['yaml-language-server', '--stdio'],
-       \ 'python': ['~/.local/bin/pyls']
+       \ 'python': ['~/.local/bin/pyls'],
+       \ 'javascript': ['/home/tgeorge/.nvm/versions/node/v10.16.3/bin/javascript-typescript-langserver']
        \ }
 if &ft ==# 'yaml' || &ft ==# 'json'
   let settings = json_decode('
