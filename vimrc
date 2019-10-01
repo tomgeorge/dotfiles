@@ -47,8 +47,8 @@ Plugin 'junegunn/goyo.vim'
 Plugin 'junegunn/limelight.vim'
 
 " JVM-based langs
-"Plugin 'tpope/vim-classpath'
-"Plugin 'tpope/vim-fireplace'
+Plugin 'tpope/vim-classpath'
+Plugin 'tpope/vim-fireplace'
 "Plugin 'guns/vim-sexp'
 "Plugin 'tpope/vim-sexp-mappings-for-regular-people'
 
@@ -56,16 +56,12 @@ Plugin 'junegunn/limelight.vim'
 Plugin 'ekalinin/Dockerfile.vim'
 
 Plugin 'fatih/vim-go'
-"Plugin 'stamblerre/gocode', {'rtp': 'vim/'}
 call vundle#end()
 call plug#begin('~/.vim/plugged')
-Plug 'autozimu/LanguageClient-neovim', {
-    \ 'branch': 'next',
-    \ 'do': 'bash install.sh',
-    \ }
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
 call plug#end()
-"let g:go_def_mode='gopls'
-"let g:go_info_mode='gopls'
+let g:go_def_mode='gopls'
+let g:go_info_mode='gopls'
 
 syntax on
 filetype plugin indent on
@@ -111,18 +107,8 @@ nnoremap <Tab> <C-w>w
 nnoremap H  ^
 nnoremap L $
 nnoremap <C-tab> 	:tabn<CR>
-" let g:miniBufExplorerAutoStart = 1
-" map <Leader>b :MBEFocus<cr>
-" let g:miniBufExplBuffersNeeded = 1
 
-"let g:ctrlp_map = '<c-p>'
-"let g:ctrlp_command = 'CtrlP'
-"let g:ctrlp_switch_buffer='Et'
-"let g:ctrlp_use_caching = 1
-"let g:ctrlp_show_hidden = 1
-"let g:ctrlp_clear_cache_on_exit = 0
-
-"nnoremap <Leader>z :Eval<cr>
+nnoremap <Leader>z :Eval<cr>
 
 let g:rbpt_colorpairs = [
     \ ['brown',       'RoyalBlue3'],
@@ -161,10 +147,6 @@ nnoremap <silent><Leader>nt :NERDTreeToggle<CR>
 nnoremap <silent><Leader>tb :TagbarToggle<CR>
 nnoremap <silent><F9> :TagbarToggle<CR>
 
-nnoremap <silent><C-Space> :call LanguageClient#textDocument_hover()<CR>
-nnoremap <silent><leader>t :call LanguageClient_contextMenu()<CR>
-
-
 let g:ackprg = 'ag --nogroup --nocolor --column'
 let g:paredit_electric_return=0
 
@@ -174,8 +156,6 @@ autocmd BufRead, BufNewFile *.cljs setlocal filetype=clojure
 autocmd BufRead, BufNewFile Jenkinsfile set syntax=groovy
 autocmd BufEnter, BufNewFile Jenkinsfile set syntax=groovy
 
-
-let g:slime_target="tmux"
 set noswapfile
 set noerrorbells visualbell t_vb=
 autocmd GUIEnter * set visualbell t_vb=
@@ -206,7 +186,6 @@ let g:syntastic_check_on_wq = 0
 let g:syntastic_javascript_checkers = ['eslint']
 let g:syntastic_typescript_checkers = ['eslint']
 
-let g:languageClient_hoverPreview = 'Auto'
 let g:go_highlight_functions = 1
 let g:go_highlight_function_calls = 1
 let g:go_highlight_fields = 1
@@ -216,6 +195,66 @@ let g:go_highlight_types = 1
 let g:airline#extensions#tabline#enabled = 0
 
 let $FZF_DEFAULT_COMMAND = 'ag --hidden --ignore .git --ignore vendor -l -g ""'
+
+" coc go configs
+" if hidden is not set, TextEdit might fail.
+set hidden
+" Some servers have issues with backup files, see #649
+set nobackup
+set nowritebackup
+" Better display for messages
+set cmdheight=2
+" You will have bad experience for diagnostic messages when it's default 4000.
+set updatetime=300
+" don't give |ins-completion-menu| messages.
+set shortmess+=c
+" always show signcolumns
+set signcolumn=yes
+" Use tab for trigger completion with characters ahead and navigate.
+" Use command ':verbose imap <tab>' to make sure tab is not mapped by other plugin.
+inoremap <silent><expr> <TAB>
+      \ pumvisible() ? "\<C-n>" :
+      \ <SID>check_back_space() ? "\<TAB>" :
+      \ coc#refresh()
+inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+
+function! s:check_back_space() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
+endfunction
+
+" Use <c-space> to trigger completion.
+inoremap <silent><expr> <c-space> coc#refresh()
+
+" disable vim-go :GoDef short cut (gd)
+" this is handled by LanguageClient [LC]
+let g:go_def_mapping_enabled = 0
+let g:go_doc_keywordprg_enabled = 0
+" Use <cr> to confirm completion, `<C-g>u` means break undo chain at current position.
+" Coc only does snippet and additional edit on confirm.
+inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+" Or use `complete_info` if your vim support it, like:
+" inoremap <expr> <cr> complete_info()["selected"] != "-1" ? "\<C-y>" : "\<C-g>u\<CR>"
+
+" Remap keys for gotos
+nmap <silent> gd <Plug>(coc-definition)
+nmap <silent> gy <Plug>(coc-type-definition)
+nmap <silent> gi <Plug>(coc-implementation)
+nmap <silent> gr <Plug>(coc-references)
+
+" Use K to show documentation in preview window
+nnoremap <silent> K :call <SID>show_documentation()<CR>
+
+function! s:show_documentation()
+  if (index(['vim','help'], &filetype) >= 0)
+    execute 'h '.expand('<cword>')
+  else
+    call CocAction('doHover')
+  endif
+endfunction
+
+" Highlight symbol under cursor on CursorHold
+autocmd CursorHold * silent call CocActionAsync('highlight')
 
 
 
