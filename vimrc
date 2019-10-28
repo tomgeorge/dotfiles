@@ -11,6 +11,7 @@ Plugin 'flazz/vim-colorschemes'
 Plugin 'gregsexton/Muon'
 Plugin 'jacoborus/tender.vim'
 Plugin 'arcticicestudio/nord-vim'
+Plugin 'sainnhe/edge'
 " }}}
 
 " Skinning 
@@ -87,9 +88,10 @@ if has('gui_running')
 	set guioptions -=T
 else
   set termguicolors
-"  set background=dark
+  set background=dark
+  colorscheme edge
 "  colorscheme gruvbox
-  colorscheme Tomorrow-Night
+"  colorscheme muon
   "colorscheme nord
 endif
 se nu
@@ -245,6 +247,8 @@ nmap <silent> gr <Plug>(coc-references)
 " Use K to show documentation in preview window
 nnoremap <silent> K :call <SID>show_documentation()<CR>
 
+nnoremap <silent> <leader>re <Plug>(coc-refactor)<CR>
+
 function! s:show_documentation()
   if (index(['vim','help'], &filetype) >= 0)
     execute 'h '.expand('<cword>')
@@ -255,6 +259,9 @@ endfunction
 
 " Highlight symbol under cursor on CursorHold
 autocmd CursorHold * silent call CocActionAsync('highlight')
+
+" Remap for rename current word
+nmap <Leader>rn <Plug>(coc-rename)
 
 
 

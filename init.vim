@@ -87,7 +87,7 @@ set termguicolors
 " For echodoc
 set cmdheight=2
 "call deoplete#custom#source('_', 'max_abbr_width', 160)
-let g:echodoc#enable_at_startup = 1
+"let g:echodoc#enable_at_startup = 1
 " let g:LanguageClient_loggingFile = expand('~/.vim/LanguageClient.log')
 " let g:LanguageClient_serverStderr = expand('~/.vim/LanguageServer.log')
 "
