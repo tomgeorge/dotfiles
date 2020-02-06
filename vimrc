@@ -26,7 +26,6 @@ Plugin 'airblade/vim-gitgutter'
 Plugin 'gregsexton/gitv'
 
 " Utilities
-Plugin 'mileszs/ack.vim'
 Plugin 'tpope/vim-repeat'
 Plugin 'tpope/vim-surround'
 Plugin 'majutsushi/tagbar'
@@ -43,15 +42,11 @@ Plugin 'othree/javascript-libraries-syntax.vim'
 Plugin 'clausreinke/typescript-tools.vim'
 Plugin 'posva/vim-vue'
 
-" Writing
-Plugin 'junegunn/goyo.vim'
-Plugin 'junegunn/limelight.vim'
-
 " JVM-based langs
-Plugin 'tpope/vim-classpath'
+" Plugin 'tpope/vim-classpath'
 Plugin 'tpope/vim-fireplace'
-"Plugin 'guns/vim-sexp'
-"Plugin 'tpope/vim-sexp-mappings-for-regular-people'
+Plugin 'guns/vim-sexp'
+" Plugin 'tpope/vim-sexp-mappings-for-regular-people'
 
 "Plugin 'chase/vim-ansible-yaml'
 Plugin 'ekalinin/Dockerfile.vim'
@@ -60,6 +55,11 @@ Plugin 'fatih/vim-go'
 call vundle#end()
 call plug#begin('~/.vim/plugged')
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'liuchengxu/vista.vim'
+Plug 'liuchengxu/vim-clap', { 'do': ':Clap install-binary' }
+Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app & yarn install'  }
+" Plug 'liquidz/vim-iced-coc-source', {'for': 'clojure'}
+" Plug 'liquidz/vim-iced', {'for': 'clojure'}
 call plug#end()
 let g:go_def_mode='gopls'
 let g:go_info_mode='gopls'
@@ -143,6 +143,7 @@ let g:rbpt_loadcmd_toggle = 0
 "au Syntax * RainbowParenthesesLoadSquare
 "au Syntax * RainbowParenthesesLoadBraces
 "au Syntax * RainbowParenthesesToggle
+"
 
 nnoremap <silent><F8> :NERDTreeToggle<CR>
 nnoremap <silent><Leader>nt :NERDTreeToggle<CR>
@@ -197,6 +198,10 @@ let g:go_highlight_types = 1
 let g:airline#extensions#tabline#enabled = 0
 
 let $FZF_DEFAULT_COMMAND = 'ag --hidden --ignore .git --ignore vendor -l -g ""'
+
+nnoremap <C-p> :Files<CR>
+nnoremap <Leader>f :Rg<CR>
+nnoremap <Leader>b :Buffers<CR>
 
 " coc go configs
 " if hidden is not set, TextEdit might fail.
@@ -281,3 +286,5 @@ nmap <Leader>rn <Plug>(coc-rename)
 "   \ 'spinner': ['fg', 'Label'],
 "   \ 'header':  ['fg', 'Comment'] }
 
+
+let g:iced_enable_default_key_mappings = v:true

@@ -110,6 +110,12 @@ export GOPATH=~/go
 export GOBIN=$GOPATH/bin
 export PATH=$PATH:$(go env GOPATH)/bin
 
+# export JAVA_HOME=$HOME/bin/openjdk-11.0.5+10
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.232.b09-0.fc31.x86_64/
+export GRAALVM_HOME=$HOME/bin/graalvm-ce-19.2.1
+export MAVEN_HOME=$HOME/bin/apache-maven-3.6.3
+export PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRAALVM_HOME/bin:$PATH
+
     
 
 # added by travis gem
@@ -139,3 +145,7 @@ if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home
 if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 export GO111MODULE=auto    
 alias kc='kubectl'
+export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+alias xclip='xclip -selection clipboard'
+alias oc_comp='source <(oc completion zsh)'
+alias kc_comp='source <(kc completion zsh)'
