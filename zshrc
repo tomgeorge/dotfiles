@@ -64,6 +64,10 @@ plugins=(git tmux docker)
   export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.rvm/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:$PATH"
 # export MANPATH="/usr/local/man:$MANPATH"
 
+if [[ -n $HOME/.vim/plugged/vim-iced ]]; then
+  export PATH="${HOME}/.vim/plugged/vim-iced/bin:$PATH"
+fi
+
 source $ZSH/oh-my-zsh.sh
 
 # You may need to manually set your language environment
@@ -100,8 +104,7 @@ autoload -Uz compinit && compinit -i
 set -o vi
 alias dl='docker ps -l -q'
 
-export NVM_DIR=~/.nvm
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+
 bindkey -v
 bindkey '^R' history-incremental-search-backward
 alias unset_proxy='unset {HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,no_proxy,NO_PROXY}'
@@ -110,9 +113,11 @@ export GOPATH=~/go
 export GOBIN=$GOPATH/bin
 export PATH=$PATH:$(go env GOPATH)/bin
 
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk/
 # export JAVA_HOME=$HOME/bin/openjdk-11.0.5+10
-export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.232.b09-0.fc31.x86_64/
+# export GRAALVM_HOME=$HOME/bin/graalvm-ce-java11-19.3.1
 export GRAALVM_HOME=$HOME/bin/graalvm-ce-19.2.1
+# export GRAALVM_HOME=$HOME/bin/graalvm-ce-java11-20.2.0
 export MAVEN_HOME=$HOME/bin/apache-maven-3.6.3
 export PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRAALVM_HOME/bin:$PATH
 
@@ -128,24 +133,21 @@ alias dev=run_dev_container
 export GPG_TTY=$(tty)
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-# tabtab source for serverless package
-# uninstall by removing these lines or running `tabtab uninstall serverless`
-[[ -f /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/serverless.zsh ]] && . /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/serverless.zsh
-# tabtab source for sls package
-# uninstall by removing these lines or running `tabtab uninstall sls`
-[[ -f /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/sls.zsh ]] && . /Users/tgeorge/.nvm/versions/node/v8.11.2/lib/node_modules/serverless/node_modules/tabtab/.completions/sls.zsh
 
 # add Pulumi to the PATH
 export PATH=$PATH:$HOME/.pulumi/bin
-
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 export GO111MODULE=auto    
 alias kc='kubectl'
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 alias xclip='xclip -selection clipboard'
 alias oc_comp='source <(oc completion zsh)'
 alias kc_comp='source <(kc completion zsh)'
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
