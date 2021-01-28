@@ -1,0 +1,47 @@
+;; The deps.edn file describes the information needed to build a classpath.
+;;
+;; When using the `clojure` or `clj` script, there are several deps.edn files
+;; that are combined:
+;; - install-level
+;; - user level (this file)
+;; - project level (current directory when invoked)
+;;
+;; For all attributes other than :paths, these config files are merged left to right.
+;; Only the last :paths is kept and others are dropped.
+
+{
+ :aliases
+ {;; project creation from templates:
+  ;; - see https://github.com/seancorfield/clj-new
+  ;; - create an application project:
+  ;;   - clj -X:new :template app :name myname/myapp
+  ;;   - cd myapp
+  ;;   - clj -M -m myname.myapp # run it!
+  ;;   - clj -M:test:runner # run the tests!
+  ;; - create a library project:
+  ;;   - clj -X:new :name myname/my-cool-lib
+  ;;   - cd my-cool-lib
+  ;;   - clj -M:test:runner # run the tests!
+  :new {:extra-deps {seancorfield/clj-new {:mvn/version "1.1.228"}}
+        :exec-fn clj-new/create
+        :exec-args {:template lib}}
+  ;; uberjar building:
+  ;; - see https://github.com/seancorfield/depstar for a minimalist approach:
+  ;;   - clj -X:uberjar :jar result.jar :main-class mymain.namespace
+  ;; - to run it:
+  ;;   - java -jar result.jar
+  ;; - build a library JAR:
+  ;;   - clj -X:jar :jar result-lib.jar
+  :uberjar {:extra-deps {seancorfield/depstar {:mvn/version "1.1.136"}}
+            :exec-fn hf.depstar/uberjar
+            :exec-args {:aot true}}
+  :jar {:extra-deps {seancorfield/depstar {:mvn/version "1.1.136"}}
+        :exec-fn hf.depstar/jar
+        :exec-args {}}
+
+  :repl/nrepl {:extra-deps {nrepl/nrepl {:mvn/version "0.8.3"}}
+               :main-opts ["-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"]}
+  :repl/connect {:extra-deps {nrepl/nrepl {:mvn/version "0.8.3"}
+                              cider/cider-nrepl {:mvn/version "0.25.2"}}
+
+                 :main-opts ["-m" "nrepl.cmdline" "--middleware" "'[cider.nrepl/cider-middleware]'" "--connect"]}}}
