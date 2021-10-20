@@ -1,5 +1,5 @@
 # Path to your oh-my-zsh installation.
-export ZSH=$HOME/.oh-my-zsh
+# export ZSH=$HOME/.oh-my-zsh
 if type "nvim" > /dev/null; then
     alias vi='nvim'
 fi
@@ -13,7 +13,7 @@ fi
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 #ZSH_THEME="af-magic"
-ZSH_THEME="lambda"
+# ZSH_THEME="lambda"
 
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
@@ -57,18 +57,18 @@ ZSH_THEME="lambda"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git tmux docker)
+# plugins=(git tmux docker asdf)
 
 # User configuration
 
-  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.rvm/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:$PATH"
+  export PATH="/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:$PATH"
 # export MANPATH="/usr/local/man:$MANPATH"
 
 if [[ -n $HOME/.vim/plugged/vim-iced ]]; then
   export PATH="${HOME}/.vim/plugged/vim-iced/bin:$PATH"
 fi
 
-source $ZSH/oh-my-zsh.sh
+# source $ZSH/oh-my-zsh.sh
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
@@ -131,7 +131,6 @@ function run_dev_container() {
 
 alias dev=run_dev_container
 export GPG_TTY=$(tty)
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 
 # add Pulumi to the PATH
@@ -149,5 +148,10 @@ if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/home
 # The next line enables shell command completion for gcloud.
 if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 
-export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+export PATH="$HOME/.rbenv/bin:$PATH"
+
+. $HOME/.asdf/asdf.sh
+source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
+
+  export PKG_CONFIG_PATH="/usr/local/opt/libpq/lib/pkgconfig"
+  export PATH="/usr/local/opt/libpq/bin:/home/tgeorge/.asdf/shims:/home/tgeorge/.asdf/bin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/usr/local/bin:/usr/local/sbin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin/gradle:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/home/tgeorge/.local/bin:/home/tgeorge/bin:/home/tgeorge/.cargo/bin:/home/tgeorge/.rvm/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin"

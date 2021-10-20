@@ -24,6 +24,7 @@ Plug 'kien/rainbow_parentheses.vim'
 
 " Git stuff
 Plug 'tpope/vim-fugitive'
+Plug 'tpope/vim-rhubarb'
 Plug 'airblade/vim-gitgutter'
 Plug 'gregsexton/gitv'
 
@@ -71,6 +72,9 @@ Plug 'norcalli/snippets.nvim'
 Plug 'eraserhd/parinfer-rust', {'do':
         \  'cargo build --release'}
 Plug 'kassio/neoterm'
+Plug 'akinsho/nvim-bufferline.lua'
+
+Plug 'vhyrro/neorg'
 call plug#end()
 
 set nocompatible
@@ -152,15 +156,17 @@ let g:airline#extensions#tabline#enabled = 0
 let g:go_def_mapping_enabled = 0
 let g:go_doc_keywordprg_enabled = 0
 
-au VimEnter *.clj RainbowParenthesesToggle
-au Syntax * RainbowParenthesesLoadRound
-au Syntax * RainbowParenthesesLoadSquare
-au Syntax * RainbowParenthesesLoadBraces
+" au VimEnter *.clj RainbowParenthesesToggle
+" au Syntax * RainbowParenthesesLoadRound
+" au Syntax * RainbowParenthesesLoadSquare
+" au Syntax * RainbowParenthesesLoadBraces
 autocmd BufRead, BufNewFile Jenkinsfile set syntax=groovy
 autocmd BufEnter, BufNewFile Jenkinsfile set syntax=groovy
 autocmd GUIEnter * set visualbell t_vb=
 
-colorscheme one
+" colorscheme one
+" colorscheme github
+colorscheme gruvbox
 
 tnoremap <Esc> <C-\><C-n>
 nnoremap ss <C-w>s
@@ -197,4 +203,22 @@ lua require('my_lspconfig')
 lua require('lsp_statusline')
 lua require('treesitter_config')
 lua require('conjure_completion')
+lua require('my_bufferline')
+lua << EOF
+    require('neorg').setup {
+        -- Tell Neorg what modules to load
+        load = {
+            ["core.defaults"] = {}, -- Load all the default modules
+            ["core.norg.concealer"] = {}, -- Allows for use of icons
+            ["core.norg.dirman"] = { -- Manage your directories with Neorg
+                config = {
+                    workspaces = {
+                        my_workspace = "~/neorg"
+                    }
+                }
+            }
+        },
+    }
+EOF
+" lua require('my_neorg')
 
