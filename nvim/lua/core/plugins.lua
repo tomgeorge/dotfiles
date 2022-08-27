@@ -217,7 +217,7 @@ return require('packer').startup({
         { 'nvim-lua/popup.nvim' },
         { 'nvim-lua/plenary.nvim' },
         { 'nvim-telescope/telescope-fzy-native.nvim' },
-        {'nvim-telescope/telescope-ui-select.nvim' },
+        { 'nvim-telescope/telescope-ui-select.nvim' },
       },
     })
 
