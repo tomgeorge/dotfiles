@@ -43,6 +43,10 @@ nmap({
   { '<Leader>en', cmd("lua require('modules.tools.config').search_neovim_configuration()"), default_opts },
   -- Custom commands
   { '<Leader>h', cmd('CurrentBufGitHistory'), default_opts },
+  -- Neogit
+  { '<Leader>g', cmd('Neogit'), default_opts },
+  -- Trouble
+  { '<Leader>t', cmd('TroubleToggle'), default_opts },
 })
 
 imap({
