@@ -23,10 +23,15 @@ function config.telescope()
         override_generic_sorter = false,
         override_file_sorter = true,
       },
+      ui_select = {
+        require('telescope.themes').get_dropdown{}
+      },
     },
   })
   require('telescope').load_extension('fzy_native')
-  require('telescope').load_exntension('luasnip')
+  require('telescope').load_extension('luasnip')
+  require('telescope').load_extension('ui-select')
+  require('telescope').load_extension('notify')
 end
 
 function config.search_neovim_configuration()

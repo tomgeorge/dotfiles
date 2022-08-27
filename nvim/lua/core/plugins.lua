@@ -203,12 +203,14 @@ return require('packer').startup({
 
     use({
       'nvim-telescope/telescope.nvim',
-      -- cmd = 'Telescope',
-      conf = require('modules.tools.config'),
+      config = function()
+        require('modules.tools.config').telescope()
+      end,
       requires = {
         { 'nvim-lua/popup.nvim' },
         { 'nvim-lua/plenary.nvim' },
         { 'nvim-telescope/telescope-fzy-native.nvim' },
+        {'nvim-telescope/telescope-ui-select.nvim' },
       },
     })
 
