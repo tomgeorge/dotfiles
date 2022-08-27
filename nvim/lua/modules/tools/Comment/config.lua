@@ -1,6 +1,6 @@
 M = {}
 
-local comment = require('comment')
+local comment = require('Comment')
 
 M.setup = function()
   comment.setup({
