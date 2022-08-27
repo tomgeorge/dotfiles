@@ -1,3 +1,0 @@
--- local conjureCompletionsPromise = require('conjure.eval')
--- conjureCompletionsPromise.'completions-promise'
--- print('got here')

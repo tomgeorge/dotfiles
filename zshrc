@@ -150,8 +150,9 @@ if [ -f '/home/tgeorge/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . 
 
 export PATH="$HOME/.rbenv/bin:$PATH"
 
-. $HOME/.asdf/asdf.sh
+echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ${ZDOTDIR:-~}/.zshrc
 source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 
-  export PKG_CONFIG_PATH="/usr/local/opt/libpq/lib/pkgconfig"
-  export PATH="/usr/local/opt/libpq/bin:/home/tgeorge/.asdf/shims:/home/tgeorge/.asdf/bin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/usr/local/bin:/usr/local/sbin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin/gradle:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/home/tgeorge/.local/bin:/home/tgeorge/bin:/home/tgeorge/.cargo/bin:/home/tgeorge/.rvm/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin"
+export PKG_CONFIG_PATH="/usr/local/opt/libpq/lib/pkgconfig"
+export PATH="/usr/local/opt/libpq/bin:/home/tgeorge/.asdf/shims:/home/tgeorge/.asdf/bin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin:/usr/local/bin/gradle:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/usr/local/bin:/usr/local/sbin:/home/tgeorge/.rbenv/bin:/home/tgeorge/.krew/bin:/usr/lib/jvm/java-1.8.0-openjdk//bin:/home/tgeorge/bin/apache-maven-3.6.3/bin:/home/tgeorge/bin/graalvm-ce-19.2.1/bin:/usr/local/go/bin:/home/tgeorge/.vim/plugged/vim-iced/bin:/usr/local/bin/gradle:/usr/bin:/usr/sbin:/bin:/sbin:~/.local/bin:~/bin:~/.linuxbrew/bin:/usr/local/share/python:/usr/local/kubebuilder/bin:/home/tgeorge/.local/bin:/home/tgeorge/bin:/home/tgeorge/.cargo/bin:/home/tgeorge/.rvm/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin:/home/tgeorge/go/bin:/home/tgeorge/.pulumi/bin"
+export PATH="$PATH:$(yarn global bin)"

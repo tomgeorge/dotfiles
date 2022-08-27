@@ -6,8 +6,14 @@
 [alias]
 	lg = "log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative --all --decorate"
 
+[log]
+  decorate = true
+
 [commit]
   gpgsign = true
+
+[help]
+  autoCorrect = 1
 
 [color]
   ui = auto
