@@ -28,6 +28,11 @@ return require('packer').startup({
 
     use({ 'lewis6991/impatient.nvim' })
 
+
+    -- [[
+    -- Tools
+    -- Completion, editing, etc
+    -- ]]
     use({ 'tpope/vim-fugitive' })
     use({ 'tpope/vim-unimpaired' })
 
@@ -36,37 +41,6 @@ return require('packer').startup({
       config = function()
         require('modules.completion.config').lspconfig()
       end,
-    })
-
-    use({
-      'j-hui/fidget.nvim',
-      config = function()
-        require('fidget').setup({})
-      end
-    })
-
-    use({
-      'hrsh7th/cmp-nvim-lsp',
-      after = 'nvim-cmp',
-      module = 'cmp_nvim_lsp',
-    })
-
-    use({
-      'onsails/lspkind.nvim',
-      requires = 'hrsh7th/nvim-cmp',
-    })
-
-    use({
-      'rcarriga/nvim-notify',
-      event = 'VimEnter',
-      config = function()
-        vim.notify = require('notify')
-      end,
-    })
-
-    use({
-      'benfowler/telescope-luasnip.nvim',
-      module = 'telescope._extensions.luasnip', -- if you wish to lazy-load
     })
 
     use({
@@ -82,6 +56,20 @@ return require('packer').startup({
         { 'hrsh7th/cmp-nvim-lsp-signature-help' },
         { 'saadparwaiz1/cmp_luasnip', after = 'LuaSnip' },
       },
+    })
+
+    use({
+      'hrsh7th/cmp-nvim-lsp',
+      after = 'nvim-cmp',
+      module = 'cmp_nvim_lsp',
+    })
+
+    use({
+      'jose-elias-alvarez/null-ls.nvim',
+      requires = 'nvim-lua/plenary.nvim',
+      config = function()
+        require('modules.tools.null-ls-nvim')
+      end,
     })
 
     use({ 'rafamadriz/friendly-snippets', event = 'BufEnter' })
@@ -120,15 +108,41 @@ return require('packer').startup({
     })
 
     use({
-      'nvim-telescope/telescope.nvim',
-      -- cmd = 'Telescope',
-      conf = require('modules.tools.config'),
-      requires = {
-        { 'nvim-lua/popup.nvim' },
-        { 'nvim-lua/plenary.nvim' },
-        { 'nvim-telescope/telescope-fzy-native.nvim' },
-      },
+      'TimUntersberger/neogit',
+      config = function()
+        require('modules.tools.neogit.config').setup()
+      end,
+      requires = { { 'nvim-lua/plenary.nvim' }, { 'sindrets/diffview.nvim' } },
     })
+
+    use({
+      'folke/trouble.nvim',
+      required = 'kyazdani42/nvim-web-devicons',
+      config = function()
+        require('modules.ui.trouble')
+      end,
+    })
+
+    use({
+      'gpanders/editorconfig.nvim',
+      event = 'BufEnter',
+    })
+
+    use({
+      'numToStr/Comment.nvim',
+      requres = 'JoosepAlviste/nvim-ts-context-commentstring',
+      config = function()
+        require('modules.tools.Comment.config').setup()
+      end,
+    })
+
+    use({ 'JoosepAlviste/nvim-ts-context-commentstring' })
+
+    use({ 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' })
+
+    -- [[
+    -- UI Customization
+    -- ]]
 
     use({
       'EdenEast/nightfox.nvim',
@@ -147,13 +161,6 @@ return require('packer').startup({
       end,
     })
 
-    --    use({
-    --      'mcchrish/zenbones.nvim',
-    --      requires = {
-    --        'rktjmp/lush.nvim'
-    --      }
-    --    })
-
     use({
       'glepnir/galaxyline.nvim',
       branch = 'main',
@@ -168,48 +175,47 @@ return require('packer').startup({
     })
 
     use({
-      'TimUntersberger/neogit',
+      'j-hui/fidget.nvim',
       config = function()
-        require('modules.tools.neogit.config').setup()
-      end,
-      requires = { { 'nvim-lua/plenary.nvim' }, { 'sindrets/diffview.nvim' } },
+        require('fidget').setup({})
+      end
     })
 
-    -- use({
-    --  'mhartington/formatter.nvim',
-    --  event = 'BufRead',
-    --  config = function()
-    --    require('modules.tools.formatter-nvim')
-    --   end,
-    -- })
+    use({
+      'onsails/lspkind.nvim',
+      requires = 'hrsh7th/nvim-cmp',
+    })
 
     use({
-      'jose-elias-alvarez/null-ls.nvim',
-      requires = 'nvim-lua/plenary.nvim',
+      'rcarriga/nvim-notify',
+      event = 'VimEnter',
       config = function()
-        require('modules.tools.null-ls-nvim')
+        vim.notify = require('notify')
       end,
+    })
+
+    use({
+      'benfowler/telescope-luasnip.nvim',
+      module = 'telescope._extensions.luasnip', -- if you wish to lazy-load
+    })
+
+
+
+    use({
+      'nvim-telescope/telescope.nvim',
+      -- cmd = 'Telescope',
+      conf = require('modules.tools.config'),
+      requires = {
+        { 'nvim-lua/popup.nvim' },
+        { 'nvim-lua/plenary.nvim' },
+        { 'nvim-telescope/telescope-fzy-native.nvim' },
+      },
     })
 
     use({
       'lewis6991/gitsigns.nvim',
       config = function()
         require('gitsigns').setup()
-      end,
-    })
-
-    use({
-      'hashivim/vim-terraform',
-      event = 'BufEnter',
-    })
-
-    -- use({ 'folke/lsp-colors.nvim' })
-
-    use({
-      'folke/trouble.nvim',
-      required = 'kyazdani42/nvim-web-devicons',
-      config = function()
-        require('modules.ui.trouble')
       end,
     })
 
@@ -234,26 +240,14 @@ return require('packer').startup({
       requires = 'antoinemadec/FixCursorHold.nvim',
     })
 
+    -- [[
+    -- Language-Specific
+    -- ]]
     use({
-      'gpanders/editorconfig.nvim',
+      'hashivim/vim-terraform',
       event = 'BufEnter',
     })
 
-    use({
-      'numToStr/Comment.nvim',
-      requres = 'JoosepAlviste/nvim-ts-context-commentstring',
-      config = function()
-        require('modules.tools.Comment.config').setup()
-      end,
-    })
-
-    use({ 'JoosepAlviste/nvim-ts-context-commentstring' })
-
-    use({ 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' })
-
-    -- use({ 'pangloss/vim-javascript' })
-    -- use({ 'MaxMEllon/vim-jsx-pretty' })
-    -- use({ 'leafgarland/typescript-vim' })
   end,
   config = {
     display = {
