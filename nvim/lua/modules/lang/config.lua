@@ -27,6 +27,13 @@ function config.nvim_treesitter()
     context_commentstring = {
       enable = true,
     },
+    rainbow = {
+      enabled = true,
+    },
+    matchup = {
+      enable = true,
+      disable_virtual_text = false,
+    }
   })
 end
 

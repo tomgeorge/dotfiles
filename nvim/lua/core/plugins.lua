@@ -86,10 +86,17 @@ return require('packer').startup({
       'nvim-treesitter/nvim-treesitter',
       run = ':TSUpdate',
       after = 'telescope.nvim',
-      conf = function()
+      config = function()
         require('modules.lang.config').nvim_treesitter()
       end,
+      requires = {
+        { 'andymass/matchup.vim' },
+        { 'JoosepAlviste/nvim-ts-context-commentstring' },
+        { 'p00f/nvim-ts-rainbow' },
+      }
     })
+
+    -- use({ 'andymaas/matchup/vim' })
 
     use({
       'nvim-treesitter/nvim-treesitter-textobjects',
