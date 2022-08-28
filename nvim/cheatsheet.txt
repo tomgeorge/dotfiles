@@ -1,0 +1,31 @@
+## LSP @LSP_Mappings
+Go to definition | C-]
+Hover | K
+List references in the quickfix window | gr
+Open diagnostic messages in a float | <Space>e
+Signature help | C-K
+Rename symbol under cursor | <Space>rn
+Add workspace folder | <Space>wa
+Remove workspace folder | <Space>wr
+List workspace folders and display in vim.notify | <Space>wl
+Go to type definition | <Space>D
+Code action | <Space>ca 
+Show references in quickfix | <Space>gr
+
+## NvimTree @NVIM_Tree
+NvimTreeToggle | <F8>
+
+## Telescope @Telescope
+Telescope buffer search | <Leader>b
+Telescope find_files | <Leader>ff
+Telescope live_grep | <Leader>fa
+Telescope help_tags | <Leader>fh 
+
+## EditNeovim @EditNeovim
+Grep through ~/.config/nvim | <Leader>en
+
+## Neogit @Neogit
+Open Neogit | <Leader>g 
+
+## Trouble @Trouble
+TroubleToggle | <Leader>t

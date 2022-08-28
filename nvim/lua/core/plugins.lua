@@ -112,6 +112,8 @@ return require('packer').startup({
       tag = 'nightly', -- optional, updated every week. (see issue #1193)
     })
 
+    use({ 'sudormrfbin/cheatsheet.nvim' })
+
     use({
       'TimUntersberger/neogit',
       config = function()
