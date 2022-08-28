@@ -19,6 +19,13 @@ function config.onedark()
   }
 end
 
+function config.catppuccin()
+  local catppuccin = require('catppuccin')
+  vim.g.catpuccin_flavour = 'frappe'
+  catppuccin.setup()
+  vim.cmd('colorscheme catppuccin')
+end
+
 function config.galaxyline()
   require('modules.ui.eviline')
 end

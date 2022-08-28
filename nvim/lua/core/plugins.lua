@@ -106,6 +106,7 @@ return require('packer').startup({
       requires = {
         'kyazdani42/nvim-web-devicons', -- optional, for file icons
       },
+      cmd = { 'NvimTreeToggle', 'NvimTreeFocus' },
       config = function()
         require('modules.tools.nvim-tree.config').setup()
       end,
@@ -169,6 +170,14 @@ return require('packer').startup({
     })
 
     use({
+      'catppuccin/nvim',
+      as = 'catppuccin',
+      -- config = function()
+      --   require('modules.ui.config').catppuccin()
+      -- end
+    })
+
+    use({
       'glepnir/galaxyline.nvim',
       branch = 'main',
       config = require('modules.ui.config').galaxyline,
@@ -210,6 +219,7 @@ return require('packer').startup({
 
     use({
       'nvim-telescope/telescope.nvim',
+      cmd = "Telescope",
       config = function()
         require('modules.tools.config').telescope()
       end,
