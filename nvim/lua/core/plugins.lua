@@ -1,99 +1,103 @@
 -- install packer automatically on new system
 -- https://github.com/wbthomason/packer.nvim#bootstrapping
 local fn = vim.fn
-local install_path = fn.stdpath('data') .. '/site/pack/packer/start/packer.nvim'
+local install_path = fn.stdpath("data") .. "/site/pack/packer/start/packer.nvim"
 
 if fn.empty(fn.glob(install_path)) > 0 then
-  print('Installing packer...')
+  print("Installing packer...")
   PACKER_BOOTSTRAP = fn.system({
-    'git',
-    'clone',
-    '--depth',
-    '1',
-    'https://github.com/wbthomason/packer.nvim',
+    "git",
+    "clone",
+    "--depth",
+    "1",
+    "https://github.com/wbthomason/packer.nvim",
     install_path,
   })
 end
 
 -- sync plugins on write/save
-vim.api.nvim_create_augroup('SyncPackerPlugins', {})
+vim.api.nvim_create_augroup("SyncPackerPlugins", {})
 vim.api.nvim_create_autocmd(
-  'BufWritePost',
-  { command = 'source <afile> | PackerSync', pattern = 'plugins.lua', group = 'SyncPackerPlugins' }
+  "BufWritePost",
+  { command = "source <afile> | PackerSync", pattern = "plugins.lua", group = "SyncPackerPlugins" }
 )
 
-return require('packer').startup({
+return require("packer").startup({
   function(use)
-    use({ 'wbthomason/packer.nvim' })
+    use({ "wbthomason/packer.nvim" })
 
-    use({ 'lewis6991/impatient.nvim' })
-
+    use({ "lewis6991/impatient.nvim" })
 
     -- [[
     -- Tools
     -- Completion, editing, etc
     -- ]]
-    use({ 'tpope/vim-fugitive' })
-    use({ 'tpope/vim-unimpaired' })
+    use({ "tpope/vim-fugitive" })
+    use({ "tpope/vim-unimpaired" })
 
     use({
-      'neovim/nvim-lspconfig',
+      "neovim/nvim-lspconfig",
       config = function()
-        require('modules.completion.config').lspconfig()
+        require("modules.completion.config").lspconfig()
       end,
     })
 
     use({
-      'hrsh7th/nvim-cmp',
+      "hrsh7th/nvim-cmp",
       -- event = 'InsertEnter',
       config = function()
-        require('modules.completion.config').nvim_cmp()
+        require("modules.completion.config").nvim_cmp()
       end,
-      wants = { 'LuaSnip' },
+      wants = { "LuaSnip" },
       requires = {
-        { 'hrsh7th/cmp-path', after = 'nvim-cmp' },
-        { 'hrsh7th/cmp-buffer', after = 'nvim-cmp' },
-        { 'hrsh7th/cmp-nvim-lsp-signature-help' },
-        { 'saadparwaiz1/cmp_luasnip', after = 'LuaSnip' },
+        { "hrsh7th/cmp-path", after = "nvim-cmp" },
+        { "hrsh7th/cmp-buffer", after = "nvim-cmp" },
+        { "hrsh7th/cmp-nvim-lsp-signature-help" },
+        { "saadparwaiz1/cmp_luasnip", after = "LuaSnip" },
       },
     })
 
     use({
-      'hrsh7th/cmp-nvim-lsp',
-      after = 'nvim-cmp',
-      module = 'cmp_nvim_lsp',
+      "hrsh7th/cmp-nvim-lsp",
+      after = "nvim-cmp",
+      module = "cmp_nvim_lsp",
     })
 
     use({
-      'jose-elias-alvarez/null-ls.nvim',
-      requires = 'nvim-lua/plenary.nvim',
+      "jose-elias-alvarez/null-ls.nvim",
+      requires = "nvim-lua/plenary.nvim",
       config = function()
-        require('modules.tools.null-ls-nvim')
+        require("modules.tools.null-ls-nvim")
       end,
     })
 
-    use({ 'rafamadriz/friendly-snippets', event = 'BufEnter' })
+    use({ "rafamadriz/friendly-snippets", event = "BufEnter" })
 
     use({
-      'L3MON4D3/LuaSnip',
-      event = 'InsertEnter',
+      "L3MON4D3/LuaSnip",
+      event = "InsertEnter",
       config = function()
-        require('modules.completion.config').lua_snip()
+        require("modules.completion.config").lua_snip()
       end,
     })
 
     use({
-      'nvim-treesitter/nvim-treesitter',
-      run = ':TSUpdate',
-      after = 'telescope.nvim',
+      "nvim-treesitter/nvim-treesitter",
+      run = ":TSUpdate",
+      after = "telescope.nvim",
       config = function()
-        require('modules.lang.config').nvim_treesitter()
+        require("modules.lang.config").nvim_treesitter()
       end,
       requires = {
-        { 'andymass/matchup.vim' },
-        { 'JoosepAlviste/nvim-ts-context-commentstring' },
-        { 'p00f/nvim-ts-rainbow' },
-      }
+        { "andymass/matchup.vim" },
+        { "JoosepAlviste/nvim-ts-context-commentstring" },
+        { "p00f/nvim-ts-rainbow" },
+      },
+    })
+
+    use({
+      "nvim-treesitter/nvim-treesitter-textobjects",
+      after = "nvim-treesitter",
     })
 
     use({
@@ -116,11 +120,11 @@ return require('packer').startup({
     use({ 'sudormrfbin/cheatsheet.nvim' })
 
     use({
-      'TimUntersberger/neogit',
+      "TimUntersberger/neogit",
       config = function()
-        require('modules.tools.neogit.config').setup()
+        require("modules.tools.neogit.config").setup()
       end,
-      requires = { { 'nvim-lua/plenary.nvim' }, { 'sindrets/diffview.nvim' } },
+      requires = { { "nvim-lua/plenary.nvim" }, { "sindrets/diffview.nvim" } },
     })
 
     use({
@@ -132,145 +136,148 @@ return require('packer').startup({
     })
 
     use({
-      'gpanders/editorconfig.nvim',
-      event = 'BufEnter',
+      "gpanders/editorconfig.nvim",
+      event = "BufEnter",
     })
 
     use({
-      'numToStr/Comment.nvim',
-      requres = 'JoosepAlviste/nvim-ts-context-commentstring',
+      "numToStr/Comment.nvim",
+      requres = "JoosepAlviste/nvim-ts-context-commentstring",
       config = function()
-        require('modules.tools.Comment.config').setup()
+        require("modules.tools.Comment.config").setup()
       end,
     })
 
-    use({ 'JoosepAlviste/nvim-ts-context-commentstring' })
+    use({ "JoosepAlviste/nvim-ts-context-commentstring" })
 
-    use({ 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' })
+    use({
+      "sindrets/diffview.nvim",
+      requires = "nvim-lua/plenary.nvim",
+      module = 'diffview',
+    })
 
     -- [[
     -- UI Customization
     -- ]]
 
     use({
-      'EdenEast/nightfox.nvim',
+      "EdenEast/nightfox.nvim",
       -- config = require('modules.ui.config').nordfox,
     })
 
     use({
-      'marko-cerovac/material.nvim',
+      "marko-cerovac/material.nvim",
       -- config = require('modules.ui.config').material,
     })
 
     use({
-      'monsonjeremy/onedark.nvim',
+      "monsonjeremy/onedark.nvim",
       config = function()
-        require('modules.ui.config').onedark()
+        require("modules.ui.config").onedark()
       end,
     })
 
     use({
-      'catppuccin/nvim',
-      as = 'catppuccin',
+      "catppuccin/nvim",
+      as = "catppuccin",
       -- config = function()
       --   require('modules.ui.config').catppuccin()
       -- end
     })
 
     use({
-      'glepnir/galaxyline.nvim',
-      branch = 'main',
-      config = require('modules.ui.config').galaxyline,
-      requires = 'kyazdani42/nvim-web-devicons',
+      "glepnir/galaxyline.nvim",
+      branch = "main",
+      config = require("modules.ui.config").galaxyline,
+      requires = "kyazdani42/nvim-web-devicons",
     })
 
     use({
-      'akinsho/nvim-bufferline.lua',
-      config = require('modules.ui.config').nvim_bufferline,
-      requires = 'kyazdani42/nvim-web-devicons',
+      "akinsho/nvim-bufferline.lua",
+      config = require("modules.ui.config").nvim_bufferline,
+      requires = "kyazdani42/nvim-web-devicons",
     })
 
     use({
-      'j-hui/fidget.nvim',
+      "j-hui/fidget.nvim",
       config = function()
-        require('fidget').setup({})
-      end
-    })
-
-    use({
-      'onsails/lspkind.nvim',
-      requires = 'hrsh7th/nvim-cmp',
-    })
-
-    use({
-      'rcarriga/nvim-notify',
-      event = 'VimEnter',
-      config = function()
-        vim.notify = require('notify')
+        require("fidget").setup({})
       end,
     })
 
     use({
-      'benfowler/telescope-luasnip.nvim',
-      module = 'telescope._extensions.luasnip', -- if you wish to lazy-load
+      "onsails/lspkind.nvim",
+      requires = "hrsh7th/nvim-cmp",
+    })
+
+    use({
+      "rcarriga/nvim-notify",
+      event = "VimEnter",
+      config = function()
+        vim.notify = require("notify")
+      end,
+    })
+
+    use({
+      "benfowler/telescope-luasnip.nvim",
+      module = "telescope._extensions.luasnip", -- if you wish to lazy-load
     })
 
 
 
     use({
-      'nvim-telescope/telescope.nvim',
+      "nvim-telescope/telescope.nvim",
       cmd = "Telescope",
       config = function()
-        require('modules.tools.config').telescope()
+        require("modules.tools.config").telescope()
       end,
       requires = {
-        { 'nvim-lua/popup.nvim' },
-        { 'nvim-lua/plenary.nvim' },
-        { 'nvim-telescope/telescope-fzy-native.nvim' },
-        { 'nvim-telescope/telescope-ui-select.nvim' },
+        { "nvim-lua/popup.nvim" },
+        { "nvim-lua/plenary.nvim" },
+        { "nvim-telescope/telescope-fzy-native.nvim" },
+        { "nvim-telescope/telescope-ui-select.nvim" },
       },
     })
 
     use({
-      'lewis6991/gitsigns.nvim',
+      "lewis6991/gitsigns.nvim",
       config = function()
-        require('gitsigns').setup()
+        require("gitsigns").setup()
       end,
     })
 
     use({
-      'lukas-reineke/indent-blankline.nvim',
-      event = 'BufRead',
+      "lukas-reineke/indent-blankline.nvim",
+      event = "BufRead",
       config = function()
-        require('modules.ui.indent-blankline-nvim')
+        require("modules.ui.indent-blankline-nvim")
       end,
     })
 
     use({
-      'windwp/nvim-autopairs',
-      -- event='InsertEnter',
+      "windwp/nvim-autopairs",
+      event = "InsertEnter",
       config = function()
-        require('modules.tools.nvim-autopairs')
+        require("modules.tools.nvim-autopairs")
       end,
     })
 
     use({
-      'kosayoda/nvim-lightbulb',
-      requires = 'antoinemadec/FixCursorHold.nvim',
+      "kosayoda/nvim-lightbulb",
+      requires = "antoinemadec/FixCursorHold.nvim",
     })
 
     -- [[
     -- Language-Specific
     -- ]]
     use({
-      'hashivim/vim-terraform',
-      event = 'BufEnter',
+      "hashivim/vim-terraform",
+      event = "BufEnter",
     })
-
   end,
   config = {
     display = {
-      open_fn = require('packer.util').float,
+      open_fn = require("packer.util").float,
     },
   },
 })
