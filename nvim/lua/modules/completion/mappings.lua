@@ -17,6 +17,8 @@ function M.setup(bufnr)
   vim.keymap.set('n', '<Space>D', vim.lsp.buf.type_definition, bufopts)
   vim.keymap.set('n', '<Space>ca', vim.lsp.buf.code_action, bufopts)
   vim.keymap.set('n', '<Space>gr', vim.lsp.buf.references, bufopts)
+  vim.keymap.set('n', ']d', vim.diagnostic.goto_next, bufopts)
+  vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, bufopts)
 end
 
 return M

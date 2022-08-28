@@ -11,6 +11,8 @@ List workspace folders and display in vim.notify | <Space>wl
 Go to type definition | <Space>D
 Code action | <Space>ca 
 Show references in quickfix | <Space>gr
+Go to next diagnostic in file | ]d
+Go to previous diagnostic in file | [d
 
 ## NvimTree @NVIM_Tree
 NvimTreeToggle | <F8>
