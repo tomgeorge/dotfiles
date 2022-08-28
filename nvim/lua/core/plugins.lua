@@ -101,23 +101,35 @@ return require("packer").startup({
     })
 
     use({
-      'nvim-treesitter/nvim-treesitter-textobjects',
-      after = 'nvim-treesitter',
+      "simrat39/symbols-outline.nvim",
+      cmd = "SymbolsOutline",
+      config = function()
+        require("symbols-outline").setup()
+      end,
     })
 
     use({
-      'kyazdani42/nvim-tree.lua',
+      "kyazdani42/nvim-tree.lua",
       requires = {
-        'kyazdani42/nvim-web-devicons', -- optional, for file icons
+        "kyazdani42/nvim-web-devicons", -- optional, for file icons
       },
-      cmd = { 'NvimTreeToggle', 'NvimTreeFocus' },
+      cmd = { "NvimTreeToggle", "NvimTreeFocus" },
       config = function()
-        require('modules.tools.nvim-tree.config').setup()
+        require("modules.tools.nvim-tree.config").setup()
       end,
-      tag = 'nightly', -- optional, updated every week. (see issue #1193)
+      tag = "nightly", -- optional, updated every week. (see issue #1193)
     })
 
-    use({ 'sudormrfbin/cheatsheet.nvim' })
+    use({
+      "sudormrfbin/cheatsheet.nvim",
+      after = "telescope.nvim",
+      cmd = "Cheatsheet",
+      requres = {
+        { "nvim-telescope/telescope.nvim" },
+        { "nvim-lua/popup.nvim" },
+        { "nvim-lua/plenary.nvim" },
+      },
+    })
 
     use({
       "TimUntersberger/neogit",
@@ -128,10 +140,11 @@ return require("packer").startup({
     })
 
     use({
-      'folke/trouble.nvim',
-      required = 'kyazdani42/nvim-web-devicons',
+      "folke/trouble.nvim",
+      cmd = "TroubleToggle",
+      required = "kyazdani42/nvim-web-devicons",
       config = function()
-        require('modules.ui.trouble')
+        require("modules.ui.trouble")
       end,
     })
 
@@ -223,11 +236,10 @@ return require("packer").startup({
       module = "telescope._extensions.luasnip", -- if you wish to lazy-load
     })
 
-
-
     use({
       "nvim-telescope/telescope.nvim",
       cmd = "Telescope",
+      module = 'telescope',
       config = function()
         require("modules.tools.config").telescope()
       end,
@@ -241,6 +253,7 @@ return require("packer").startup({
 
     use({
       "lewis6991/gitsigns.nvim",
+      event = "BufRead",
       config = function()
         require("gitsigns").setup()
       end,
