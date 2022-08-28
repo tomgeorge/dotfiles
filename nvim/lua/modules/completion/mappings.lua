@@ -15,7 +15,6 @@ function M.setup(bufnr)
     vim.notify(vim.lsp.buf.list_workspace_folders(), vim.log.levels.INFO, {title = 'List Workspace Folders'})
   end, bufopts)
   vim.keymap.set('n', '<Space>D', vim.lsp.buf.type_definition, bufopts)
-  vim.keymap.set('n', '<Space>rn', vim.lsp.buf.rename, bufopts)
   vim.keymap.set('n', '<Space>ca', vim.lsp.buf.code_action, bufopts)
   vim.keymap.set('n', '<Space>gr', vim.lsp.buf.references, bufopts)
 end
