@@ -96,8 +96,6 @@ return require('packer').startup({
       }
     })
 
-    -- use({ 'andymaas/matchup/vim' })
-
     use({
       'nvim-treesitter/nvim-treesitter-textobjects',
       after = 'nvim-treesitter',
