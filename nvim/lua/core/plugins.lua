@@ -233,12 +233,12 @@ return require("packer").startup({
     })
 
     use({
-      "benfowler/telescope-luasnip.nvim",
-      module = "telescope._extensions.luasnip", -- if you wish to lazy-load
+      'benfowler/telescope-luasnip.nvim',
+      module = 'telescope._extensions.luasnip', -- if you wish to lazy-load
     })
 
     use({
-      "nvim-telescope/telescope.nvim",
+      'nvim-telescope/telescope.nvim',
       config = function()
         require("modules.tools.config").telescope()
       end,
@@ -285,6 +285,10 @@ return require("packer").startup({
     use({
       "hashivim/vim-terraform",
       event = "BufEnter",
+    })
+
+    use ({
+      'Olical/conjure'
     })
 
     use ({
