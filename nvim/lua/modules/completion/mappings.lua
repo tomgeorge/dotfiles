@@ -1,10 +1,12 @@
 M = {}
 
+local telescope = require('telescope.builtin')
+
 function M.setup(bufnr)
   local bufopts = { noremap = true, silent = true, buffer = bufnr }
   vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
-  vim.keymap.set('n', 'C-]', vim.lsp.buf.definition, bufopts)
-  vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+  vim.keymap.set('n', 'C-]', telescope.lsp_definitions, bufopts)
+  vim.keymap.set('n', 'gr', telescope.lsp_references, bufopts)
   vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, bufopts)
   vim.keymap.set('n', '<Space>f', vim.lsp.buf.format, bufopts)
   vim.keymap.set('n', 'C-K', vim.lsp.buf.signature_help, bufopts )
