@@ -52,7 +52,7 @@ local on_attach = function(client, bufnr)
   mappings.setup(bufnr)
 end
 
-local servers = { 'tsserver' }
+local servers = { 'tsserver', 'clojure_lsp' }
 
 for _, server in ipairs(servers) do
   print('in for loop')

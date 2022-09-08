@@ -50,10 +50,11 @@ return require("packer").startup({
       end,
       wants = { "LuaSnip" },
       requires = {
-        { "hrsh7th/cmp-path", after = "nvim-cmp" },
-        { "hrsh7th/cmp-buffer", after = "nvim-cmp" },
-        { "hrsh7th/cmp-nvim-lsp-signature-help" },
-        { "saadparwaiz1/cmp_luasnip", after = "LuaSnip" },
+        { 'hrsh7th/cmp-path', after = 'nvim-cmp' },
+        { 'hrsh7th/cmp-buffer', after = 'nvim-cmp' },
+        { 'PaterJason/cmp-conjure', after ='nvim-cmp' },
+        { 'hrsh7th/cmp-nvim-lsp-signature-help' },
+        { 'saadparwaiz1/cmp_luasnip', after = 'LuaSnip' },
       },
     })
 
@@ -238,8 +239,6 @@ return require("packer").startup({
 
     use({
       "nvim-telescope/telescope.nvim",
-      cmd = "Telescope",
-      module = 'telescope',
       config = function()
         require("modules.tools.config").telescope()
       end,
@@ -287,6 +286,11 @@ return require("packer").startup({
       "hashivim/vim-terraform",
       event = "BufEnter",
     })
+
+    use ({
+      'Olical/conjure'
+    })
+
   end,
   config = {
     display = {

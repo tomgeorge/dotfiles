@@ -49,9 +49,17 @@ function config.nvim_cmp()
         path = '[Path]',
         luasnip = '[Snippet]',
         buffer = '[Buffer]',
+        conjure = '[Conj]',
       },
       format = require('lspkind').cmp_format({
-        mode = 'text_symbol'
+        mode = 'symbol_text',
+        menu = {
+          buffer = '[Buffer]',
+          nvim_lsp = '[LSP]',
+          path = '[Path]',
+          luasnip = '[Snippet]',
+          conjure = '[Conj]',
+        }
       }),
     },
     snippet = {
@@ -70,6 +78,7 @@ function config.nvim_cmp()
       { name = 'nvim_lsp' },
       { name = 'luasnip' },
       { name = 'nvim_lua' },
+      { name = 'conjure' },
       { name = 'path' },
       { name = 'buffer', keyword_length = 5 },
       { name = 'nvim_lsp_signature_help' },
