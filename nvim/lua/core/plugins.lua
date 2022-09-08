@@ -122,6 +122,18 @@ return require("packer").startup({
     })
 
     use({
+      'folke/which-key.nvim',
+      config = function()
+        require('modules.tools.which-key.config')
+      end
+    })
+
+    use({
+      'gpanders/editorconfig.nvim',
+      event = 'BufEnter',
+    })
+
+    use({
       "sudormrfbin/cheatsheet.nvim",
       after = "telescope.nvim",
       cmd = "Cheatsheet",
@@ -293,6 +305,15 @@ return require("packer").startup({
 
     use ({
       'Olical/conjure'
+    })
+
+    use ({
+      'tpope/vim-sexp-mappings-for-regular-people',
+      requires = {
+        'guns/vim-sexp',
+        'tpope/vim-surround',
+        'tpope/vim-repeat'
+      }
     })
 
   end,
