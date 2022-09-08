@@ -56,6 +56,14 @@ local servers = { 'tsserver', 'clojure_lsp' }
 
 for _, server in ipairs(servers) do
   print('in for loop')
+  if server == "clojure_lsp" then
+    lspconfig[server].setup {
+      on_attach = on_attach,
+      init_options = {
+        "trace.server" == "debug",
+      },
+    }
+  end
   lspconfig[server].setup {
     on_attach = on_attach
   }
