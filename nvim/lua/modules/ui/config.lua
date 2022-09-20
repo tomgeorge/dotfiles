@@ -1,33 +1,38 @@
 local config = {}
 
 function config.zephyr()
-  vim.cmd('colorscheme zephyr')
+	vim.cmd("colorscheme zephyr")
 end
 
 function config.nordfox()
-  vim.cmd('colorscheme nordfox')
+	vim.cmd("colorscheme nordfox")
 end
 
 function config.material()
-  vim.cmd('colorscheme material')
+	vim.cmd("colorscheme material")
 end
 
 function config.onedark()
-  local onedark = require('onedark')
-  onedark.setup {
-    transparent = false,
-  }
+	local onedark = require("onedark")
+	onedark.setup({
+		transparent = false,
+	})
+end
+
+function config.tundra()
+	require("nvim-tundra").setup({})
+	vim.opt.background = "dark"
+	vim.cmd("colorscheme tundra")
 end
 
 function config.catppuccin()
-  local catppuccin = require('catppuccin')
-  vim.g.catpuccin_flavour = 'frappe'
-  catppuccin.setup()
-  vim.cmd('colorscheme catppuccin')
+	vim.g.catppuccin_flavour = "frappe"
+	require('catppuccin').setup()
+	vim.cmd[[colorscheme catppuccin]]
 end
 
 function config.galaxyline()
-  require('modules.ui.eviline')
+	require("modules.ui.eviline")
 end
 
 -- function config.dashboard()
@@ -55,21 +60,21 @@ end
 --end
 
 function config.nvim_bufferline()
-  require('bufferline').setup({
-    options = {
-      modified_icon = '✥',
-      buffer_close_icon = '',
-      always_show_bufferline = false,
-    },
-  })
+	require("bufferline").setup({
+		options = {
+			modified_icon = "✥",
+			buffer_close_icon = "",
+			always_show_bufferline = false,
+		},
+	})
 end
 
 function config.nvim_tree()
-  require('nvim-tree').setup({
-    disable_netrw = false,
-    hijack_cursor = true,
-    hijack_netrw = true,
-  })
+	require("nvim-tree").setup({
+		disable_netrw = false,
+		hijack_cursor = true,
+		hijack_netrw = true,
+	})
 end
 
 return config
