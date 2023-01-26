@@ -2,13 +2,11 @@ local api = vim.api
 local lspconfig = require('lspconfig')
 local mappings = require('modules.completion.mappings')
 
-local capabilities = vim.lsp.protocol.make_client_capabilities()
-
 -- if not packer_plugins['cmp-nvim-lsp'].loaded then
 --  print("cmp-nvim-lsp not loaded")
 --  vim.cmd([[packadd cmp-nvim-lsp]])
 -- end
-capabilities = require('cmp_nvim_lsp').update_capabilities(capabilities)
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
 local signs = {
   Error = ' ',
@@ -52,12 +50,13 @@ local on_attach = function(client, bufnr)
   mappings.setup(bufnr)
 end
 
-local servers = { 'tsserver', 'clojure_lsp' }
+local servers = { 'tsserver', 'clojure_lsp', 'gopls'}
 
 for _, server in ipairs(servers) do
   print('in for loop')
   if server == "clojure_lsp" then
     lspconfig[server].setup {
+      capabilities = capabilities,
       on_attach = on_attach,
       init_options = {
         "trace.server" == "debug",
@@ -65,6 +64,7 @@ for _, server in ipairs(servers) do
     }
   end
   lspconfig[server].setup {
+    capabilities = capabilities,
     on_attach = on_attach
   }
 end
