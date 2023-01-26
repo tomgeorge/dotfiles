@@ -174,7 +174,6 @@ return require("packer").startup({
 		use({
 			"sindrets/diffview.nvim",
 			requires = "nvim-lua/plenary.nvim",
-			module = "diffview",
 		})
 
 		-- [[
