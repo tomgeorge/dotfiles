@@ -1,7 +1,11 @@
-local ok, impatient = pcall(require, 'impatient')
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+require("core.options")
+require("core.utils").load_mappings()
+require("core.autocommands")
 
-if ok then
-  impatient.enable_profile()
+if not vim.loop.fs_stat(lazypath) then
+  require("core.bootstrap").lazy(lazypath)
 end
+vim.opt.rtp:prepend(lazypath)
 
-require('core')
+require "plugins"
