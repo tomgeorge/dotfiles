@@ -9,9 +9,10 @@ M.on_attach = function(client, bufnr)
     client.server_capabilities.documentFormattingProvider = false
     client.server_capabilities.documentRangeFormattingProvider = false
   end
-  -- if client.server_capabilities.inlayHintProvider then
-  --   vim.lsp.buf.inlay_hint(bufnr, true)
-  -- end
+  if client.server_capabilities.inlayHintProvider then
+    print(client.name .. ' supports inlay hints')
+    vim.lsp.inlay_hint(bufnr, true)
+  end
   utils.load_mappings('lspconfig', { buffer = bufnr })
 end
 
