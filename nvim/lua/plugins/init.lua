@@ -165,6 +165,29 @@ local plugins = {
     end,
   },
   {
+    "echasnovski/mini.indentscope",
+    version = false,
+    event = { "BufReadPre", "BufNewFile" },
+    opts = {
+      symbol = "│",
+      options = { true_as_border = true },
+    },
+    init = function()
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = {
+          "help",
+          "dashboard",
+          "Trouble",
+          "lazy",
+          "toggleterm"
+        },
+        callback = function()
+          vim.b.miniindentscope_disable = true
+        end,
+      })
+    end,
+  },
+  {
     "nvim-treesitter/nvim-treesitter",
     init = function()
       require("core.utils").lazy_load("nvim-treesitter")
