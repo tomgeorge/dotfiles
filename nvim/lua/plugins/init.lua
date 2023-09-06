@@ -3,7 +3,17 @@ local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colors
 
 local plugins = {
   { "tpope/vim-unimpaired", lazy = false },
-  colorscheme_plugin_spec,
+  {
+    "sainnhe/gruvbox-material",
+    lazy = false,
+    priority = 1000,
+    config = function()
+      vim.opt.background = "dark"
+      vim.g.gruvbox_material_background = "soft"
+      vim.cmd("colorscheme gruvbox-material")
+    end
+  },
+  -- colorscheme_plugin_spec,
   {
     "nvim-telescope/telescope.nvim",
     tag = "0.1.2",
