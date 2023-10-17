@@ -3,4 +3,5 @@ return {
   "javascript",
   "html",
   "lua",
+  "go"
 }
