@@ -302,6 +302,18 @@ local plugins = {
       end
     end,
   },
+  {
+    "rcarriga/nvim-dap-ui",
+    dependencies = {
+      "mfussenegger/nvim-dap",
+      {
+        "leoluz/nvim-dap-go",
+        config = true,
+      },
+    },
+    event = "VeryLazy",
+    config = true,
+  },
 }
 
 local lazy_config = require("core.config").lazy_nvim
