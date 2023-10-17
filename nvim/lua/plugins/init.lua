@@ -106,8 +106,42 @@ local plugins = {
     end,
   },
   {
-    "creativenull/efmls-configs-nvim",
-    version = "v1.x.x",
+    "stevearc/conform.nvim",
+    event = "VeryLazy",
+    config = function()
+      print("Setting up conform")
+      require("conform").setup({
+        formatters_by_ft = {
+          lua = { "stylua" },
+          go = { "gofmt", "goimports" },
+        },
+        format_on_save = {
+          timeout_ms = 500,
+          lsp_fallback = true,
+        },
+      })
+    end,
+  },
+  {
+    "mfussenegger/nvim-lint",
+    event = "VeryLazy",
+    opts = {
+      linters_by_ft = {
+        go = { "golangcilint" },
+        lua = { "luacheck" },
+      },
+    },
+    config = function(_, opts)
+      local lint = require("lint")
+      lint.linters_by_ft = opts.linters_by_ft
+      local group = vim.api.nvim_create_augroup("LintOnWrite", { clear = true })
+      vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost", "InsertLeave" }, {
+        group = group,
+        callback = function()
+          require("lint").try_lint()
+        end,
+      })
+    end,
   },
   {
     "folke/neodev.nvim",

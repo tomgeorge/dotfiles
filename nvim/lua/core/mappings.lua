@@ -159,7 +159,7 @@ M.lspconfig = {
     },
     ["<leader>f"] = {
       function()
-        vim.lsp.buf.format({ async = true })
+        require("conform").format()
       end,
       "Format file",
     },
@@ -229,7 +229,6 @@ M.gitsigns = {
 
     ["<leader>gtd"] = {
       function()
-        require("gitsigns").toggle_deleted()
       end,
       "Toggle deleted",
     },
