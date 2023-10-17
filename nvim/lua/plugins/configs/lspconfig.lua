@@ -5,10 +5,6 @@ local lspconfig = require("lspconfig")
 -- export on_attach & capabilities for custom lspconfigs
 
 M.on_attach = function(client, bufnr)
-  -- if client.name ~= "efm" then
-  --   client.server_capabilities.documentFormattingProvider = false
-  --   client.server_capabilities.documentRangeFormattingProvider = false
-  -- end
   if client.server_capabilities.inlayHintProvider then
     print(client.name .. " supports inlay hints")
     vim.lsp.inlay_hint(bufnr, true)

@@ -1,4 +1,4 @@
--- local colorscheme = "monokai-pro"
+local colorscheme = "gruvbox-material"
 -- If you want to use another colorscheme that has fun lua stuff
 -- local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
 
@@ -107,10 +107,6 @@ local plugins = {
       require("plugins.configs.lspconfig")
     end,
   },
-  -- {
-  --   "creativenull/efmls-configs-nvim",
-  --   version = "v1.x.x",
-  -- },
   {
     "stevearc/conform.nvim",
     event = "VeryLazy",
