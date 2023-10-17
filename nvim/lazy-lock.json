@@ -8,7 +8,6 @@
   "conform.nvim": { "branch": "master", "commit": "f883e901587c335277fc86cd12867513f85914d7" },
   "diffview.nvim": { "branch": "main", "commit": "7e5a85c186027cab1e825d018f07c350177077fc" },
   "dressing.nvim": { "branch": "master", "commit": "b1c7b70e1e0875243ed38f51fe7a61d08e11607e" },
-  "efmls-configs-nvim": { "branch": "main", "commit": "cd8876b5afe602f90e53e5d92555980e6b379be4" },
   "gitsigns.nvim": { "branch": "main", "commit": "d8b52fc95e3d424e5c09b287ee2c293dcb4e26fb" },
   "glow.nvim": { "branch": "main", "commit": "5b38fb7b6e806cac62707a4aba8c10c5f14d5bb5" },
   "gruvbox-material": { "branch": "master", "commit": "b5f8c6a6c1cda630c53b061b765068a0898d47a3" },

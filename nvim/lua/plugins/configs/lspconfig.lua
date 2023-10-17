@@ -5,12 +5,12 @@ local lspconfig = require('lspconfig')
 -- export on_attach & capabilities for custom lspconfigs
 
 M.on_attach = function(client, bufnr)
-  if client.name ~= 'efm' then
-    client.server_capabilities.documentFormattingProvider = false
-    client.server_capabilities.documentRangeFormattingProvider = false
-  end
+  -- if client.name ~= "efm" then
+  --   client.server_capabilities.documentFormattingProvider = false
+  --   client.server_capabilities.documentRangeFormattingProvider = false
+  -- end
   if client.server_capabilities.inlayHintProvider then
-    print(client.name .. ' supports inlay hints')
+    print(client.name .. " supports inlay hints")
     vim.lsp.inlay_hint(bufnr, true)
   end
   utils.load_mappings('lspconfig', { buffer = bufnr })
@@ -36,19 +36,37 @@ M.capabilities.textDocument.completion.completionItem = {
   },
 }
 
-local servers = { 'html', 'cssls', 'clangd', 'lua_ls', 'gopls', 'bashls', 'efm' }
+local servers = { "html", "cssls", "clangd", "lua_ls", "gopls", "bashls" }
 
 for _, lsp in ipairs(servers) do
-  if lsp ~= 'efm' then
+  if lsp == "gopls" then
+    lspconfig[lsp].setup({
+      on_attach = M.on_attach,
+      capabilities = M.capabilities,
+      settings = {
+        gopls = {
+          -- staticcheck = true,
+          -- analyses = {
+          --   unusedparams = true,
+          --   shadow = true,
+          -- },
+          hints = {
+            parameterNames = false,
+            assignVariableTypes = false,
+            compositeLiteralFields = false,
+            compositeLiteralTypes = false,
+            constantValues = false,
+            functionTypeParameters = false,
+            rangeVariableTypes = false,
+          },
+        },
+      },
+    })
+  else
     lspconfig[lsp].setup({
       on_attach = M.on_attach,
       capabilities = M.capabilities,
     })
-  else
-    lspconfig[lsp].setup(vim.tbl_extend('force', require('plugins.configs.efmls-configs').efmls_config, {
-      on_attach = M.on_attach,
-      capabilities = M.capabilities,
-    }))
   end
 end
 
