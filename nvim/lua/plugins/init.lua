@@ -1,5 +1,6 @@
-local colorscheme = "catppuccin"
-local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
+-- local colorscheme = "monokai-pro"
+-- If you want to use another colorscheme that has fun lua stuff
+-- local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
 
 local plugins = {
   { "tpope/vim-unimpaired", lazy = false },
@@ -75,7 +76,8 @@ local plugins = {
           ["<C-f>"] = cmp.mapping.scroll_docs(4),
           ["<C-Space>"] = cmp.mapping.complete(),
           ["<C-e>"] = cmp.mapping.abort(),
-          ["<CR>"] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+          -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+          ["<CR>"] = cmp.mapping.confirm({ select = true }),
         }),
         sources = cmp.config.sources({
           { name = "nvim_lsp" },
@@ -105,6 +107,10 @@ local plugins = {
       require("plugins.configs.lspconfig")
     end,
   },
+  -- {
+  --   "creativenull/efmls-configs-nvim",
+  --   version = "v1.x.x",
+  -- },
   {
     "stevearc/conform.nvim",
     event = "VeryLazy",
@@ -213,7 +219,7 @@ local plugins = {
           "dashboard",
           "Trouble",
           "lazy",
-          "toggleterm"
+          "toggleterm",
         },
         callback = function()
           vim.b.miniindentscope_disable = true

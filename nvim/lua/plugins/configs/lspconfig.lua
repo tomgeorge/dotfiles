@@ -1,6 +1,6 @@
 local M = {}
-local utils = require('core.utils')
-local lspconfig = require('lspconfig')
+local utils = require("core.utils")
+local lspconfig = require("lspconfig")
 
 -- export on_attach & capabilities for custom lspconfigs
 
@@ -13,13 +13,13 @@ M.on_attach = function(client, bufnr)
     print(client.name .. " supports inlay hints")
     vim.lsp.inlay_hint(bufnr, true)
   end
-  utils.load_mappings('lspconfig', { buffer = bufnr })
+  utils.load_mappings("lspconfig", { buffer = bufnr })
 end
 
 M.capabilities = vim.lsp.protocol.make_client_capabilities()
 
 M.capabilities.textDocument.completion.completionItem = {
-  documentationFormat = { 'markdown', 'plaintext' },
+  documentationFormat = { "markdown", "plaintext" },
   snippetSupport = true,
   preselectSupport = true,
   insertReplaceSupport = true,
@@ -29,9 +29,9 @@ M.capabilities.textDocument.completion.completionItem = {
   tagSupport = { valueSet = { 1 } },
   resolveSupport = {
     properties = {
-      'documentation',
-      'detail',
-      'additionalTextEdits',
+      "documentation",
+      "detail",
+      "additionalTextEdits",
     },
   },
 }
@@ -70,7 +70,7 @@ for _, lsp in ipairs(servers) do
   end
 end
 
-require('neodev').setup({
+require("neodev").setup({
   override = function(_, library)
     library.enabled = true
     library.plugins = true
@@ -84,15 +84,15 @@ lspconfig.lua_ls.setup({
   settings = {
     Lua = {
       completion = {
-        callSnippet = 'Replace',
+        callSnippet = "Replace",
       },
       diagnostics = {
-        globals = { 'vim' },
+        globals = { "vim" },
       },
       workspace = {
         library = {
-          [vim.fn.expand('$VIMRUNTIME/lua')] = true,
-          [vim.fn.expand('$VIMRUNTIME/lua/vim/lsp')] = true,
+          [vim.fn.expand("$VIMRUNTIME/lua")] = true,
+          [vim.fn.expand("$VIMRUNTIME/lua/vim/lsp")] = true,
         },
         maxPreload = 100000,
         preloadFileSize = 10000,
@@ -103,47 +103,47 @@ lspconfig.lua_ls.setup({
 })
 
 local function lspSymbol(name, icon)
-  local hl = 'DiagnosticSign' .. name
+  local hl = "DiagnosticSign" .. name
   vim.fn.sign_define(hl, { text = icon, numhl = hl, texthl = hl })
 end
 
-lspSymbol('Error', '󰅙')
-lspSymbol('Info', '󰋼')
-lspSymbol('Hint', '󰌵')
-lspSymbol('Warn', '')
+lspSymbol("Error", "󰅙")
+lspSymbol("Info", "󰋼")
+lspSymbol("Hint", "󰌵")
+lspSymbol("Warn", "")
 
 vim.diagnostic.config({
   virtual_text = {
-    prefix = '',
+    prefix = "",
   },
   signs = true,
   underline = true,
   update_in_insert = false,
 })
 
-vim.lsp.handlers['textDocument/hover'] = vim.lsp.with(vim.lsp.handlers.hover, {
-  border = 'single',
+vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, {
+  border = "single",
 })
-vim.lsp.handlers['textDocument/signatureHelp'] = vim.lsp.with(vim.lsp.handlers.signature_help, {
-  border = 'single',
+vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, {
+  border = "single",
   focusable = false,
-  relative = 'cursor',
+  relative = "cursor",
 })
 
 -- Borders for LspInfo winodw
-local win = require('lspconfig.ui.windows')
+local win = require("lspconfig.ui.windows")
 local _default_opts = win.default_opts
 
 win.default_opts = function(options)
   local opts = _default_opts(options)
-  opts.border = 'single'
+  opts.border = "single"
   return opts
 end
 
 local t = {
-  [0] = 'one',
-  [1] = 'two',
-  [2] = 'three',
+  [0] = "one",
+  [1] = "two",
+  [2] = "three",
 }
 
 table.remove(t, 1)
