@@ -11,7 +11,7 @@ local plugins = {
       vim.opt.background = "dark"
       vim.g.gruvbox_material_background = "soft"
       vim.cmd("colorscheme gruvbox-material")
-    end
+    end,
   },
   -- colorscheme_plugin_spec,
   {
