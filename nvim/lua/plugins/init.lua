@@ -248,11 +248,15 @@ local plugins = {
     opts = require("plugins.configs.gitsigns").gitsigns,
   },
   {
+    "sindrets/diffview.nvim",
+    config = true,
+    cmd = "DiffviewOpen",
+  },
+  {
     "NeogitOrg/neogit",
     init = function()
       require("core.utils").load_mappings("neogit")
     end,
-    dependencies = "sindrets/diffview.nvim",
     cmd = "Neogit",
     opts = require("plugins.configs.neogit").opts,
   },
