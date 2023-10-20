@@ -67,7 +67,7 @@ M.lspconfig = {
 
     ["C-]"] = {
       function()
-        vim.lsp.buf.definition()
+        require("telescope.builtin").lsp_type_definitions()
       end,
       "LSP definition",
     },
@@ -81,7 +81,7 @@ M.lspconfig = {
 
     ["gi"] = {
       function()
-        vim.lsp.buf.implementation()
+        require("telescope.builtin").lsp_implementations()
       end,
       "LSP implementation",
     },
@@ -95,7 +95,7 @@ M.lspconfig = {
 
     ["<leader>D"] = {
       function()
-        vim.lsp.buf.type_definition()
+        require("telescope.builtin").lsp_type_definitions()
       end,
       "Jumps to the definition of the type of the symbol under cursor",
     },
@@ -116,7 +116,7 @@ M.lspconfig = {
 
     ["gr"] = {
       function()
-        vim.lsp.buf.references()
+        require("telescope.builtin").lsp_references()
       end,
       "LSP references",
     },
