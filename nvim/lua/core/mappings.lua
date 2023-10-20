@@ -225,7 +225,7 @@ M.gitsigns = {
       "Reset hunk",
     },
 
-    ["<leader>gh"] = {
+    ["<leader>gP"] = {
       function()
         require("gitsigns").preview_hunk()
       end,
