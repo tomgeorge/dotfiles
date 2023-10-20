@@ -11,7 +11,7 @@ M.lazy_nvim = {
   },
   dev = {
     path = "~/git",
-    patterns = { "neodev.nvim" },
+    patterns = {},
   },
   ui = {
     icons = {
