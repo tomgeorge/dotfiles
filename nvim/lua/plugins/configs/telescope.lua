@@ -1,4 +1,36 @@
+local function open_in_diffview()
+  local action_state = require("telescope.actions.state")
+  local entry = action_state.get_selected_entry()
+  local value = entry.value
+  -- close Telescope window properly prior to switching windows
+  vim.api.nvim_win_close(0, true)
+  vim.cmd("stopinsert")
+  vim.schedule(function()
+    vim.cmd(("DiffviewOpen %s^!"):format(value))
+  end)
+end
+
 return {
+  pickers = {
+    git_bcommits = {
+      mappings = {
+        i = {
+          ["<cr>"] = function()
+            open_in_diffview()
+          end,
+        },
+      },
+    },
+    git_commits = {
+      mappings = {
+        i = {
+          ["<cr>"] = function()
+            open_in_diffview()
+          end,
+        },
+      },
+    },
+  },
   defaults = {
     prompt_prefix = "    ",
     selection_caret = "  ",
