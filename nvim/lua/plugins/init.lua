@@ -201,6 +201,11 @@ local plugins = {
     end,
   },
   {
+    "echasnovski/mini.surround",
+    event = "BufEnter",
+    config = true,
+  },
+  {
     "echasnovski/mini.indentscope",
     version = false,
     event = { "BufReadPre", "BufNewFile" },
