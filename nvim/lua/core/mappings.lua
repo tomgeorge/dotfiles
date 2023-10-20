@@ -14,7 +14,7 @@ M.window = {
 M.general = {
   n = {
     ["<Esc>"] = { "<cmd>noh<CR>" },
-  }
+  },
 }
 
 M.telescope = {
@@ -228,8 +228,7 @@ M.gitsigns = {
     },
 
     ["<leader>gtd"] = {
-      function()
-      end,
+      function() end,
       "Toggle deleted",
     },
   },
@@ -290,9 +289,9 @@ M.mini_files = {
       function()
         require("mini.files").open()
       end,
-      "Open mini.file file exporer"
-    }
-  }
+      "Open mini.file file exporer",
+    },
+  },
 }
 
 return M
