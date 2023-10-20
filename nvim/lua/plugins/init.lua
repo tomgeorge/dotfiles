@@ -273,7 +273,6 @@ local plugins = {
     init = function()
       print("trouble.init")
       require("core.utils").load_mappings("trouble")
-      require("plugins.configs.trouble").setup_autocmd()
     end,
     config = function()
       require("plugins.configs.trouble").setup()
@@ -307,14 +306,29 @@ local plugins = {
   {
     "rcarriga/nvim-dap-ui",
     dependencies = {
-      "mfussenegger/nvim-dap",
+      {
+        "mfussenegger/nvim-dap",
+        init = function()
+          require("core.utils").load_mappings("dap")
+        end,
+      },
       {
         "leoluz/nvim-dap-go",
         config = true,
       },
+      {
+        "theHamsta/nvim-dap-virtual-text",
+        config = true,
+      },
     },
     event = "VeryLazy",
-    config = true,
+    config = function()
+      require("dapui").setup()
+      local dap, dapui = require("dap"), require("dapui")
+      dap.listeners.after.event_initialized["dapui_config"] = function()
+        dapui.open()
+      end
+    end,
   },
 }
 
