@@ -306,4 +306,52 @@ M.mini_files = {
   },
 }
 
+M.dap = {
+  plugin = true,
+  n = {
+    ["<leader>dc"] = {
+      function()
+        require("dap").continue()
+      end,
+      "Start Debugger/Continue",
+    },
+    ["<leader>db"] = {
+      function()
+        require("dap").toggle_breakpoint()
+      end,
+      "Toggle breakpoint",
+    },
+    ["<leader>dn"] = {
+      function()
+        require("dap").step_over()
+      end,
+      "Step Over",
+    },
+    ["<leader>ds"] = {
+      function()
+        require("dap").step_into()
+      end,
+      "Step Into",
+    },
+    ["<leader>dt"] = {
+      function()
+        require("dap-go").debug_test()
+      end,
+      "Debug test",
+    },
+    ["<leader>dh"] = {
+      function()
+        require("dap.ui.widgets").hover()
+      end,
+      "Debug test",
+    },
+    ["<leader>dx"] = {
+      function()
+        require("dapui").close()
+      end,
+      "Debug test",
+    },
+  },
+}
+
 return M
