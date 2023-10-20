@@ -37,6 +37,18 @@ M.telescope = {
     ["<leader>pt"] = { "<cmd> Telescope terms <CR>", "Pick hidden term" },
 
     ["<leader>ma"] = { "<cmd> Telescope marks <CR>", "telescope bookmarks" },
+    ["<leader>gh"] = {
+      function()
+        require("telescope.builtin").git_bcommits()
+      end,
+      "List commits for current buffer with diff preview",
+    },
+    ["<leader>gH"] = {
+      function()
+        require("telescope.builtin").git_commits()
+      end,
+      "Lists commits for current directory with diff preview",
+    },
   },
 }
 
