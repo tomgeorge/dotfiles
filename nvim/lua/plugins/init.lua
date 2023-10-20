@@ -111,7 +111,6 @@ local plugins = {
     "stevearc/conform.nvim",
     event = "VeryLazy",
     config = function()
-      print("Setting up conform")
       require("conform").setup({
         formatters_by_ft = {
           lua = { "stylua" },
@@ -131,6 +130,7 @@ local plugins = {
       linters_by_ft = {
         go = { "golangcilint" },
         lua = { "luacheck" },
+        sh = { "shellcheck" },
       },
     },
     config = function(_, opts)
