@@ -42,7 +42,13 @@ local plugins = {
     config = function()
       local config = require("plugins.configs.telescope")
       require("telescope").setup(config)
+      require("telescope").load_extension("notify")
     end,
+  },
+  {
+    "rcarriga/nvim-notify",
+    config = true,
+    event = "VeryLazy",
   },
   {
     "numToStr/Comment.nvim",
