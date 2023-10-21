@@ -178,6 +178,7 @@ local plugins = {
       sections = {
         lualine_c = {
           "require('lsp-progress').progress()",
+          "filename",
         },
       },
     },
