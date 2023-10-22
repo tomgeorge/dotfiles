@@ -1,4 +1,5 @@
 local colorscheme = "gruvbox-material"
+
 -- If you want to use another colorscheme that has fun lua stuff
 -- local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
 
@@ -47,10 +48,13 @@ local plugins = {
       "hrsh7th/cmp-buffer",
       "hrsh7th/cmp-nvim-lsp-signature-help",
       "hrsh7th/cmp-nvim-lsp",
+      "hrsh7th/cmp-nvim-lua",
       "L3MON4D3/LuaSnip",
+      "onsails/lspkind.nvim",
     },
     opts = function()
       local cmp = require("cmp")
+      local lspkind = require("lspkind")
       return {
         snippet = {
           -- REQUIRED - you must specify a snippet engine
@@ -59,13 +63,11 @@ local plugins = {
           end,
         },
         formatting = {
-          max_width = 0,
-          source_names = {
-            nvim_lsp = "[LSP]",
-            path = "[Path]",
-            luasnip = "[Snippet]",
-            buffer = "[Buffer]",
-          },
+          format = lspkind.cmp_format({
+            mode = "symbol_text",
+            max_width = 50,
+            ellipsis_char = "...",
+          }),
         },
         window = {
           completion = cmp.config.window.bordered(),
@@ -81,6 +83,7 @@ local plugins = {
         }),
         sources = cmp.config.sources({
           { name = "nvim_lsp" },
+          { name = "nvim_lua" },
           { name = "luasnip" },
           { name = "buffer" },
           { name = "path" },
