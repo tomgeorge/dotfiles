@@ -28,6 +28,15 @@ M.telescope = {
     ["<leader>fh"] = { "<cmd> Telescope help_tags <CR>", "Help page" },
     ["<leader>fo"] = { "<cmd> Telescope oldfiles <CR>", "Find oldfiles" },
     ["<leader>fz"] = { "<cmd> Telescope current_buffer_fuzzy_find <CR>", "Find in current buffer" },
+    ["<leader>fn"] = {
+      function()
+        require("telescope.builtin").find_files({
+          cwd = "~/.config/nvim",
+          prompt_title = "Neovim config",
+        })
+      end,
+      "Open dotfiles",
+    },
 
     -- git
     ["<leader>gm"] = { "<cmd> Telescope git_commits <CR>", "Git commits (telescope)" },
