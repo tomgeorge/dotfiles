@@ -349,6 +349,16 @@ M.dap = {
       end,
       "Step Into",
     },
+    ["<leader>do"] = {
+      function()
+        require("dap").step_out()
+      end,
+    },
+    ["<leader>dX"] = {
+      function()
+        require("dap").terminate()
+      end,
+    },
     ["<leader>dt"] = {
       function()
         require("dap-go").debug_test()
