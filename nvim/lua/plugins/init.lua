@@ -413,12 +413,10 @@ local plugins = {
     end,
   },
   {
-    dir = "~/git/go-test.nvim",
+    "go-test.nvim",
     dev = true,
+    config = true,
     lazy = false,
-    config = function()
-      require("go-test").setup()
-    end,
   },
 }
 
