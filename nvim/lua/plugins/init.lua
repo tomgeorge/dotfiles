@@ -6,6 +6,15 @@ local colorscheme = "gruvbox-material"
 local plugins = {
   { "tpope/vim-unimpaired", lazy = false },
   {
+    "rcarriga/nvim-notify",
+    config = function()
+      local notify = require("notify")
+      notify.setup()
+      vim.notify = notify
+    end,
+    event = "VeryLazy",
+  },
+  {
     "sainnhe/gruvbox-material",
     lazy = false,
     priority = 1000,
@@ -184,6 +193,18 @@ local plugins = {
     config = function()
       require("lsp-progress").setup()
     end,
+  },
+  {
+    "echasnovski/mini.ai",
+    config = function()
+      require("mini.ai").setup({
+        mappings = {
+          goto_left = "g[",
+          goto_right = "g]",
+        },
+      })
+    end,
+    lazy = false,
   },
   {
     "echasnovski/mini.tabline",
