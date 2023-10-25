@@ -342,6 +342,14 @@ local plugins = {
       end
     end,
   },
+  {
+    dir = "~/git/go-test.nvim",
+    dev = true,
+    lazy = false,
+    config = function()
+      require("go-test").setup()
+    end,
+  },
 }
 
 local lazy_config = require("core.config").lazy_nvim
