@@ -14,6 +14,14 @@ M.window = {
 M.general = {
   n = {
     ["<Esc>"] = { "<cmd>noh<CR>" },
+    ["<C-d>"] = { "<C-d>zz" },
+    ["<C-u>"] = { "<C-u>zz" },
+    ["<leader>y"] = { '"+y' },
+    ["<leader>Y"] = { '"+Y' },
+  },
+  v = {
+    ["<leader>p"] = { '"_dP' },
+    ["<leader>y"] = { '"+y' },
   },
 }
 
