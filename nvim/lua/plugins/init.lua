@@ -246,10 +246,14 @@ local plugins = {
   {
     "echasnovski/mini.ai",
     config = function()
+      local spec_treesitter = require("mini.ai").gen_spec.treesitter
       require("mini.ai").setup({
         mappings = {
           goto_left = "g[",
           goto_right = "g]",
+        },
+        custom_textobjects = {
+          F = spec_treesitter({ a = "@function.outer", i = "@function_innter" }),
         },
       })
     end,
@@ -303,13 +307,16 @@ local plugins = {
   },
   {
     "nvim-treesitter/nvim-treesitter",
+    dependencies = { "nvim-treesitter/nvim-treesitter-textobjects" },
     init = function()
+      print("lazy loading treesitter")
       require("core.utils").lazy_load("nvim-treesitter")
     end,
     cmd = { "TSInstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
     build = ":TSUpdate",
     opts = require("plugins.configs.treesitter"),
     config = function(_, opts)
+      print("treesitter opts are " .. vim.inspect(opts))
       require("nvim-treesitter.configs").setup(opts)
     end,
   },
