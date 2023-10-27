@@ -226,8 +226,10 @@ local plugins = {
         section_separators = "",
       },
       sections = {
-        lualine_c = {
-          "require('lsp-progress').progress()",
+        lualine_x = {
+          function()
+            return require("plugins.configs.lualine").status_line()
+          end,
           "filename",
         },
       },
