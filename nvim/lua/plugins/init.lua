@@ -123,15 +123,11 @@ local plugins = {
             end
           end, { "i", "s" }),
           ["<C-p>"] = cmp.mapping(function(fallback)
-            print("hey")
             if cmp.visible() then
-              print("cmp.visible()")
               cmp.select_prev_item()
             elseif luasnip.jumpable(-1) then
-              print("luasnip jumpable")
               luasnip.jump(-1)
             else
-              print("fallback")
               fallback()
             end
           end, { "i", "s" }),
@@ -319,14 +315,12 @@ local plugins = {
     "nvim-treesitter/nvim-treesitter",
     dependencies = { "nvim-treesitter/nvim-treesitter-textobjects" },
     init = function()
-      print("lazy loading treesitter")
       require("core.utils").lazy_load("nvim-treesitter")
     end,
     cmd = { "TSInstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
     build = ":TSUpdate",
     opts = require("plugins.configs.treesitter"),
     config = function(_, opts)
-      print("treesitter opts are " .. vim.inspect(opts))
       require("nvim-treesitter.configs").setup(opts)
     end,
   },
@@ -370,7 +364,6 @@ local plugins = {
     "folke/trouble.nvim",
     event = "VeryLazy",
     init = function()
-      print("trouble.init")
       require("core.utils").load_mappings("trouble")
     end,
     config = function()

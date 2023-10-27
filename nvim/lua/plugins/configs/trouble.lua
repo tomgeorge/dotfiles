@@ -13,7 +13,6 @@ M.opts = {
 --
 local replace_quickfix = function()
   local title = vim.fn.getloclist(vim.fn.win_getid(), { title = 0 }).title
-  print("title is " .. title)
   if title ~= nil and title == "Help TOC" then
     return
   end
@@ -21,7 +20,6 @@ local replace_quickfix = function()
   local ok, trouble = pcall(require, "trouble")
   if ok then
     vim.defer_fn(function()
-      print("in defered fn")
       vim.cmd("cclose")
       trouble.open("quickfix")
     end, 0)
@@ -45,7 +43,6 @@ local function use_trouble()
 end
 
 M.setup_autocmd = function()
-  print("registering autocmd")
   local group = vim.api.nvim_create_augroup("ReplaceQuickfixWithTrouble", { clear = true })
   vim.api.nvim_create_autocmd("BufWinEnter", {
     pattern = "quickfix",
