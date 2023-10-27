@@ -142,7 +142,7 @@ M.lspconfig = {
       "LSP code action",
     },
 
-    ["gr"] = {
+    ["<leader>r"] = {
       function()
         require("telescope.builtin").lsp_references()
       end,
@@ -246,6 +246,12 @@ M.gitsigns = {
       end,
       "Stage hunk",
     },
+    ["<leader>gu"] = {
+      function()
+        require("gitsigns").undo_stage_hunk()
+      end,
+      "Reset hunk",
+    },
     ["<leader>gr"] = {
       function()
         require("gitsigns").reset_hunk()
@@ -275,7 +281,27 @@ M.gitsigns = {
   v = {
     ["<leader>gs"] = {
       function()
-        require("gitsigns").stage_hunk()
+        local selection = require("plugins.configs.gitsigns").get_visual_selection_lines()
+        require("notify").notify("Staging from line " .. selection[1] .. " to " .. selection[2], vim.log.levels.INFO, {
+          title = "gitsigns",
+          icon = "󰊢 ",
+        })
+        require("gitsigns").stage_hunk(selection)
+      end,
+      "Stage hunk",
+    },
+    ["<leader>gu"] = {
+      function()
+        local selection = require("plugins.configs.gitsigns").get_visual_selection_lines()
+        require("notify").notify(
+          "Unstaging from line " .. selection[1] .. " to " .. selection[2],
+          vim.log.levels.INFO,
+          {
+            title = "gitsigns",
+            icon = "󰊢 ",
+          }
+        )
+        require("gitsigns").undo_stage_hunk(selection)
       end,
       "Stage hunk",
     },

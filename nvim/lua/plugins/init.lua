@@ -259,7 +259,7 @@ local plugins = {
           goto_right = "g]",
         },
         custom_textobjects = {
-          F = spec_treesitter({ a = "@function.outer", i = "@function_innter" }),
+          F = spec_treesitter({ a = "@function.outer", i = "@function.inner" }),
         },
       })
     end,
