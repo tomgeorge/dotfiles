@@ -14,14 +14,18 @@ M.window = {
 M.general = {
   n = {
     ["<Esc>"] = { "<cmd>noh<CR>" },
-    ["<C-d>"] = { "<C-d>zz" },
-    ["<C-u>"] = { "<C-u>zz" },
+    ["<C-d>"] = { "<C-d>zz", "Scroll down and center" },
+    ["<C-u>"] = { "<C-u>zz", "Scroll down and center" },
+    ["j"] = { "jzz" },
+    ["k"] = { "kzz", "Scroll down and center" },
+    ["H"] = { "^" },
+    ["L"] = { "$" },
     ["<leader>y"] = { '"+y' },
     ["<leader>Y"] = { '"+Y' },
   },
   v = {
-    ["<leader>p"] = { '"_dP' },
-    ["<leader>y"] = { '"+y' },
+    ["<leader>p"] = { '"_dP', "Paste selection while keeping previous yank" },
+    ["<leader>y"] = { '"+y', "Copy to system clipboard (I think this happens by default now)" },
   },
 }
 
@@ -266,6 +270,14 @@ M.gitsigns = {
     ["<leader>gtd"] = {
       function() end,
       "Toggle deleted",
+    },
+  },
+  v = {
+    ["<leader>gs"] = {
+      function()
+        require("gitsigns").stage_hunk()
+      end,
+      "Stage hunk",
     },
   },
 }

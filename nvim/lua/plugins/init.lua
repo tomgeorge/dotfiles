@@ -5,8 +5,12 @@ local colorscheme = "gruvbox-material"
 
 local plugins = {
   { "tpope/vim-unimpaired", lazy = false },
+  { "vim-scripts/ReplaceWithRegister", event = "BufReadPost" },
   {
     "rcarriga/nvim-notify",
+    init = function()
+      vim.notify = require("notify")
+    end,
     config = function()
       local notify = require("notify")
       notify.setup()
@@ -216,7 +220,11 @@ local plugins = {
       "linrongbin16/lsp-progress.nvim",
     },
     opts = {
-      theme = colorscheme,
+      options = {
+        theme = colorscheme,
+        component_separators = "",
+        section_separators = "",
+      },
       sections = {
         lualine_c = {
           "require('lsp-progress').progress()",

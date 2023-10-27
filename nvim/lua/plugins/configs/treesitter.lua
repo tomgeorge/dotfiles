@@ -9,6 +9,22 @@ return {
       -- mini.ai is taking care of keymaps
       keymaps = {},
     },
+    move = {
+      enable = true,
+      set_jumps = false,
+      goto_next_start = {
+        ["]f"] = "@function.outer",
+      },
+      goto_next_end = {
+        ["]F"] = "@function.outer",
+      },
+      goto_previous_start = {
+        ["[f"] = "@function.outer",
+      },
+      goto_previous_end = {
+        ["[F"] = "@function.outer",
+      },
+    },
   },
   highlight = {
     enable = true,
