@@ -2,6 +2,7 @@ local M = {}
 
 M.colorscheme_plugin_spec = function(selected_colorscheme)
   local colorscheme_path = "colors." .. selected_colorscheme
+  print("colorscheme_path is " .. colorscheme_path)
   local colorscheme = require(colorscheme_path)
 
   return {
