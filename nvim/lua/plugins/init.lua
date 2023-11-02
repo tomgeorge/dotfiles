@@ -160,6 +160,14 @@ local plugins = {
   },
   {
     "neovim/nvim-lspconfig",
+    dependencies = {
+      "aznhe21/actions-preview.nvim",
+      config = function()
+        require("actions-preview").setup({
+          backend = { "nui", "telescope" },
+        })
+      end,
+    },
     init = function()
       require("core.utils").lazy_load("nvim-lspconfig")
     end,
