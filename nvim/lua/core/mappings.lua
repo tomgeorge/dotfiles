@@ -135,7 +135,7 @@ M.lspconfig = {
 
     ["<leader>ca"] = {
       function()
-        vim.lsp.buf.code_action()
+        require("actions-preview").code_actions()
       end,
       "LSP code action",
     },
@@ -279,27 +279,13 @@ M.gitsigns = {
   v = {
     ["<leader>gs"] = {
       function()
-        local selection = require("plugins.configs.gitsigns").get_visual_selection_lines()
-        require("notify").notify("Staging from line " .. selection[1] .. " to " .. selection[2], vim.log.levels.INFO, {
-          title = "gitsigns",
-          icon = "󰊢 ",
-        })
-        require("gitsigns").stage_hunk(selection)
+        require("gitsigns").stage_hunk({ vim.fn.line("."), vim.fn.line("v") })
       end,
-      "Stage hunk",
+      "Stage selected range",
     },
     ["<leader>gu"] = {
       function()
-        local selection = require("plugins.configs.gitsigns").get_visual_selection_lines()
-        require("notify").notify(
-          "Unstaging from line " .. selection[1] .. " to " .. selection[2],
-          vim.log.levels.INFO,
-          {
-            title = "gitsigns",
-            icon = "󰊢 ",
-          }
-        )
-        require("gitsigns").undo_stage_hunk(selection)
+        require("gitsigns").undo_stage_hunk({ vim.fn.line("."), vim.fn.line("v") })
       end,
       "Stage hunk",
     },
