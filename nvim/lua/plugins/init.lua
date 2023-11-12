@@ -68,6 +68,7 @@ local plugins = {
       "hrsh7th/cmp-nvim-lsp-signature-help",
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-nvim-lua",
+      "PaterJason/cmp-conjure",
       "saadparwaiz1/cmp_luasnip",
       {
         "L3MON4D3/LuaSnip",
@@ -141,6 +142,7 @@ local plugins = {
         sources = cmp.config.sources({
           { name = "nvim_lsp" },
           { name = "nvim_lua" },
+          { name = "conjure" },
           { name = "luasnip" },
           { name = "buffer" },
           { name = "path" },
@@ -149,6 +151,28 @@ local plugins = {
         }),
       }
     end,
+  },
+  {
+    "Olical/conjure",
+    ft = { "clojure" },
+    config = function(_, opts)
+      print("loading conjure for some reason")
+      require("conjure.main").main()
+      require("conjure.mapping")["on-filetype"]()
+    end,
+    dependencies = {
+      "tpope/vim-sexp-mappings-for-regular-people",
+      "tpope/vim-repeat",
+      "guns/vim-sexp",
+    },
+  },
+  {
+    "clojure-vim/vim-jack-in",
+    lazy = false,
+    ft = "clojure",
+    dependencies = {
+      "tpope/vim-dispatch",
+    },
   },
   {
     "norcalli/nvim-colorizer.lua",
@@ -183,6 +207,7 @@ local plugins = {
         formatters_by_ft = {
           lua = { "stylua" },
           go = { "gofmt", "goimports" },
+          clojure = { "cljstyle" },
         },
         format_on_save = {
           timeout_ms = 1000,
@@ -199,6 +224,7 @@ local plugins = {
         go = { "golangcilint" },
         lua = { "luacheck" },
         sh = { "shellcheck" },
+        clojure = { "clj-kondo" },
       },
     },
     config = function(_, opts)

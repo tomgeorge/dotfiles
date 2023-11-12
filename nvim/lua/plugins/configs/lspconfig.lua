@@ -32,7 +32,7 @@ M.capabilities.textDocument.completion.completionItem = {
   },
 }
 
-local servers = { "html", "cssls", "clangd", "lua_ls", "gopls", "bashls" }
+local servers = { "html", "cssls", "clangd", "lua_ls", "gopls", "bashls", "clojure_lsp" }
 
 for _, lsp in ipairs(servers) do
   if lsp == "gopls" then
