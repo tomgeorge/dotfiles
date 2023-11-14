@@ -164,6 +164,11 @@ local plugins = {
       "tpope/vim-sexp-mappings-for-regular-people",
       "tpope/vim-repeat",
       "guns/vim-sexp",
+      {
+        "akinsho/toggleterm.nvim",
+        version = "*",
+        config = true,
+      },
     },
   },
   {
