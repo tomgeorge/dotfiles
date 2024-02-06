@@ -25,6 +25,12 @@ M.general = {
     ["<leader>p"] = { '"_dP', "Paste selection while keeping previous yank" },
     ["<leader>y"] = { '"+y', "Copy to system clipboard (I think this happens by default now)" },
   },
+  t = {
+    ["<Esc>"] = { "<C-\\><C-n>" },
+  },
+  i = {
+    ["kj"] = { "<esc>" },
+  },
 }
 
 M.telescope = {
@@ -352,6 +358,18 @@ M.mini_files = {
   },
 }
 
+M.oil_nvim = {
+  plugin = true,
+  n = {
+    ["<leader>o"] = {
+      function()
+        require("oil").open()
+      end,
+      "Open oil.nvim file exporer",
+    },
+  },
+}
+
 M.dap = {
   plugin = true,
   n = {
@@ -406,6 +424,17 @@ M.dap = {
         require("dapui").close()
       end,
       "Debug test",
+    },
+  },
+}
+
+M.toggleterm = {
+  plugin = true,
+  n = {
+    ["<C-T>"] = {
+      function()
+        require("toggleterm").toggle()
+      end,
     },
   },
 }

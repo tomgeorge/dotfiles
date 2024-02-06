@@ -68,7 +68,6 @@ local plugins = {
       "hrsh7th/cmp-nvim-lsp-signature-help",
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-nvim-lua",
-      "PaterJason/cmp-conjure",
       "saadparwaiz1/cmp_luasnip",
       {
         "L3MON4D3/LuaSnip",
@@ -156,9 +155,17 @@ local plugins = {
     "Olical/conjure",
     ft = { "clojure" },
     config = function(_, opts)
-      print("loading conjure for some reason")
+      print("loading conjure")
       require("conjure.main").main()
       require("conjure.mapping")["on-filetype"]()
+    end,
+    init = function()
+      vim.g.maplocalleader = ","
+      vim.g["conjure#log#hud#anchor"] = "NE"
+      vim.g["conjure#log#hud#border"] = "none"
+      vim.g["conjure#mapping#doc_word"] = nil
+      vim.g["conjure#client#clojure#nrepl#connection#auto_repl#enabled"] = false
+      vim.g["conjure#client#clojure#nrepl#eval#raw_out"] = true
     end,
     dependencies = {
       "tpope/vim-sexp-mappings-for-regular-people",
@@ -168,6 +175,30 @@ local plugins = {
         "akinsho/toggleterm.nvim",
         version = "*",
         config = true,
+        opts = {
+          direction = "float",
+        },
+        init = function()
+          require("core.utils").load_mappings("toggleterm")
+        end,
+      },
+      {
+        "PaterJason/cmp-conjure",
+        config = function()
+          local cmp = require("cmp")
+          local config = cmp.get_config()
+          table.insert(config.sources, {
+            name = "buffer",
+            option = {
+              sources = {
+                {
+                  name = "conjure",
+                },
+              },
+            },
+          })
+          cmp.setup(config)
+        end,
       },
     },
   },
@@ -216,7 +247,7 @@ local plugins = {
           terraform = { "terraform_fmt" },
         },
         format_on_save = {
-          timeout_ms = 1000,
+          timeout_ms = 5000,
           lsp_fallback = true,
         },
       })
@@ -262,6 +293,14 @@ local plugins = {
         section_separators = "",
       },
       sections = {
+        lualine_c = {
+          {
+            "filename",
+            file_status = true,
+            newfile_status = true,
+            path = 1,
+          },
+        },
         lualine_x = {
           function()
             return require("plugins.configs.lualine").status_line()
@@ -323,6 +362,44 @@ local plugins = {
       require("core.utils").load_mappings("mini_files")
     end,
   },
+  -- {
+  --   "stevearc/oil.nvim",
+  --   opts = {
+  --     columns = {
+  --       "permissions",
+  --       { "size", highlight = "Special" },
+  --       { "mtime", highlight = "Number" },
+  --       "icon",
+  --     },
+  --     keymaps = {
+  --       ["g?"] = "actions.show_help",
+  --       ["<CR>"] = "actions.select",
+  --       ["<C-v>"] = "actions.select_vsplit",
+  --       ["<C-s>"] = "actions.select_split",
+  --       ["<C-t>"] = "actions.select_tab",
+  --       ["<C-p>"] = "actions.preview",
+  --       ["<C-c>"] = "actions.close",
+  --       ["<C-r>"] = "actions.refresh",
+  --       ["-"] = "actions.parent",
+  --       ["_"] = "actions.open_cwd",
+  --       ["`"] = "actions.cd",
+  --       ["~"] = "actions.tcd",
+  --       ["gs"] = "actions.change_sort",
+  --       ["gx"] = "actions.open_external",
+  --       ["g."] = "actions.toggle_hidden",
+  --       ["g\\"] = "actions.toggle_trash",
+  --     },
+  --     use_default_keymaps = false,
+  --     win_options = {
+  --       number = false,
+  --       relativenumber = false,
+  --     },
+  --   },
+  --   dependencies = { "nvim-tree/nvim-web-devicons" },
+  --   init = function()
+  --     require("core.utils").load_mappings("oil_nvim")
+  --   end,
+  -- },
   {
     "echasnovski/mini.surround",
     event = "BufEnter",
@@ -446,7 +523,25 @@ local plugins = {
       },
       {
         "leoluz/nvim-dap-go",
-        config = true,
+        config = function()
+          require("dap-go").setup({
+            dap_configurations = {
+              {
+                type = "go",
+                name = "Attach remote (run on port 43000)",
+                mode = "remote",
+                request = "attach",
+                connect = {
+                  host = "127.0.0.1",
+                  port = "43000",
+                },
+              },
+            },
+            delve = {
+              port = "43000",
+            },
+          })
+        end,
       },
       {
         "theHamsta/nvim-dap-virtual-text",

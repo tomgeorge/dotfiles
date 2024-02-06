@@ -11,9 +11,11 @@ M.on_attach = function(client, bufnr)
   utils.load_mappings("lspconfig", { buffer = bufnr })
 end
 
-M.capabilities = vim.lsp.protocol.make_client_capabilities()
-
-M.capabilities = vim.tbl_deep_extend("force", M.capabilities, require("cmp_nvim_lsp").default_capabilities())
+M.capabilities = vim.tbl_deep_extend(
+  "force",
+  vim.lsp.protocol.make_client_capabilities(),
+  require("cmp_nvim_lsp").default_capabilities()
+)
 
 M.capabilities.textDocument.completion.completionItem = {
   documentationFormat = { "markdown", "plaintext" },
@@ -33,10 +35,13 @@ M.capabilities.textDocument.completion.completionItem = {
   },
 }
 
-local new_servers = {
+local servers = {
   lua_ls = {
     settings = {
       Lua = {
+        codeLens = {
+          enable = true,
+        },
         completion = {
           callSnippet = "Replace",
         },
@@ -87,6 +92,8 @@ local new_servers = {
   clangd = {},
   html = {},
   cssls = {},
+  tailwindcss = {},
+  ruby_ls = {},
 }
 
 require("neodev").setup({
@@ -96,7 +103,7 @@ require("neodev").setup({
   end,
 })
 
-for server, settings in pairs(new_servers) do
+for server, settings in pairs(servers) do
   local extra_capabilities = settings.capabilities or {}
   capabilities = vim.tbl_deep_extend("force", M.capabilities, extra_capabilities)
   lspconfig[server].setup({
