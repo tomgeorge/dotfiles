@@ -345,6 +345,12 @@ local plugins = {
     lazy = false,
   },
   {
+    "echasnovski/mini.jump",
+    version = false,
+    lazy = false,
+    config = true,
+  },
+  {
     "echasnovski/mini.tabline",
     version = "*",
     lazy = false,
@@ -451,7 +457,7 @@ local plugins = {
   {
     "sindrets/diffview.nvim",
     config = true,
-    cmd = "DiffviewOpen",
+    cmd = { "DiffviewOpen", "DiffviewFileHistory" },
   },
   {
     "NeogitOrg/neogit",
