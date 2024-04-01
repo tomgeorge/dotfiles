@@ -379,7 +379,19 @@ M.dap = {
       end,
       "Start Debugger/Continue",
     },
+    ["<F5>"] = {
+      function()
+        require("dap").continue()
+      end,
+      "Start Debugger/Continue",
+    },
     ["<leader>db"] = {
+      function()
+        require("dap").toggle_breakpoint()
+      end,
+      "Toggle breakpoint",
+    },
+    ["<F9>"] = {
       function()
         require("dap").toggle_breakpoint()
       end,
@@ -391,7 +403,19 @@ M.dap = {
       end,
       "Step Over",
     },
+    ["<F10>"] = {
+      function()
+        require("dap").step_over()
+      end,
+      "Step Over",
+    },
     ["<leader>ds"] = {
+      function()
+        require("dap").step_into()
+      end,
+      "Step Into",
+    },
+    ["<F11>"] = {
       function()
         require("dap").step_into()
       end,
@@ -401,11 +425,25 @@ M.dap = {
       function()
         require("dap").step_out()
       end,
+      "Step Out",
+    },
+    ["<F23>"] = {
+      function()
+        require("dap").step_out()
+      end,
+      "Step Out",
     },
     ["<leader>dX"] = {
       function()
         require("dap").terminate()
       end,
+      "Terminate debug session",
+    },
+    ["<F17>"] = {
+      function()
+        require("dap").terminate()
+      end,
+      "Terminate debug session",
     },
     ["<leader>dt"] = {
       function()
@@ -417,13 +455,13 @@ M.dap = {
       function()
         require("dap.ui.widgets").hover()
       end,
-      "Debug test",
+      "Hover",
     },
     ["<leader>dx"] = {
       function()
         require("dapui").close()
       end,
-      "Debug test",
+      "Close",
     },
   },
 }
