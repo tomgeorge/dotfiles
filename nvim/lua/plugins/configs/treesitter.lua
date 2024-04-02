@@ -37,6 +37,16 @@ return {
         ["[F"] = "@function.outer",
       },
     },
+    lsp_interop = {
+      enable = true,
+      floating_preview_opts = {
+        border = "single",
+      },
+      peek_definition_code = {
+        ["<leader>df"] = "@function.outer",
+        ["<leader>dF"] = "@class.outer",
+      },
+    },
   },
   highlight = {
     enable = true,
