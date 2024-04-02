@@ -1,5 +1,17 @@
 return {
-  ensure_installed = { "lua", "go", "bash", "vimdoc", "vim", "terraform", "query", "http", "json" },
+  ensure_installed = {
+    "lua",
+    "go",
+    "bash",
+    "vimdoc",
+    "vim",
+    "terraform",
+    "query",
+    "http",
+    "json",
+    "markdown",
+    "markdown_inline",
+  },
 
   textobjects = {
     select = {

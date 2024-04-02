@@ -68,6 +68,7 @@ local plugins = {
       "hrsh7th/cmp-nvim-lsp-signature-help",
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-nvim-lua",
+      -- "PaterJason/cmp-conjure",
       "saadparwaiz1/cmp_luasnip",
       {
         "L3MON4D3/LuaSnip",
@@ -151,57 +152,25 @@ local plugins = {
       }
     end,
   },
-  {
-    "Olical/conjure",
-    ft = { "clojure" },
-    config = function(_, opts)
-      print("loading conjure")
-      require("conjure.main").main()
-      require("conjure.mapping")["on-filetype"]()
-    end,
-    init = function()
-      vim.g.maplocalleader = ","
-      vim.g["conjure#log#hud#anchor"] = "NE"
-      vim.g["conjure#log#hud#border"] = "none"
-      vim.g["conjure#mapping#doc_word"] = nil
-      vim.g["conjure#client#clojure#nrepl#connection#auto_repl#enabled"] = false
-      vim.g["conjure#client#clojure#nrepl#eval#raw_out"] = true
-    end,
-    dependencies = {
-      "tpope/vim-sexp-mappings-for-regular-people",
-      "tpope/vim-repeat",
-      "guns/vim-sexp",
-      {
-        "akinsho/toggleterm.nvim",
-        version = "*",
-        config = true,
-        opts = {
-          direction = "float",
-        },
-        init = function()
-          require("core.utils").load_mappings("toggleterm")
-        end,
-      },
-      {
-        "PaterJason/cmp-conjure",
-        config = function()
-          local cmp = require("cmp")
-          local config = cmp.get_config()
-          table.insert(config.sources, {
-            name = "buffer",
-            option = {
-              sources = {
-                {
-                  name = "conjure",
-                },
-              },
-            },
-          })
-          cmp.setup(config)
-        end,
-      },
-    },
-  },
+  -- {
+  --   "Olical/conjure",
+  --   ft = { "clojure" },
+  --   config = function(_, opts)
+  --     print("loading conjure for some reason")
+  --     require("conjure.main").main()
+  --     require("conjure.mapping")["on-filetype"]()
+  --   end,
+  --   dependencies = {
+  --     "tpope/vim-sexp-mappings-for-regular-people",
+  --     "tpope/vim-repeat",
+  --     "guns/vim-sexp",
+  --     {
+  --       "akinsho/toggleterm.nvim",
+  --       version = "*",
+  --       config = true,
+  --     },
+  --   },
+  -- },
   {
     "clojure-vim/vim-jack-in",
     lazy = false,
@@ -466,6 +435,9 @@ local plugins = {
     end,
     cmd = "Neogit",
     opts = require("plugins.configs.neogit").opts,
+    dependencies = {
+      "sindrets/diffview.nvim",
+    },
   },
   {
     "folke/which-key.nvim",
@@ -485,6 +457,7 @@ local plugins = {
   },
   {
     "folke/trouble.nvim",
+    branch = "dev",
     event = "VeryLazy",
     init = function()
       require("core.utils").load_mappings("trouble")
@@ -531,10 +504,11 @@ local plugins = {
         "leoluz/nvim-dap-go",
         config = function()
           require("dap-go").setup({
+
             dap_configurations = {
               {
                 type = "go",
-                name = "Attach remote (run on port 43000)",
+                name = "Attach remote (port 43000)",
                 mode = "remote",
                 request = "attach",
                 connect = {
@@ -553,6 +527,7 @@ local plugins = {
         "theHamsta/nvim-dap-virtual-text",
         config = true,
       },
+      { "nvim-neotest/nvim-nio" },
     },
     event = "VeryLazy",
     config = function()
