@@ -21,6 +21,16 @@ return {
       -- mini.ai is taking care of keymaps
       keymaps = {},
     },
+    lsp_interop = {
+      enable = true,
+      floating_preview_opts = {
+        border = "single",
+      },
+      peek_definition_code = {
+        ["<leader>df"] = "@function.outer",
+        ["<leader>dF"] = "@class.outer",
+      },
+    },
     move = {
       enable = true,
       set_jumps = false,
