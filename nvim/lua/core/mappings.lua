@@ -31,6 +31,9 @@ M.general = {
   i = {
     ["kj"] = { "<esc>" },
   },
+  c = {
+    ["%%"] = { [[getcmdtype() == ':' ? expand('%:h').'/' : '%%']], opts = { expr = true } },
+  },
 }
 
 M.telescope = {

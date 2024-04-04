@@ -13,10 +13,17 @@ M.load_mappings = function(section, mapping_opt)
         local default_opts = vim.tbl_deep_extend("force", { mode = mode }, mapping_opt or {})
         for keybind, mapping_info in pairs(mode_values) do
           local opts = vim.tbl_deep_extend("force", default_opts, mapping_info.opts or {})
-
+          -- if keybind == "%%" then
+          --   vim.notify("mapping_info is " .. vim.inspect(mapping_info))
+          -- end
           mapping_info.opts, opts.mode = nil, nil
           opts.desc = mapping_info[2]
 
+          -- if keybind == "%%" then
+          --   vim.notify("keybind" .. vim.inspect(keybind))
+          --   vim.notify("mode" .. vim.inspect(mode))
+          --   vim.notify("opts" .. vim.inspect(opts))
+          -- end
           vim.keymap.set(mode, keybind, mapping_info[1], opts)
         end
       end
