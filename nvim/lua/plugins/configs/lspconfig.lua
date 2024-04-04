@@ -8,6 +8,21 @@ M.on_attach = function(client, bufnr)
   if client.server_capabilities.inlayHintProvider then
     vim.lsp.inlay_hint(bufnr, true)
   end
+  -- workaround for gopls not supporting semanticTokensProvider
+  -- https://github.com/golang/go/issues/54531#issuecomment-1464982242
+  if client.name == "gopls" then
+    if not client.server_capabilities.semanticTokensProvider then
+      local semantic = client.config.capabilities.textDocument.semanticTokens
+      client.server_capabilities.semanticTokensProvider = {
+        full = true,
+        legend = {
+          tokenTypes = semantic.tokenTypes,
+          tokenModifiers = semantic.tokenModifiers,
+        },
+        range = true,
+      }
+    end
+  end
   utils.load_mappings("lspconfig", { buffer = bufnr })
 end
 
@@ -70,20 +85,37 @@ local servers = {
   gopls = {
     settings = {
       gopls = {
-        -- staticcheck = true,
-        -- analyses = {
-        --   unusedparams = true,
-        --   shadow = true,
-        -- },
-        hints = {
-          parameterNames = false,
-          assignVariableTypes = false,
-          compositeLiteralFields = false,
-          compositeLiteralTypes = false,
-          constantValues = false,
-          functionTypeParameters = false,
-          rangeVariableTypes = false,
+        gofumpt = true,
+        codelenses = {
+          gc_details = false,
+          generate = true,
+          regenerate_cgo = true,
+          run_govulncheck = true,
+          test = true,
+          tidy = true,
+          upgrade_dependency = true,
+          vendor = true,
         },
+        analyses = {
+          fieldalignment = true,
+          nilness = true,
+          unusedwrite = true,
+          unusedparams = true,
+          useany = true,
+        },
+        -- hints = {
+        --   parameterNames = true,
+        --   assignVariableTypes = true,
+        --   compositeLiteralFields = true,
+        --   compositeLiteralTypes = true,
+        --   constantValues = true,
+        --   functionTypeParameters = true,
+        --   rangeVariableTypes = true,
+        -- },
+        staticcheck = true,
+        usePlaceholders = true,
+        directoryFilters = { "-.git", "-.vscode", "-.idea", "-.vscode-test", "-node_modules" },
+        semanticTokens = true,
       },
     },
   },
