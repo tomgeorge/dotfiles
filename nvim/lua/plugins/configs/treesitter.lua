@@ -5,12 +5,13 @@ return {
     "bash",
     "vimdoc",
     "vim",
-    "terraform",
+    "hcl",
     "query",
     "http",
     "json",
     "markdown",
     "markdown_inline",
+    "yaml",
   },
 
   textobjects = {

@@ -1,6 +1,7 @@
 local M = {}
 
 M.plugin_string = "catppuccin/nvim"
+M.name = "catppuccin"
 
 M.opts = {
   flavour = "frappe",

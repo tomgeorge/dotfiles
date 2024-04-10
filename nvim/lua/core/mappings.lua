@@ -20,6 +20,18 @@ M.general = {
     ["L"] = { "$" },
     ["<leader>y"] = { '"+y' },
     ["<leader>Y"] = { '"+Y' },
+    ["<leader>bg"] = {
+      function()
+        local toggle = {
+          dark = "light",
+          light = "dark",
+        }
+        local bg = vim.o.background
+        vim.cmd("set background=" .. toggle[bg])
+        print("Set background to " .. vim.o.background)
+      end,
+      "Toggle background from dark to light",
+    },
   },
   v = {
     ["<leader>p"] = { '"_dP', "Paste selection while keeping previous yank" },
