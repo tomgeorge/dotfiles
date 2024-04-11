@@ -1,4 +1,4 @@
-local colorscheme = "catppuccin"
+local colorscheme = "gruvbox"
 
 -- If you want to use another colorscheme that has fun lua stuff
 local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
@@ -18,16 +18,6 @@ local plugins = {
     end,
     event = "VeryLazy",
   },
-  -- {
-  --   "sainnhe/gruvbox-material",
-  --   lazy = false,
-  --   priority = 1000,
-  --   config = function()
-  --     vim.opt.background = "dark"
-  --     vim.g.gruvbox_material_background = "soft"
-  --     vim.cmd("colorscheme gruvbox-material")
-  --   end,
-  -- },
   colorscheme_plugin_spec,
   {
     "nvim-telescope/telescope.nvim",
@@ -161,6 +151,7 @@ local plugins = {
   --     require("conjure.mapping")["on-filetype"]()
   --   end,
   --   dependencies = {
+  --     "julienvincent/nvim-paredit"
   --     "tpope/vim-sexp-mappings-for-regular-people",
   --     "tpope/vim-repeat",
   --     "guns/vim-sexp",
@@ -359,44 +350,6 @@ local plugins = {
       require("core.utils").load_mappings("mini_files")
     end,
   },
-  -- {
-  --   "stevearc/oil.nvim",
-  --   opts = {
-  --     columns = {
-  --       "permissions",
-  --       { "size", highlight = "Special" },
-  --       { "mtime", highlight = "Number" },
-  --       "icon",
-  --     },
-  --     keymaps = {
-  --       ["g?"] = "actions.show_help",
-  --       ["<CR>"] = "actions.select",
-  --       ["<C-v>"] = "actions.select_vsplit",
-  --       ["<C-s>"] = "actions.select_split",
-  --       ["<C-t>"] = "actions.select_tab",
-  --       ["<C-p>"] = "actions.preview",
-  --       ["<C-c>"] = "actions.close",
-  --       ["<C-r>"] = "actions.refresh",
-  --       ["-"] = "actions.parent",
-  --       ["_"] = "actions.open_cwd",
-  --       ["`"] = "actions.cd",
-  --       ["~"] = "actions.tcd",
-  --       ["gs"] = "actions.change_sort",
-  --       ["gx"] = "actions.open_external",
-  --       ["g."] = "actions.toggle_hidden",
-  --       ["g\\"] = "actions.toggle_trash",
-  --     },
-  --     use_default_keymaps = false,
-  --     win_options = {
-  --       number = false,
-  --       relativenumber = false,
-  --     },
-  --   },
-  --   dependencies = { "nvim-tree/nvim-web-devicons" },
-  --   init = function()
-  --     require("core.utils").load_mappings("oil_nvim")
-  --   end,
-  -- },
   {
     "echasnovski/mini.surround",
     event = "BufEnter",
