@@ -1,4 +1,4 @@
-local colorscheme = "gruvbox"
+local colorscheme = "rose-pine"
 
 -- If you want to use another colorscheme that has fun lua stuff
 local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
@@ -171,7 +171,17 @@ local plugins = {
     },
   },
   {
-    "norcalli/nvim-colorizer.lua",
+    "akinsho/toggleterm.nvim",
+    version = "*",
+    config = true,
+    opts = {
+      direction = "float",
+      open_mapping = [[<C-t>]],
+    },
+    event = "VeryLazy",
+  },
+  {
+    "norcall/nvim-colorizer.lua",
     event = "BufReadPre",
     config = function()
       local config = require("plugins.configs.colorizer")
