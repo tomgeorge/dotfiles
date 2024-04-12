@@ -1,12 +1,16 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
 
+wezterm.on("update-right-status", function(window, pane)
+	window:set_right_status(pane:get_foreground_process_name())
+end)
+
 return {
-	color_scheme = "nord",
-	font = wezterm.font("SauceCodePro NerdFont"),
-	font_size = 11,
-	window_background_opacity = 1,
-	text_background_opacity = 1,
+	color_scheme = "rose-pine-moon",
+	font = wezterm.font("JetBrains Mono"),
+	font_size = 13,
+	window_background_opacity = 0.9,
+	text_background_opacity = 0.9,
 	tab_bar_at_bottom = true,
 	use_fancy_tab_bar = false,
 	leader = { key = "a", mods = "CTRL" },
@@ -26,5 +30,7 @@ return {
 		{ key = "c", mods = "LEADER", action = act.SpawnTab("CurrentPaneDomain") },
 		{ key = "]", mods = "LEADER", action = act.ActivateTabRelative(1) },
 		{ key = "[", mods = "LEADER", action = act.ActivateTabRelative(-1) },
+		{ key = "r", mods = "LEADER", action = act.ReloadConfiguration },
+		{ key = "y", mods = "LEADER", action = act.QuickSelect },
 	},
 }
