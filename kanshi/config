@@ -1,0 +1,19 @@
+profile docked_lid_open {
+  output DP-1 mode 1920x1080@74.998Hz  position 1920,0
+  output DP-2 mode 1920x1080@60.000Hz position 0,0
+  output eDP-1 mode 1920x1080@60.020Hz position 3840,0
+  exec swaymsg workspace 1, move workspace to DP-2
+}
+
+profile lid_closed {
+  output DP-1 mode 1920x1080@74.998Hz  position 1920,0
+  output DP-2 mode 1920x1080@60.000Hz position 0,0
+  output eDP-1 disable
+  exec swaymsg workspace 1, move workspace to DP-2
+}
+
+profile away {
+  output DP-1 disable
+  output DP-2 disable
+  output eDP-1 mode 1920x1080@60.020Hz position 0,0
+}
