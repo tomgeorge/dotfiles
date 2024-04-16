@@ -484,7 +484,7 @@ M.dap = {
 M.toggleterm = {
   plugin = true,
   n = {
-    ["<C-T>"] = {
+    ["<C-t>"] = {
       function()
         require("toggleterm").toggle()
       end,

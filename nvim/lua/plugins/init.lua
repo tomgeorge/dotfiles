@@ -1,4 +1,4 @@
-local colorscheme = "rose-pine"
+local colorscheme = "catppuccin"
 
 -- If you want to use another colorscheme that has fun lua stuff
 local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colorscheme)
