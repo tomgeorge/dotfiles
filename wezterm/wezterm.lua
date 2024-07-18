@@ -6,10 +6,11 @@ wezterm.on("update-right-status", function(window, pane)
 end)
 
 return {
-	color_scheme = "rose-pine-moon",
+	color_scheme = "Catppuccin Frappe",
 	font = wezterm.font("JetBrains Mono"),
 	font_size = 13,
 	window_background_opacity = 0.9,
+	window_decorations = "RESIZE",
 	text_background_opacity = 0.9,
 	tab_bar_at_bottom = true,
 	use_fancy_tab_bar = false,

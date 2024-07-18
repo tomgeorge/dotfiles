@@ -126,6 +126,7 @@ local servers = {
   cssls = {},
   tailwindcss = {},
   ruby_ls = {},
+  nil_ls = {},
 }
 
 require("neodev").setup({
