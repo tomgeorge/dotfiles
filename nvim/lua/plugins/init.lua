@@ -142,26 +142,26 @@ local plugins = {
       }
     end,
   },
-  -- {
-  --   "Olical/conjure",
-  --   ft = { "clojure" },
-  --   config = function(_, opts)
-  --     print("loading conjure for some reason")
-  --     require("conjure.main").main()
-  --     require("conjure.mapping")["on-filetype"]()
-  --   end,
-  --   dependencies = {
-  --     "julienvincent/nvim-paredit"
-  --     "tpope/vim-sexp-mappings-for-regular-people",
-  --     "tpope/vim-repeat",
-  --     "guns/vim-sexp",
-  --     {
-  --       "akinsho/toggleterm.nvim",
-  --       version = "*",
-  --       config = true,
-  --     },
-  --   },
-  -- },
+  {
+    "Olical/conjure",
+    ft = { "clojure" },
+    config = function(_, opts)
+      print("loading conjure for some reason")
+      require("conjure.main").main()
+      require("conjure.mapping")["on-filetype"]()
+    end,
+    dependencies = {
+      "julienvincent/nvim-paredit",
+      "tpope/vim-sexp-mappings-for-regular-people",
+      "tpope/vim-repeat",
+      "guns/vim-sexp",
+      {
+        "akinsho/toggleterm.nvim",
+        version = "*",
+        config = true,
+      },
+    },
+  },
   {
     "clojure-vim/vim-jack-in",
     lazy = false,
@@ -241,6 +241,19 @@ local plugins = {
       vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost", "InsertLeave" }, {
         group = group,
         callback = function()
+          local ignore_repositories = { "karpenter" }
+          local should_ignore = function(path)
+            for _, ignore in ipairs(ignore_repositories) do
+              if string.find(path, ignore) then
+                return true
+              end
+              return false
+            end
+          end
+
+          if should_ignore(vim.fn.getcwd()) then
+            return
+          end
           require("lint").try_lint()
         end,
       })

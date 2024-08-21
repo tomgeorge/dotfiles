@@ -11,6 +11,7 @@ M.colorscheme_plugin_spec = function(selected_colorscheme)
   end
   return {
     colorscheme.plugin_string,
+    dependencies = colorscheme.dependencies or {},
     lazy = false,
     priority = 1000,
     config = colorscheme.config or default_config,

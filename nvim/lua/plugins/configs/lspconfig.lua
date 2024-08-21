@@ -125,6 +125,7 @@ local servers = {
   html = {},
   cssls = {},
   tailwindcss = {},
+  tsserver = {},
   ruby_ls = {},
   nil_ls = {},
 }
@@ -138,7 +139,7 @@ require("neodev").setup({
 
 for server, settings in pairs(servers) do
   local extra_capabilities = settings.capabilities or {}
-  capabilities = vim.tbl_deep_extend("force", M.capabilities, extra_capabilities)
+  local capabilities = vim.tbl_deep_extend("force", M.capabilities, extra_capabilities)
   lspconfig[server].setup({
     on_attach = M.on_attach,
     capabilities = capabilities,

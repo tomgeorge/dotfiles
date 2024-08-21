@@ -1,9 +1,9 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
 
-wezterm.on("update-right-status", function(window, pane)
-	window:set_right_status(pane:get_foreground_process_name())
-end)
+-- wezterm.on("update-right-status", function(window, pane)
+-- 	window:set_right_status(pane:get_foreground_process_name())
+-- end)
 
 return {
 	color_scheme = "Catppuccin Frappe",
