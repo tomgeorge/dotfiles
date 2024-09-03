@@ -21,7 +21,7 @@ local plugins = {
   colorscheme_plugin_spec,
   {
     "nvim-telescope/telescope.nvim",
-    tag = "0.1.2",
+    tag = "0.1.8",
     dependencies = {
       "nvim-lua/plenary.nvim",
       {
@@ -181,7 +181,7 @@ local plugins = {
     event = "VeryLazy",
   },
   {
-    "norcall/nvim-colorizer.lua",
+    "norcalli/nvim-colorizer.lua",
     event = "BufReadPre",
     config = function()
       local config = require("plugins.configs.colorizer")
@@ -260,9 +260,14 @@ local plugins = {
     end,
   },
   {
-    "folke/neodev.nvim",
-    lazy = false,
-    dev = false,
+    "folke/lazydev.nvim",
+    ft = "lua",
+    config = true,
+  },
+  {
+    "folke/trouble.nvim",
+    opts = {},
+    cmd = "Trouble",
   },
   {
     "nvim-lualine/lualine.nvim",
@@ -302,10 +307,10 @@ local plugins = {
     init = function()
       -- listen lsp-progress event and refresh lualine
       vim.api.nvim_create_augroup("lualine_augroup", { clear = true })
-      vim.api.nvim_create_autocmd("User LspProgressStatusUpdated", {
-        group = "lualine_augroup",
-        callback = require("lualine").refresh,
-      })
+      -- vim.api.nvim_create_autocmd("User LspProgressStatusUpdated", {
+      --   group = "lualine_augroup",
+      --   callback = require("lualine").refresh,
+      -- })
     end,
     config = function()
       require("lsp-progress").setup()
@@ -453,21 +458,21 @@ local plugins = {
       wk.register(triggers)
     end,
   },
-  {
-    "folke/trouble.nvim",
-    branch = "dev",
-    event = "VeryLazy",
-    init = function()
-      require("core.utils").load_mappings("trouble")
-    end,
-    config = function()
-      require("plugins.configs.trouble").setup()
-    end,
-    dependencies = {
-      "neovim/nvim-lspconfig",
-      "nvim-tree/nvim-web-devicons",
-    },
-  },
+  -- {
+  --   "folke/trouble.nvim",
+  --   branch = "dev",
+  --   event = "VeryLazy",
+  --   init = function()
+  --     require("core.utils").load_mappings("trouble")
+  --   end,
+  --   config = function()
+  --     require("plugins.configs.trouble").setup()
+  --   end,
+  --   dependencies = {
+  --     "neovim/nvim-lspconfig",
+  --     "nvim-tree/nvim-web-devicons",
+  --   },
+  -- },
   {
     "ellisonleao/glow.nvim",
     cmd = "Glow",
@@ -544,6 +549,31 @@ local plugins = {
     dev = true,
     config = true,
     lazy = false,
+  },
+  {
+    "ThePrimeagen/refactoring.nvim",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-treesitter/nvim-treesitter",
+    },
+    cmd = "Refactor",
+    opts = {
+      prompt_func_param_type = {
+        go = true,
+      },
+      prompt_func_return_type = {
+        go = true,
+      },
+    },
+  },
+  {
+    "olexsmir/gopher.nvim",
+    ft = "go",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-treesitter/nvim-treesitter",
+      "mfussenegger/nvim-dap",
+    },
   },
 }
 

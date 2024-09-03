@@ -6,23 +6,27 @@ local lspconfig = require("lspconfig")
 
 M.on_attach = function(client, bufnr)
   if client.server_capabilities.inlayHintProvider then
-    vim.lsp.inlay_hint(bufnr, true)
+    -- vim.lsp.inlay_hint.enable(true)
   end
+  vim.api.nvim_create_autocmd({ "BufEnter", "CursorHold", "InsertLeave" }, {
+    buffer = bufnr,
+    callback = vim.lsp.codelens.refresh,
+  })
   -- workaround for gopls not supporting semanticTokensProvider
   -- https://github.com/golang/go/issues/54531#issuecomment-1464982242
-  if client.name == "gopls" then
-    if not client.server_capabilities.semanticTokensProvider then
-      local semantic = client.config.capabilities.textDocument.semanticTokens
-      client.server_capabilities.semanticTokensProvider = {
-        full = true,
-        legend = {
-          tokenTypes = semantic.tokenTypes,
-          tokenModifiers = semantic.tokenModifiers,
-        },
-        range = true,
-      }
-    end
-  end
+  -- if client.name == "gopls" then
+  --   if not client.server_capabilities.semanticTokensProvider then
+  --     local semantic = client.config.capabilities.textDocument.semanticTokens
+  --     client.server_capabilities.semanticTokensProvider = {
+  --       full = true,
+  --       legend = {
+  --         tokenTypes = semantic.tokenTypes,
+  --         tokenModifiers = semantic.tokenModifiers,
+  --       },
+  --       range = true,
+  --     }
+  --   end
+  -- end
   utils.load_mappings("lspconfig", { buffer = bufnr })
 end
 
@@ -55,7 +59,7 @@ local servers = {
     settings = {
       Lua = {
         codeLens = {
-          enable = true,
+          enable = false,
         },
         completion = {
           callSnippet = "Replace",
@@ -64,10 +68,6 @@ local servers = {
           globals = { "vim" },
         },
         workspace = {
-          library = {
-            [vim.fn.expand("$VIMRUNTIME/lua")] = true,
-            [vim.fn.expand("$VIMRUNTIME/lua/vim/lsp")] = true,
-          },
           maxPreload = 100000,
           preloadFileSize = 10000,
           checkThirdParty = false, -- https://github.com/LunarVim/LunarVim/issues/4049
@@ -126,16 +126,8 @@ local servers = {
   cssls = {},
   tailwindcss = {},
   tsserver = {},
-  ruby_ls = {},
   nil_ls = {},
 }
-
-require("neodev").setup({
-  override = function(_, library)
-    library.enabled = true
-    library.plugins = true
-  end,
-})
 
 for server, settings in pairs(servers) do
   local extra_capabilities = settings.capabilities or {}
@@ -158,9 +150,7 @@ lspSymbol("Hint", "󰌵")
 lspSymbol("Warn", "")
 
 vim.diagnostic.config({
-  virtual_text = {
-    prefix = "",
-  },
+  virtual_text = false,
   signs = true,
   underline = true,
   update_in_insert = false,
@@ -177,6 +167,7 @@ vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.s
 
 -- Borders for LspInfo winodw
 local win = require("lspconfig.ui.windows")
+
 local _default_opts = win.default_opts
 
 win.default_opts = function(options)

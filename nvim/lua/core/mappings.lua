@@ -57,10 +57,7 @@ M.telescope = {
     ["<leader>fw"] = { "<cmd> Telescope live_grep <CR>", "Live grep" },
     ["<leader>fb"] = {
       function()
-        require("telescope.builtin").buffers({
-          sort_lastused = true,
-          sort_mru = true,
-        })
+        require("telescope.builtin").buffers({})
       end,
     },
     ["<leader>fh"] = { "<cmd> Telescope help_tags <CR>", "Help page" },
@@ -177,14 +174,14 @@ M.lspconfig = {
 
     ["[d"] = {
       function()
-        vim.diagnostic.goto_prev({ float = { border = "rounded" } })
+        vim.diagnostic.jump({ count = 1, float = { border = "single" } })
       end,
       "Go to previous diagnostic",
     },
 
     ["]d"] = {
       function()
-        vim.diagnostic.goto_next({ float = { border = "rounded" } })
+        vim.diagnostic.jump({ count = 1, float = { border = "single" } })
       end,
       "Go to next diagnostic",
     },
@@ -327,38 +324,6 @@ M.neogit = {
 
 M.trouble = {
   plugin = true,
-  n = {
-    ["<leader>xx"] = {
-      function()
-        require("trouble").open()
-      end,
-      "Open Trouble",
-    },
-    ["<leader>xw"] = {
-      function()
-        require("trouble").open("workspace_diagnostics")
-      end,
-      "Open workspace diagnostics",
-    },
-    ["<leader>xd"] = {
-      function()
-        require("trouble").open("document_diagnostics")
-      end,
-      "Open document diagnostics",
-    },
-    ["<leader>xq"] = {
-      function()
-        require("trouble").open("quickfix")
-      end,
-      "Open quickfix",
-    },
-    ["<leader>xl"] = {
-      function()
-        require("trouble").open("loclist")
-      end,
-      "Open location list",
-    },
-  },
 }
 
 M.mini_files = {
