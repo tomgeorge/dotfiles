@@ -449,14 +449,20 @@ local plugins = {
       vim.opt.timeout = true
       vim.opt.timeoutlen = 500
     end,
-    config = function()
-      local opts = require("plugins.configs.which-key").opts
-      local triggers = require("plugins.configs.which-key").triggers
-      local wk = require("which-key")
-
-      wk.setup(opts)
-      wk.register(triggers)
-    end,
+    opts = {
+      triggers = {
+        { "<leader>f", group = "File Operations" },
+        { "<leader>g", group = "Git Operations" },
+        { "<leader>t", group = "Tests" },
+        { "<leader>x", group = "Trouble" },
+      },
+      replace = {
+        key = {
+          { "<leader>", "SPC" },
+        },
+      },
+    },
+    config = true,
   },
   -- {
   --   "folke/trouble.nvim",
