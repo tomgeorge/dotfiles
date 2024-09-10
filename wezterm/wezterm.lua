@@ -6,7 +6,8 @@ local act = wezterm.action
 -- end)
 
 return {
-	color_scheme = "Catppuccin Frappe",
+	-- color_scheme = "Catppuccin Frappe",
+	color_scheme = "Everforest Dark Medium (Gogh)",
 	font = wezterm.font("JetBrains Mono"),
 	font_size = 13,
 	window_background_opacity = 0.9,
