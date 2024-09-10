@@ -7,18 +7,6 @@ local colorscheme_plugin_spec = require("colors").colorscheme_plugin_spec(colors
 local plugins = {
   { "tpope/vim-unimpaired", lazy = false },
   { "vim-scripts/ReplaceWithRegister", event = "BufReadPost" },
-  {
-    "rcarriga/nvim-notify",
-    init = function()
-      vim.notify = require("notify")
-    end,
-    config = function()
-      local notify = require("notify")
-      notify.setup()
-      vim.notify = notify
-    end,
-    event = "VeryLazy",
-  },
   colorscheme_plugin_spec,
   {
     "nvim-telescope/telescope.nvim",
@@ -37,13 +25,14 @@ local plugins = {
     config = function()
       local config = require("plugins.configs.telescope")
       require("telescope").setup(config)
-      require("telescope").load_extension("notify")
     end,
   },
   {
-    "rcarriga/nvim-notify",
+    "echasnovski/mini.notify",
+    init = function()
+      vim.notify = require("mini.notify").make_notify()
+    end,
     config = true,
-    event = "VeryLazy",
   },
   {
     "numToStr/Comment.nvim",
