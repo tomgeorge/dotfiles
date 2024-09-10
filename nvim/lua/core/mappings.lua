@@ -174,7 +174,7 @@ M.lspconfig = {
 
     ["[d"] = {
       function()
-        vim.diagnostic.jump({ count = 1, float = { border = "single" } })
+        vim.diagnostic.jump({ count = -1, float = { border = "single" } })
       end,
       "Go to previous diagnostic",
     },
