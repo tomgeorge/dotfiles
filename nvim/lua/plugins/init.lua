@@ -1,4 +1,3 @@
-local colorscheme = "catppuccin"
 -- local colorscheme = "catppuccin"
 local colorscheme = "everforest"
 
