@@ -1,5 +1,5 @@
 local M = {}
-local utils = require("core.utils")
+local utils = require("utils")
 local lspconfig = require("lspconfig")
 
 -- export on_attach & capabilities for custom lspconfigs
@@ -30,11 +30,19 @@ M.on_attach = function(client, bufnr)
   utils.load_mappings("lspconfig", { buffer = bufnr })
 end
 
-M.capabilities = vim.tbl_deep_extend(
-  "force",
-  vim.lsp.protocol.make_client_capabilities(),
-  require("cmp_nvim_lsp").default_capabilities()
-)
+local function capabilities()
+  local ok, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
+  if ok then
+    return vim.tbl_deep_extend(
+      "force",
+      vim.lsp.protocol.make_client_capabilities(),
+      require("cmp_nvim_lsp").default_capabilities()
+    )
+  end
+  return vim.lsp.protocol.make_client_capabilities()
+end
+
+M.capabilities = capabilities()
 
 M.capabilities.textDocument.completion.completionItem = {
   documentationFormat = { "markdown", "plaintext" },
@@ -55,26 +63,8 @@ M.capabilities.textDocument.completion.completionItem = {
 }
 
 local servers = {
-  lua_ls = {
-    settings = {
-      Lua = {
-        codeLens = {
-          enable = false,
-        },
-        completion = {
-          callSnippet = "Replace",
-        },
-        diagnostics = {
-          globals = { "vim" },
-        },
-        workspace = {
-          maxPreload = 100000,
-          preloadFileSize = 10000,
-          checkThirdParty = false, -- https://github.com/LunarVim/LunarVim/issues/4049
-        },
-      },
-    },
-  },
+  gleam = {},
+  pyright = {},
   terraformls = {
     capabilities = {
       experimental = {
@@ -97,7 +87,6 @@ local servers = {
           vendor = true,
         },
         analyses = {
-          fieldalignment = true,
           nilness = true,
           unusedwrite = true,
           unusedparams = true,
@@ -123,10 +112,11 @@ local servers = {
   clojure_lsp = {},
   clangd = {},
   html = {},
-  cssls = {},
+  -- cssls = {},
   tailwindcss = {},
-  tsserver = {},
+  ts_ls = {},
   nil_ls = {},
+  jsonls = {},
 }
 
 for server, settings in pairs(servers) do
@@ -149,12 +139,19 @@ lspSymbol("Info", "󰋼")
 lspSymbol("Hint", "󰌵")
 lspSymbol("Warn", "")
 
-vim.diagnostic.config({
-  virtual_text = false,
-  signs = true,
-  underline = true,
-  update_in_insert = false,
-})
+-- vim.diagnostic.config({
+--   virtual_text = false,
+--   signs = {
+--     text = {
+--       [vim.diagnostic.severity.ERROR] = "󰅙",
+--       [vim.diagnostic.severity.INFO] = "󰋼",
+--       [vim.diagnostic.severity.HINT] = "󰌵",
+--       [vim.diagnostic.severity.WARN] = "",
+--     },
+--   },
+--   underline = true,
+--   update_in_insert = false,
+-- })
 
 vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, {
   border = "single",

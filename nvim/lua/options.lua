@@ -67,10 +67,11 @@ vim.opt.pumheight = 15
 vim.opt.helpheight = 12
 vim.opt.previewheight = 12
 vim.opt.showcmd = true
+-- somewhere here
 -- just for nightly
 vim.opt.cmdheight = 1
 vim.opt.cmdwinheight = 5
-vim.opt.equalalways = false
+-- vim.opt.equalalways = false
 vim.opt.laststatus = 2
 vim.opt.display = "lastline"
 vim.opt.showbreak = "↳  "
@@ -95,8 +96,7 @@ vim.opt.number = true
 vim.opt.colorcolumn = "80"
 vim.opt.foldenable = true
 vim.opt.signcolumn = "yes"
--- vim.opt.conceallevel = 2
--- vim.opt.concealcursor = "niv"
+vim.opt.concealcursor = "niv"
 vim.opt.relativenumber = true
 
 if vim.loop.os_uname().sysname == "Darwin" then

@@ -1,0 +1,6 @@
+vim.keymap.set("n", "<leader>tf", function()
+  require("mini.test").run_file()
+end)
+vim.keymap.set("n", "<leader>ta", function()
+  require("mini.test").run()
+end)

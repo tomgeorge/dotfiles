@@ -1,0 +1,75 @@
+local M = {}
+local lsp_ns = vim.api.nvim_create_namespace("my.lsp")
+local diagnostic_ns = vim.api.nvim_create_namespace("on_diagnostic_jump")
+local function on_attach(_, bufnr)
+  local function keymap(mode, lhs, rhs, desc)
+    vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
+  end
+  vim.lsp.document_color.enable(true, bufnr)
+  keymap("n", "<leader>rn", vim.lsp.buf.rename, "LSP Rename")
+  keymap("n", "<leader>ca", function()
+    require("commands").code_action()
+  end, "LSP Code Action")
+  keymap("n", "C-]", function()
+    require("commands").lsp_definition()
+  end, "LSP Definition")
+  keymap("n", "<leader>rr", function()
+    require("commands").lsp_references()
+  end, "LSP References")
+  keymap("n", "<leader>ri", function()
+    require("commands").lsp_implementations()
+  end, "LSP Implementations")
+  keymap("n", "<leader>ld", function()
+    require("commands").lsp_document_symbols()
+  end, "LSP Document Symbols")
+
+  vim.diagnostic.config({
+    signs = {
+      text = {
+        [vim.diagnostic.severity.ERROR] = "󰅙",
+        [vim.diagnostic.severity.INFO] = "󰋼",
+        [vim.diagnostic.severity.HINT] = "󰌵",
+        [vim.diagnostic.severity.WARN] = "",
+      },
+    },
+    float = { border = "single" },
+    virtual_text = false,
+    jump = {
+      on_jump = function(diagnostic, buf)
+        if not diagnostic then
+          return
+        end
+        vim.diagnostic.show(
+          diagnostic_ns,
+          buf,
+          { diagnostic },
+          { virtual_text = { current_line = true, source = true } }
+        )
+      end,
+    },
+  })
+end
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = vim.api.nvim_create_augroup("my.lsp", {}),
+  callback = function(args)
+    local client = assert(vim.lsp.get_client_by_id(args.data.client_id))
+    on_attach(client, args.buf)
+  end,
+  desc = "Configure LSP keymaps",
+})
+
+vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
+  once = true,
+  desc = "Enable LSP",
+  callback = function()
+    local server_configs = vim
+      .iter(vim.api.nvim_get_runtime_file("lsp/*.lua", true))
+      :map(function(file)
+        return vim.fn.fnamemodify(file, ":t:r")
+      end)
+      :totable()
+    vim.lsp.enable(server_configs)
+  end,
+})
+return M

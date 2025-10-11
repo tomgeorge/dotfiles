@@ -6,6 +6,7 @@ return {
     "vimdoc",
     "vim",
     "hcl",
+    "diff",
     "query",
     "http",
     "json",
@@ -13,6 +14,8 @@ return {
     "markdown_inline",
     "yaml",
     "nix",
+    "clojure",
+    "fennel",
   },
 
   textobjects = {

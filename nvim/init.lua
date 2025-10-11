@@ -1,12 +1,23 @@
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-require("core.options")
-require("core.utils").load_mappings()
-require("core.autocommands")
+vim.g.mapleader = " "
+vim.g.maplocalleader = ","
 
-if not vim.loop.fs_stat(lazypath) then
-  require("core.bootstrap").lazy(lazypath)
+require("options")
+require("utils").load_mappings()
+
+if vim.env.PROF then
+  -- example for lazy.nvim
+  -- change this to the correct path for your plugin manager
+  local snacks = vim.fn.stdpath("data") .. "/lazy/snacks.nvim"
+  vim.opt.rtp:append(snacks)
+  require("snacks.profiler").startup({
+    startup = {
+      event = "VimEnter", -- stop profiler on this event. Defaults to `VimEnter`
+      -- event = "UIEnter",
+      -- event = "VeryLazy",
+    },
+  })
 end
-vim.opt.rtp:prepend(lazypath)
-
-require("plugins")
-
+require("config.lazy")
+require("commands")
+require("autocommands")
+require("lsp")

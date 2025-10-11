@@ -1,7 +1,5 @@
 local M = {}
 
-vim.g.mapleader = " "
-
 M.window = {
   n = {
     ["<C-l>"] = { "<C-w>l", "Window right" },
@@ -9,6 +7,16 @@ M.window = {
     ["<C-j>"] = { "<C-w>j", "Window up" },
     ["<C-k>"] = { "<C-w>k", "Window down" },
   },
+}
+
+M.notifications = {
+  -- n = {
+  --   ["<leader>na"] = {
+  --     function()
+  --       require("mini.notify").show_history()
+  --     end,
+  --   },
+  -- },
 }
 
 M.general = {
@@ -38,7 +46,7 @@ M.general = {
     ["<leader>y"] = { '"+y', "Copy to system clipboard (I think this happens by default now)" },
   },
   t = {
-    ["<Esc>"] = { "<C-\\><C-n>" },
+    ["<Esc><Esc>"] = { "<C-\\><C-n>" },
   },
   i = {
     ["kj"] = { "<esc>" },
@@ -51,16 +59,7 @@ M.general = {
 M.telescope = {
   plugin = true,
   n = {
-    -- find
-    ["<leader>ff"] = { "<cmd> Telescope find_files <CR>", "Find files" },
-    ["<leader>fa"] = { "<cmd> Telescope find_files follow=true no_ignore=true hidden=true <CR>", "Find all" },
-    ["<leader>fw"] = { "<cmd> Telescope live_grep <CR>", "Live grep" },
-    ["<leader>fb"] = {
-      function()
-        require("telescope.builtin").buffers({})
-      end,
-    },
-    ["<leader>fh"] = { "<cmd> Telescope help_tags <CR>", "Help page" },
+    -- ["<leader>fh"] = { "<cmd> Telescope help_tags <CR>", "Help page" },
     ["<leader>fo"] = { "<cmd> Telescope oldfiles <CR>", "Find oldfiles" },
     ["<leader>fz"] = { "<cmd> Telescope current_buffer_fuzzy_find <CR>", "Find in current buffer" },
     ["<leader>fn"] = {
@@ -111,7 +110,8 @@ M.lspconfig = {
 
     ["C-]"] = {
       function()
-        require("telescope.builtin").lsp_type_definitions()
+        require("snacks").picker.lsp_type_definitions()
+        -- require("telescope.builtin").lsp_type_definitions()
       end,
       "LSP definition",
     },
@@ -125,7 +125,8 @@ M.lspconfig = {
 
     ["gi"] = {
       function()
-        require("telescope.builtin").lsp_implementations()
+        require("snacks.picker").lsp_implementations()
+        -- require("telescope.builtin").lsp_implementations()
       end,
       "LSP implementation",
     },
@@ -151,16 +152,10 @@ M.lspconfig = {
       "LSP rename",
     },
 
-    ["<leader>ca"] = {
-      function()
-        require("actions-preview").code_actions()
-      end,
-      "LSP code action",
-    },
-
     ["<leader>r"] = {
       function()
-        require("telescope.builtin").lsp_references()
+        require("snacks.picker").lsp_references()
+        -- require("telescope.builtin").lsp_references()
       end,
       "LSP references",
     },
@@ -213,12 +208,12 @@ M.lspconfig = {
       end,
       "List workspace folders",
     },
-    ["<leader>f"] = {
-      function()
-        require("conform").format()
-      end,
-      "Format file",
-    },
+    -- ["<leader>f"] = {
+    --   function()
+    --     require("conform").format()
+    --   end,
+    --   "Format file",
+    -- },
   },
 }
 
@@ -233,7 +228,7 @@ M.gitsigns = {
           return "]c"
         end
         vim.schedule(function()
-          require("gitsigns").next_hunk()
+          require("gitsigns").nav_hunk("next")
         end)
         return "<Ignore>"
       end,
@@ -247,7 +242,7 @@ M.gitsigns = {
           return "[c"
         end
         vim.schedule(function()
-          require("gitsigns").prev_hunk()
+          require("gitsigns").nav_hunk("prev")
         end)
         return "<Ignore>"
       end,
@@ -310,44 +305,8 @@ M.gitsigns = {
   },
 }
 
-M.neogit = {
-  plugin = true,
-  n = {
-    ["<leader>gg"] = {
-      function()
-        require("neogit").open()
-      end,
-      "Open Neogit",
-    },
-  },
-}
-
 M.trouble = {
   plugin = true,
-}
-
-M.mini_files = {
-  plugin = true,
-  n = {
-    ["<leader>o"] = {
-      function()
-        require("mini.files").open()
-      end,
-      "Open mini.file file exporer",
-    },
-  },
-}
-
-M.oil_nvim = {
-  plugin = true,
-  n = {
-    ["<leader>o"] = {
-      function()
-        require("oil").open()
-      end,
-      "Open oil.nvim file exporer",
-    },
-  },
 }
 
 M.dap = {
@@ -401,6 +360,11 @@ M.dap = {
       end,
       "Step Into",
     },
+    ["<leader>dl"] = {
+      function()
+        require("osv").launch({ port = 8086 })
+      end,
+    },
     ["<leader>do"] = {
       function()
         require("dap").step_out()
@@ -440,6 +404,10 @@ M.dap = {
     ["<leader>dx"] = {
       function()
         require("dapui").close()
+        if require("osv").is_running() then
+          require("osv").stop()
+          print("stopped osv")
+        end
       end,
       "Close",
     },

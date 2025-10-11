@@ -1,9 +1,10 @@
-local M = {}
-
-M.plugin_string = "olimorris/onedarkpro.nvim"
-M.require_path = "onedarkpro"
-M.name = "onedark"
-
-M.opts = {}
-
-return M
+return {
+  plugin_string = "olimorris/onedarkpro.nvim",
+  module_name = "onedarkpro",
+  plugin_name = "onedark",
+  opts = {
+    styles = {
+      comments = "italic",
+    },
+  },
+}
