@@ -78,8 +78,8 @@ local keymaps = {
   },
 }
 
-require("which-key").add(keymaps)
+-- require("which-key").add(keymaps)
 
 for i, mapping in ipairs(keymaps) do
-  vim.keymap.set("n", mapping[1], mapping[2])
+  vim.keymap.set("n", mapping[1], mapping[2], { desc = mapping.desc })
 end
