@@ -5,6 +5,7 @@ local function on_attach(_, bufnr)
   local function keymap(mode, lhs, rhs, desc)
     vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
   end
+
   vim.lsp.document_color.enable(true, bufnr)
   keymap("n", "<leader>rn", vim.lsp.buf.rename, "LSP Rename")
   keymap("n", "<leader>ca", function()
@@ -33,27 +34,43 @@ local function on_attach(_, bufnr)
       },
     },
     float = { border = "single" },
-    virtual_text = false,
-    jump = {
-      on_jump = function(diagnostic, buf)
-        if not diagnostic then
-          return
-        end
-        vim.diagnostic.show(
-          diagnostic_ns,
-          buf,
-          { diagnostic },
-          { virtual_text = { current_line = true, source = true } }
-        )
-      end,
+    -- virtual_text = false,
+    virtual_text = {
+      spacing = 4,
+      prefix = "",
+      current_line = true,
     },
+    underline = true,
+    severity_sort = true,
   })
 end
 
 vim.api.nvim_create_autocmd("LspAttach", {
   group = vim.api.nvim_create_augroup("my.lsp", {}),
   callback = function(args)
+    local bufnr = args.buf
     local client = assert(vim.lsp.get_client_by_id(args.data.client_id))
+
+    if client:supports_method(vim.lsp.protocol.Methods.textDocument_inlineCompletion, bufnr) then
+      vim.lsp.inline_completion.enable(true, { bufnr = bufnr })
+
+      vim.keymap.set(
+        "i",
+        "<C-F>",
+        vim.lsp.inline_completion.get,
+        { desc = "LSP: accept inline completion", buffer = bufnr }
+      )
+      vim.keymap.set(
+        "i",
+        "<C-G>",
+        vim.lsp.inline_completion.select,
+        { desc = "LSP: switch inline completion", buffer = bufnr }
+      )
+    end
+
+    if client and client.server_capabilities and client.name == "terraform-ls" then
+      client.server_capabilities.semanticTokensProvider = nil
+    end
     on_attach(client, args.buf)
   end,
   desc = "Configure LSP keymaps",
@@ -72,4 +89,5 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
     vim.lsp.enable(server_configs)
   end,
 })
+
 return M
