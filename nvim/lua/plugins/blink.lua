@@ -2,7 +2,16 @@ return {
   enabled = true,
   "saghen/blink.cmp",
   event = "InsertEnter",
-  dependencies = { "rafamadriz/friendly-snippets" },
+  dependencies = {
+    "rafamadriz/friendly-snippets",
+    {
+      "fang2hou/blink-copilot",
+      opts = {
+        max_completions = 1,
+        max_attempts = 2,
+      },
+    },
+  },
   version = "1.*",
   ---@module 'blink.cmp'
   ---@type blink.cmp.Config
@@ -36,9 +45,17 @@ return {
 
     -- Default list of enabled providers defined so that you can extend it
     -- elsewhere in your config, without redefining it, due to `opts_extend`
-    -- sources = {
-    --   default = { "lsp", "path", "snippets", "buffer" },
-    -- },
+    sources = {
+      default = { "lsp", "path", "snippets", "buffer", "copilot" },
+      providers = {
+        copilot = {
+          name = "copilot",
+          module = "blink-copilot",
+          score_offset = 100,
+          async = true,
+        },
+      },
+    },
 
     -- (Default) Rust fuzzy matcher for typo resistance and significantly better performance
     -- You may use a lua implementation instead by using `implementation = "lua"` or fallback to the lua implementation,
