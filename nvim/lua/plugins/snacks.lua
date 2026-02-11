@@ -108,5 +108,11 @@ return {
       end,
       desc = "Search command history",
     },
+    {
+      "<leader>ss",
+      function()
+        Snacks.picker.lsp_symbols()
+      end,
+    },
   },
 }
