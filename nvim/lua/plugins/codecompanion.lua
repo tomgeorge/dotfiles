@@ -1,5 +1,6 @@
 return {
   {
+    enabled = false,
     cmd = { "CodeCompanion", "CodeCompanionChat" },
     "olimorris/codecompanion.nvim",
     opts = {

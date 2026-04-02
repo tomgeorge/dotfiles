@@ -1,9 +1,9 @@
 return {
   "folke/sidekick.nvim",
   opts = {
-    backend = "zellij",
+    backend = "tmux",
     nes = {
-      disable = false,
+      enabled = false,
     },
   },
   keys = {

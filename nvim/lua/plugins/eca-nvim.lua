@@ -1,5 +1,6 @@
 return {
   "eca/eca-nvim",
+  enabled = false,
   dependencies = {
     "MunifTanjim/nui.nvim",
   },

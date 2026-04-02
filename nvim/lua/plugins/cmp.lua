@@ -9,7 +9,11 @@ return {
       "hrsh7th/cmp-nvim-lsp-signature-help",
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-nvim-lua",
-      -- "PaterJason/cmp-conjure",
+      {
+        "PaterJason/cmp-conjure",
+        dir = "/Users/tgeorge/git/cmp-conjure",
+        dev = true,
+      },
       "saadparwaiz1/cmp_luasnip",
       {
         "L3MON4D3/LuaSnip",
@@ -38,8 +42,13 @@ return {
         formatting = {
           format = lspkind.cmp_format({
             mode = "symbol_text",
-            max_width = 50,
+            -- max_width = 50,
             ellipsis_char = "...",
+            menu = {
+              buffer = "[Buffer]",
+              nvim_lsp = "[LSP]",
+              conjure = "[Conjure]",
+            },
           }),
         },
         window = {

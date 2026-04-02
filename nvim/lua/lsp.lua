@@ -52,7 +52,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
     local client = assert(vim.lsp.get_client_by_id(args.data.client_id))
 
     if client:supports_method(vim.lsp.protocol.Methods.textDocument_inlineCompletion, bufnr) then
-      vim.lsp.inline_completion.enable(true, { bufnr = bufnr })
+      -- vim.lsp.inline_completion.enable(true, { bufnr = bufnr })
 
       vim.keymap.set(
         "i",
@@ -66,6 +66,10 @@ vim.api.nvim_create_autocmd("LspAttach", {
         vim.lsp.inline_completion.select,
         { desc = "LSP: switch inline completion", buffer = bufnr }
       )
+
+      vim.keymap.set("n", "<leader>ic", function()
+        vim.lsp.inline_completion.enable(vim.lsp.inline_completion.is_enabled())
+      end, { desc = "LSP: Toggle inline completion", buffer = bufnr })
     end
 
     if client and client.server_capabilities and client.name == "terraform-ls" then
@@ -84,6 +88,10 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
       .iter(vim.api.nvim_get_runtime_file("lsp/*.lua", true))
       :map(function(file)
         return vim.fn.fnamemodify(file, ":t:r")
+      end)
+      -- FIXME: copilot isn't working, NES is buggy and annoying
+      :filter(function(server)
+        return server ~= "copilot"
       end)
       :totable()
     vim.lsp.enable(server_configs)

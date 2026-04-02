@@ -11,6 +11,10 @@ return {
         max_attempts = 2,
       },
     },
+    -- {
+    --   "blink-cmp-conjure",
+    --   dir = "~/git/blink-cmp-conjure",
+    -- },
   },
   version = "1.*",
   ---@module 'blink.cmp'
@@ -41,19 +45,41 @@ return {
     },
 
     -- (Default) Only show the documentation popup when manually triggered
-    completion = { documentation = { auto_show = false } },
+    completion = {
+      documentation = { auto_show = false },
+      menu = {
+        draw = {
+          columns = {
+            { "label", "label_description", gap = 2 },
+            { "kind_icon", "source_name", gap = 2 },
+          },
+        },
+      },
+    },
 
     -- Default list of enabled providers defined so that you can extend it
     -- elsewhere in your config, without redefining it, due to `opts_extend`
     sources = {
-      default = { "lsp", "path", "snippets", "buffer", "copilot" },
+      default = {
+        "lsp",
+        "path",
+        "snippets",
+        "buffer",
+        --"copilot" ,
+        -- "conjure",
+        "omni",
+      },
       providers = {
-        copilot = {
-          name = "copilot",
-          module = "blink-copilot",
-          score_offset = 100,
-          async = true,
-        },
+        --   copilot = {
+        --     name = "copilot",
+        --     module = "blink-copilot",
+        --     score_offset = 100,
+        --     async = true,
+        --   },
+        -- conjure = {
+        --   name = "conjure",
+        --   module = "blink-cmp-conjure",
+        -- },
       },
     },
 

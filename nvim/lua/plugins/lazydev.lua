@@ -2,8 +2,15 @@
 ---@type lazy.PluginSpec
 return {
   "folke/lazydev.nvim",
+  dependencies = {
+    "DrKJeff16/wezterm-types",
+  },
   ft = "lua",
-  opts = {},
+  opts = {
+    library = {
+      { path = "wezterm-types", words = { "wezterm" } },
+    },
+  },
   config = true,
   keys = {
     {

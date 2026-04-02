@@ -4,22 +4,22 @@ return {
     config = true,
     lazy = false,
   },
-  {
-    "neovim/nvim-lspconfig",
-    dependencies = {
-      "aznhe21/actions-preview.nvim",
-      enabled = false,
-      opts = {
-        backend = { "snacks" },
-      },
-    },
-    init = function()
-      require("utils").lazy_load("nvim-lspconfig")
-    end,
-    config = function()
-      require("plugins.configs.lspconfig")
-    end,
-  },
+  -- {
+  --   "neovim/nvim-lspconfig",
+  --   dependencies = {
+  --     "aznhe21/actions-preview.nvim",
+  --     enabled = false,
+  --     opts = {
+  --       backend = { "snacks" },
+  --     },
+  --   },
+  --   init = function()
+  --     require("utils").lazy_load("nvim-lspconfig")
+  --   end,
+  --   config = function()
+  --     require("plugins.configs.lspconfig")
+  --   end,
+  -- },
   {
     "stevearc/conform.nvim",
     event = "VeryLazy",
@@ -105,18 +105,5 @@ return {
     },
     lazy = false,
     config = true,
-  },
-  {
-    "nvim-treesitter/nvim-treesitter",
-    dependencies = { "nvim-treesitter/nvim-treesitter-textobjects" },
-    init = function()
-      require("utils").lazy_load("nvim-treesitter")
-    end,
-    cmd = { "TSInstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
-    build = ":TSUpdate",
-    opts = require("plugins.configs.treesitter"),
-    config = function(_, opts)
-      require("nvim-treesitter.configs").setup(opts)
-    end,
   },
 }

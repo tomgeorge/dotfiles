@@ -63,8 +63,8 @@ local keymaps = {
     desc = "[t]est [O]utput panel",
   },
   {
-    "<leader>tt",
-    function()
+    keymap = "<leader>tt",
+    fn = function()
       require("neotest").run.stop()
     end,
     desc = "[t]est [t]erminate",
@@ -78,8 +78,6 @@ local keymaps = {
   },
 }
 
--- require("which-key").add(keymaps)
-
-for i, mapping in ipairs(keymaps) do
-  vim.keymap.set("n", mapping[1], mapping[2], { desc = mapping.desc })
+for _, mapping in ipairs(keymaps) do
+  vim.keymap.set("n", mapping.keymap or mapping[1], mapping.fn or mapping[2], { desc = mapping.desc })
 end

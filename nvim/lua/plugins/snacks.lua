@@ -32,7 +32,7 @@ return {
     scope = { enabled = true },
     scroll = { enabled = false },
     statuscolumn = { enabled = false },
-    words = { enabled = false },
+    words = { enabled = true },
   },
   keys = {
     {
@@ -48,16 +48,18 @@ return {
     {
       "]]",
       function()
-        Snacks.words.jump(1)
+        Snacks.words.jump(vim.v.count1)
       end,
       desc = "Jump to next reference",
+      mode = { "n", "t" },
     },
     {
       "[[",
       function()
-        Snacks.words.jump(-1)
+        Snacks.words.jump(-vim.v.count1)
       end,
       desc = "Jump to next reference",
+      mode = { "n", "t" },
     },
     {
       "<leader><space>",
