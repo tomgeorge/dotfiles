@@ -1,5 +1,5 @@
 ---@module 'lazy'
----@type lazy.PluginSpec
+---@type LazySpec
 return {
   "folke/lazydev.nvim",
   dependencies = {

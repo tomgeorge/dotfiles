@@ -1,12 +1,12 @@
 local M = {}
 local lsp_ns = vim.api.nvim_create_namespace("my.lsp")
 local diagnostic_ns = vim.api.nvim_create_namespace("on_diagnostic_jump")
-local function on_attach(_, bufnr)
+local function on_attach(client, bufnr)
   local function keymap(mode, lhs, rhs, desc)
     vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
   end
 
-  vim.lsp.document_color.enable(true, bufnr)
+  vim.lsp.document_color.enable(true, { client = client, bufnr = bufnr })
   keymap("n", "<leader>rn", vim.lsp.buf.rename, "LSP Rename")
   keymap("n", "<leader>ca", function()
     require("commands").code_action()
