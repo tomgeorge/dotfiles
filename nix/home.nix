@@ -100,6 +100,7 @@
 
   home.packages = with pkgs; [
     babashka
+    bat
     bitwarden-cli
     claude-code
     clj-kondo
@@ -108,6 +109,7 @@
     coreutils
     cosign
     curl
+    discord
     dive
     fd
     gettext
