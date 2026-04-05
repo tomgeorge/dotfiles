@@ -8,6 +8,16 @@
 
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+    homebrew-core = {
+      url = "github:homebrew/homebrew-core";
+      flake = false;
+    };
+    homebrew-cask = {
+      url = "github:homebrew/homebrew-cask";
+      flake = false;
+    };
   };
 
   outputs =
@@ -76,6 +86,19 @@
       # $ darwin-rebuild build --flake .#Toms-MacBook-Pro
       darwinConfigurations."Toms-MacBook-Pro" = nix-darwin.lib.darwinSystem {
         modules = [
+          nix-homebrew.darwinModules.nix-homebrew
+          {
+            nix-homebrew = {
+              enable = true;
+              user = "tgeorge";
+              taps = {
+                "homebrew/homebrew-code" = homebrew-core;
+                "homebrew/homebrew-cask" = homebrew-cask;
+
+              };
+              mutableTaps = false;
+            };
+          }
           configuration
           home-manager.darwinModules.home-manager
           {
