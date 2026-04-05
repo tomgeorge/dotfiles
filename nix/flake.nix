@@ -25,6 +25,9 @@
       self,
       nix-darwin,
       nixpkgs,
+      nix-homebrew,
+      homebrew-core,
+      homebrew-cask,
       home-manager,
     }:
     let
@@ -73,11 +76,11 @@
           homebrew.enableFishIntegration = true;
           homebrew.enableZshIntegration = true;
           homebrew.casks = [
-            # "todoist-app"
-            # "fantastical"
-            # "visual-studio-code"
-            # "hey-desktop"
-            # "claude"
+            "todoist-app"
+            "fantastical"
+            "visual-studio-code"
+            "hey-desktop"
+            "claude"
           ];
         };
     in
