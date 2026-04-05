@@ -126,6 +126,7 @@
     nixd
     nixfmt
     pass
+    raycast
     ripgrep
     shellcheck
     skopeo
