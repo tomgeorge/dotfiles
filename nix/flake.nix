@@ -52,6 +52,12 @@
             ];
           };
 
+          fonts.packages = with pkgs; [
+            dejavu_fonts
+            nerd-fonts.fira-code
+            jetbrains-mono
+          ];
+
           # Necessary for using flakes on this system.
           nix.settings.experimental-features = "nix-command flakes";
 
@@ -84,6 +90,7 @@
             "hey-desktop"
             "claude"
             "mozilla-vpn"
+            "balenaetcher"
           ];
         };
     in
