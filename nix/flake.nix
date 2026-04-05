@@ -90,7 +90,6 @@
             "hey-desktop"
             "claude"
             "mozilla-vpn"
-            "balenaetcher"
           ];
         };
     in

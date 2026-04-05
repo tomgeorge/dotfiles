@@ -100,6 +100,7 @@
 
   home.packages = with pkgs; [
     babashka
+    balena-cli
     bat
     bitwarden-cli
     claude-code
