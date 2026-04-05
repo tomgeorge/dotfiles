@@ -109,7 +109,6 @@
     coreutils
     cosign
     curl
-    discord
     dive
     fd
     gettext

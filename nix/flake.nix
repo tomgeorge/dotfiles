@@ -29,6 +29,7 @@
               fish
               zsh
               openssl_3_6
+              discord
             ];
             shells = [
               fish
@@ -55,6 +56,17 @@
 
           # The platform the configuration will be used on.
           nixpkgs.hostPlatform = "aarch64-darwin";
+
+          homebrew.enable = true;
+          homebrew.enableFishIntegration = true;
+          homebrew.enableZshIntegration = true;
+          homebrew.casks = [
+            "todoist-app"
+            "fantastical"
+            "visual-studio-code"
+            "hey-desktop"
+            "claude"
+          ];
         };
     in
     {
