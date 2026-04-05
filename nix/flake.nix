@@ -43,6 +43,8 @@
               zsh
               openssl_3_6
               discord
+              raycast
+              wezterm
             ];
             shells = [
               fish
@@ -81,6 +83,7 @@
             "visual-studio-code"
             "hey-desktop"
             "claude"
+            "mozilla-vpn"
           ];
         };
     in

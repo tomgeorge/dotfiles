@@ -18,7 +18,7 @@
       vi = "nvim";
       vim = "nvim";
       diff = "nvim -d";
-      rebuild = "sudo darwin-rebuild switch --flake ~/.config/nix";
+      rebuild = "sudo darwin-rebuild switch --flake $HOME/git/dotfiles/nix";
       cd = "z";
       hmh = "man home-configuration.nix";
     };
@@ -126,7 +126,6 @@
     nixd
     nixfmt
     pass
-    raycast
     ripgrep
     shellcheck
     skopeo
