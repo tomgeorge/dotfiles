@@ -54,6 +54,8 @@
           # $ darwin-rebuild changelog
           system.stateVersion = 6;
 
+          system.primaryUser = "tgeorge";
+
           # The platform the configuration will be used on.
           nixpkgs.hostPlatform = "aarch64-darwin";
 
@@ -61,11 +63,11 @@
           homebrew.enableFishIntegration = true;
           homebrew.enableZshIntegration = true;
           homebrew.casks = [
-            "todoist-app"
-            "fantastical"
-            "visual-studio-code"
-            "hey-desktop"
-            "claude"
+            # "todoist-app"
+            # "fantastical"
+            # "visual-studio-code"
+            # "hey-desktop"
+            # "claude"
           ];
         };
     in
