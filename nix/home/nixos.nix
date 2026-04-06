@@ -4,7 +4,6 @@
   home = {
     username = "tgeorge";
     homeDirectory = "/home/tgeorge";
-    stateVersion = "25.05";
   };
 
   programs.bash = {
