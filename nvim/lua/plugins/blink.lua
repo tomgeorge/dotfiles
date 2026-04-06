@@ -1,3 +1,5 @@
+---@module 'lazy'
+---@type LazySpec[]
 return {
   enabled = true,
   "saghen/blink.cmp",
@@ -50,8 +52,8 @@ return {
       menu = {
         draw = {
           columns = {
-            { "label", "label_description", gap = 2 },
-            { "kind_icon", "source_name", gap = 2 },
+            { "label",     "label_description", gap = 2 },
+            { "kind_icon", "source_name",       gap = 2 },
           },
         },
       },
