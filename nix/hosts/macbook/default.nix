@@ -48,5 +48,6 @@
     "hey-desktop"
     "claude"
     "mozilla-vpn"
+    "rectangle"
   ];
 }

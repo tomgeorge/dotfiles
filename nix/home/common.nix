@@ -1,4 +1,9 @@
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 
 {
   home = {
@@ -81,24 +86,46 @@
   };
 
   home.packages = with pkgs; [
+    babashka
+    balena-cli
     bat
+    bitwarden-cli
+    claude-code
+    clj-kondo
+    clojure-lsp
     cmake
     coreutils
+    cosign
     curl
+    dive
     fd
     gettext
     github-cli
     gnupg
+    gnutls
+    golangci-lint
+    htmx-lsp2
     htop
+    k9s
     lazygit
+    lua-language-server
+    neil
     neovim
     ninja
     nixd
     nixfmt
+    pass
     ripgrep
     shellcheck
+    skopeo
+    sqlc
+    stow
+    tailwindcss-language-server
+    templ
+    terraform-ls
     tmux
     tree-sitter
+    typescript-language-server
     yazi
   ];
 }

@@ -21,8 +21,4 @@
     exec-once = vicinae server
     bind = $mod, Space, exec, vicinae toggle
   '';
-
-  home.packages = with pkgs; [
-    vicinae
-  ];
 }

@@ -19,29 +19,4 @@
     enableBashIntegration = true;
     enableZshIntegration = true;
   };
-
-  home.packages = with pkgs; [
-    babashka
-    balena-cli
-    bitwarden-cli
-    claude-code
-    clj-kondo
-    clojure-lsp
-    cosign
-    dive
-    gnutls
-    golangci-lint
-    htmx-lsp2
-    k9s
-    lua-language-server
-    neil
-    pass
-    skopeo
-    sqlc
-    stow
-    tailwindcss-language-server
-    templ
-    terraform-ls
-    typescript-language-server
-  ];
 }
