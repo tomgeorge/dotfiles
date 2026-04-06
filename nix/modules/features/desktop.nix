@@ -1,4 +1,9 @@
-{ inputs, config, lib, ... }:
+{
+  inputs,
+  config,
+  lib,
+  ...
+}:
 
 {
   flake.modules = {
@@ -36,6 +41,13 @@
     homeManager.nixosDesktop =
       { ... }:
       {
+        programs.bash = {
+          enable = true;
+        };
+
+        programs.noctalia-shell = {
+          enable = true;
+        };
         programs.vicinae.enable = true;
         programs.waybar.enable = true;
 
