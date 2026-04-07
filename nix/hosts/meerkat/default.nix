@@ -23,7 +23,6 @@
 
   users.users.tgeorge = {
     isNormalUser = true;
-    shell = pkgs.fish;
     extraGroups = [
       "wheel"
       "networkmanager"
@@ -32,8 +31,6 @@
       tree
     ];
   };
-
-  programs.fish.enable = true;
 
   environment.systemPackages = with pkgs; [
     vim

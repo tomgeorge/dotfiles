@@ -6,10 +6,6 @@
     homeDirectory = "/Users/tgeorge";
   };
 
-  programs.fish.shellAliases = {
-    rebuild = "sudo darwin-rebuild switch --flake $HOME/git/dotfiles/nix";
-  };
-
   programs.claude-code = {
     enable = true;
   };

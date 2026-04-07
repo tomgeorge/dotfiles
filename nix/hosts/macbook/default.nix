@@ -5,7 +5,6 @@
 
   environment = with pkgs; {
     systemPackages = [
-      fish
       zsh
       openssl_3_6
       discord
@@ -13,7 +12,6 @@
       wezterm
     ];
     shells = [
-      fish
       zsh
     ];
   };
@@ -27,9 +25,7 @@
   nix.settings.experimental-features = "nix-command flakes";
 
   users.users.tgeorge.home = "/Users/tgeorge";
-  users.users.tgeorge.shell = pkgs.fish;
 
-  programs.fish.enable = true;
   programs.zsh.enable = true;
 
   system.configurationRevision = self.rev or self.dirtyRev or null;
@@ -39,7 +35,6 @@
   nixpkgs.hostPlatform = "aarch64-darwin";
 
   homebrew.enable = true;
-  homebrew.enableFishIntegration = true;
   homebrew.enableZshIntegration = true;
   homebrew.casks = [
     "todoist-app"
