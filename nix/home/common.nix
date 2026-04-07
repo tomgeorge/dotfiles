@@ -109,6 +109,7 @@
     k9s
     lazygit
     lua-language-server
+    luajitPackages.luacheck
     neil
     neovim
     ninja
