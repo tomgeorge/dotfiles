@@ -36,21 +36,8 @@
     vim
     wget
     kitty
-    wezterm
     git
-    hyprpaper
   ];
-
-  services.displayManager.ly.enable = true;
-  programs.firefox.enable = true;
-
-  programs.hyprland = {
-    enable = true;
-    withUWSM = true;
-    xwayland.enable = true;
-  };
-  programs.hyprlock.enable = true;
-  services.hypridle.enable = true;
 
   nix.settings.experimental-features = [
     "nix-command"

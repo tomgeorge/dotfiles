@@ -1,8 +1,8 @@
-{ ... }:
+{ config, lib, ... }:
 
 {
-  flake = {
-    darwinModules.fish =
+  flake.modules = {
+    darwin.fish =
       { pkgs, ... }:
       {
         programs.fish.enable = true;
@@ -13,9 +13,10 @@
         users.users.tgeorge.shell = pkgs.fish;
 
         homebrew.enableFishIntegration = true;
+
       };
 
-    nixosModules.fish =
+    nixos.fish =
       { pkgs, ... }:
       {
         programs.fish.enable = true;
@@ -23,7 +24,7 @@
         users.users.tgeorge.shell = pkgs.fish;
       };
 
-    homeManagerModules.fish =
+    homeManager.fish =
       { pkgs, ... }:
       {
         home.shell.enableFishIntegration = true;

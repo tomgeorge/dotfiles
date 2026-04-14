@@ -56,7 +56,12 @@
           specialArgs = { inherit self; };
           modules = [
             ./hosts/macbook/default.nix
-            self.darwinModules.fish
+            self.modules.darwin.fish
+            self.modules.darwin.shellTools
+            self.modules.darwin.terminal
+            self.modules.darwin.desktop
+            self.modules.darwin.apps
+            self.modules.darwin.fonts
             nix-homebrew.darwinModules.nix-homebrew
             {
               nix-homebrew = {
@@ -75,9 +80,11 @@
               home-manager.useUserPackages = true;
               home-manager.users.tgeorge = {
                 imports = [
-                  ./home/common.nix
-                  ./home/darwin.nix
-                  self.homeManagerModules.fish
+                  ./home
+                  self.modules.homeManager.fish
+                  self.modules.homeManager.shellTools
+                  self.modules.homeManager.dev
+                  self.modules.homeManager.terminal
                 ];
               };
             }
@@ -89,16 +96,21 @@
           system = "x86_64-linux";
           modules = [
             ./hosts/meerkat/default.nix
-            self.nixosModules.fish
+            self.modules.nixos.fish
+            self.modules.nixos.terminal
+            self.modules.nixos.desktop
             home-manager.nixosModules.home-manager
             {
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.tgeorge = {
                 imports = [
-                  ./home/common.nix
-                  ./home/nixos.nix
-                  self.homeManagerModules.fish
+                  ./home
+                  self.modules.homeManager.fish
+                  self.modules.homeManager.shellTools
+                  self.modules.homeManager.dev
+                  self.modules.homeManager.terminal
+                  self.modules.homeManager.desktop
                 ];
               };
               home-manager.backupFileExtension = "backup";
