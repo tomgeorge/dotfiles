@@ -47,6 +47,7 @@
           cosign
           curl
           dive
+          erlang
           fd
           flyctl
           gettext

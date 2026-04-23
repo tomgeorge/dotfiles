@@ -80,7 +80,8 @@
               home-manager.useUserPackages = true;
               home-manager.users.tgeorge = {
                 imports = [
-                  ./home
+                  ./home/common.nix
+                  ./home/darwin.nix
                   self.modules.homeManager.fish
                   self.modules.homeManager.shellTools
                   self.modules.homeManager.dev
