@@ -34,6 +34,7 @@
 
         # Pull in Linux-only HM config through the system module
         home-manager.sharedModules = [
+          inputs.noctalia.homeModules.default
           inputs.self.modules.homeManager.nixosDesktop
         ];
       };
