@@ -10,8 +10,8 @@
     darwin.desktop =
       { pkgs, ... }:
       {
-        environment.systemPackages = [
-          pkgs.tailscale-gui
+        homebrew.casks = [
+          "tailscale-app"
         ];
       };
 
