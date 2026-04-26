@@ -30,6 +30,8 @@ return {
           go = { "gofmt", "goimports" },
           clojure = { "cljstyle" },
           terraform = { "terraform_fmt" },
+          sh = { "shfmt" },
+          fish = { "fish_indent" },
         },
         format_on_save = {
           timeout_ms = 5000,
@@ -46,6 +48,8 @@ return {
         go = { "golangcilint" },
         lua = { "luacheck" },
         sh = { "shellcheck" },
+        zsh = { "shellcheck" },
+        fish = { "fish" },
         clojure = { "clj-kondo" },
       },
     },

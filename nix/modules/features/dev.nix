@@ -40,6 +40,7 @@ in
         home.packages = with pkgs; [
           babashka
           balena-cli
+          bash-language-server
           bat
           bitwarden-cli
           claude-code
@@ -51,6 +52,7 @@ in
           curl
           dive
           erlang
+          fish-lsp
           fd
           flyctl
           gettext
@@ -71,6 +73,7 @@ in
           nixfmt
           pass
           ripgrep
+          shfmt
           shellcheck
           skopeo
           sqlc
