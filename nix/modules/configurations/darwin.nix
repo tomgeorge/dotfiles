@@ -33,7 +33,7 @@ in
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.users.${username} = {
-            imports = builtins.attrValues config.flake.modules.homeManager;
+            imports = builtins.attrValues (removeAttrs config.flake.modules.homeManager [ "nixosDesktop" ]);
           };
         }
       ]

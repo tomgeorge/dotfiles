@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ inputs, config, lib, ... }:
 
 {
   flake.modules = {
@@ -9,6 +9,7 @@
           pkgs.tailscale-gui
         ];
       };
+
     nixos.desktop =
       { pkgs, ... }:
       {
@@ -25,10 +26,15 @@
         };
         programs.hyprlock.enable = true;
         services.hypridle.enable = true;
+
+        # Pull in Linux-only HM config through the system module
+        home-manager.sharedModules = [
+          inputs.self.modules.homeManager.nixosDesktop
+        ];
       };
 
-    homeManager.desktop =
-      { pkgs, ... }:
+    homeManager.nixosDesktop =
+      { ... }:
       {
         programs.vicinae.enable = true;
         programs.waybar.enable = true;
