@@ -1,5 +1,8 @@
 { config, lib, ... }:
 
+let
+  username = config.my.username;
+in
 {
   flake.modules = {
     darwin.fish =
@@ -10,7 +13,7 @@
         environment.systemPackages = [ pkgs.fish ];
         environment.shells = [ pkgs.fish ];
 
-        users.users.tgeorge.shell = pkgs.fish;
+        users.users.${username}.shell = pkgs.fish;
 
         homebrew.enableFishIntegration = true;
 
@@ -21,7 +24,7 @@
       {
         programs.fish.enable = true;
 
-        users.users.tgeorge.shell = pkgs.fish;
+        users.users.${username}.shell = pkgs.fish;
       };
 
     homeManager.fish =

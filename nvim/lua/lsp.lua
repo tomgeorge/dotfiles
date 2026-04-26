@@ -8,7 +8,7 @@ local function on_attach(client, bufnr)
 
   vim.lsp.document_color.enable(true, { client = client, bufnr = bufnr })
   keymap("n", "<leader>rn", vim.lsp.buf.rename, "LSP Rename")
-  keymap("n", "<leader>ca", function()
+  keymap({ "n", "v" }, "<leader>ca", function()
     require("commands").code_action()
   end, "LSP Code Action")
   keymap("n", "C-]", function()
