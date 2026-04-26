@@ -6,10 +6,14 @@ local act = wezterm.action
 -- end)
 
 return {
-	-- color_scheme = "Catppuccin Frappe",
-	color_scheme = "Everforest Dark Medium (Gogh)",
-	font = wezterm.font("JetBrains Mono"),
-	font_size = 13,
+	color_scheme = "Catppuccin Frappe",
+	-- color_scheme = "Everforest Dark Medium (Gogh)",
+	-- font = wezterm.font("JetBrains Mono"),
+	-- font = wezterm.font("Fira Code Nerd Font"),
+	font = wezterm.font("DejaVu Sans Mono"),
+	font_size = 22,
+	term = "wezterm",
+	default_prog = { "/etc/profiles/per-user/tgeorge/bin/fish", "-l" },
 	window_background_opacity = 0.9,
 	window_decorations = "RESIZE",
 	text_background_opacity = 0.9,

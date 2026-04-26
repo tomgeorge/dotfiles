@@ -104,7 +104,7 @@ return {
     event = "InsertEnter",
     config = function()
       local ai = require("mini.ai")
-      require("mini.ai").setup({
+      ai.setup({
         custom_textobjects = {
           o = ai.gen_spec.treesitter({
             a = { "@block.outer", "@conditional.outer", "@loop.outer" },
