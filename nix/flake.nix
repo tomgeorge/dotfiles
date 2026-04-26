@@ -36,68 +36,8 @@
   };
 
   outputs =
-    inputs@{
-      self,
-      nixpkgs,
-      nix-darwin,
-      home-manager,
-      nix-homebrew,
-      homebrew-core,
-      homebrew-cask,
-      ...
-    }:
-    {
-      # macOS (nix-darwin)
-      darwinConfigurations."Toms-MacBook-Pro" = nix-darwin.lib.darwinSystem {
-        specialArgs = { inherit self; };
-        modules = [
-          ./hosts/macbook/default.nix
-          nix-homebrew.darwinModules.nix-homebrew
-          {
-            nix-homebrew = {
-              enable = true;
-              user = "tgeorge";
-              taps = {
-                "homebrew/homebrew-code" = homebrew-core;
-                "homebrew/homebrew-cask" = homebrew-cask;
-              };
-              mutableTaps = false;
-            };
-          }
-          home-manager.darwinModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.tgeorge = {
-              imports = [
-                ./home/common.nix
-                ./home/darwin.nix
-              ];
-            };
-          }
-        ];
-      };
-
-      # NixOS (meerkat desktop)
-      nixosConfigurations.meerkat = nixpkgs.lib.nixosSystem {
-        specialArgs = { inherit inputs; };
-        system = "x86_64-linux";
-        modules = [
-          ./hosts/meerkat/default.nix
-          home-manager.nixosModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.tgeorge = {
-              imports = [
-                ./home/common.nix
-                ./home/nixos.nix
-                inputs.noctalia.homeModules.default
-              ];
-            };
-            home-manager.backupFileExtension = "backup";
-          }
-        ];
-      };
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = inputs.import-tree.lib.import-tree ./modules;
     };
 }
