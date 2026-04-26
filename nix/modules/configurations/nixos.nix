@@ -16,7 +16,7 @@ in
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.users.${username} = {
-            imports = builtins.attrValues (removeAttrs config.flake.modules.homeManager [ "nixosDesktop" ]);
+            imports = builtins.attrValues config.flake.modules.homeManager;
           };
           home-manager.backupFileExtension = "backup";
         }
