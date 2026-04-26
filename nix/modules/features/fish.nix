@@ -1,7 +1,7 @@
 { config, lib, ... }:
 
 let
-  username = config.my.username;
+  username = config.user.username;
 in
 {
   flake.modules = {

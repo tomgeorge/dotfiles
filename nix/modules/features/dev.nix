@@ -1,7 +1,7 @@
 { config, lib, ... }:
 
 let
-  inherit (config.my) gitName gitEmail;
+  inherit (config.user) userFullName userEmaail;
 in
 {
   flake.modules = {
@@ -15,8 +15,8 @@ in
         programs.git = {
           enable = true;
           settings = {
-            user.name = gitName;
-            user.email = gitEmail;
+            user.name = userFullName;
+            user.email = userEmaail;
             init.defaultBranch = "main";
           };
           signing.format = "openpgp";

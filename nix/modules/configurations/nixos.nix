@@ -5,7 +5,7 @@
 }:
 
 let
-  username = config.my.username;
+  username = config.user.username;
 in
 {
   flake = {
@@ -21,7 +21,8 @@ in
           };
           home-manager.backupFileExtension = "backup";
         }
-      ] ++ builtins.attrValues config.flake.modules.nixos;
+      ]
+      ++ builtins.attrValues config.flake.modules.nixos;
     };
   };
 }

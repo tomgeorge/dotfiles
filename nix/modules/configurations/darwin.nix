@@ -5,14 +5,16 @@
 }:
 
 let
-  username = config.my.username;
+  username = config.user.username;
 in
 {
   imports = [ inputs.flake-parts.flakeModules.modules ];
 
   flake = {
     darwinConfigurations."Toms-MacBook-Pro" = inputs.nix-darwin.lib.darwinSystem {
-      specialArgs = { self = inputs.self; };
+      specialArgs = {
+        self = inputs.self;
+      };
       modules = [
         inputs.nix-homebrew.darwinModules.nix-homebrew
         {
@@ -34,7 +36,8 @@ in
             imports = builtins.attrValues config.flake.modules.homeManager;
           };
         }
-      ] ++ builtins.attrValues config.flake.modules.darwin;
+      ]
+      ++ builtins.attrValues config.flake.modules.darwin;
     };
   };
 }
