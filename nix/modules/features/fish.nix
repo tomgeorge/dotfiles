@@ -1,30 +1,25 @@
-{ config, lib, ... }:
-
-let
-  username = config.user.username;
-in
 {
   flake.modules = {
     darwin.fish =
-      { pkgs, ... }:
+      { config, pkgs, ... }:
       {
         programs.fish.enable = true;
 
         environment.systemPackages = [ pkgs.fish ];
         environment.shells = [ pkgs.fish ];
 
-        users.users.${username}.shell = pkgs.fish;
+        users.users.${config.user.username}.shell = pkgs.fish;
 
         homebrew.enableFishIntegration = true;
 
       };
 
     nixos.fish =
-      { pkgs, ... }:
+      { config, pkgs, ... }:
       {
         programs.fish.enable = true;
 
-        users.users.${username}.shell = pkgs.fish;
+        users.users.${config.user.username}.shell = pkgs.fish;
       };
 
     homeManager.fish =

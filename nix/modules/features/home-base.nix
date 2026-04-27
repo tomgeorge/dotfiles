@@ -1,12 +1,10 @@
-{ config, ... }:
-
-let
-  username = config.user.username;
-in
 {
   flake.modules = {
     homeManager.base =
-      { pkgs, ... }:
+      { config, pkgs, ... }:
+      let
+        username = config.user.username;
+      in
       {
         home = {
           inherit username;

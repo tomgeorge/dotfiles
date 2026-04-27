@@ -1,8 +1,3 @@
-{ config, ... }:
-
-let
-  username = config.user.username;
-in
 {
   flake.modules = {
     nixos.meerkat =
@@ -12,6 +7,9 @@ in
         pkgs,
         ...
       }:
+      let
+        username = config.user.username;
+      in
       {
         imports = [
           ./_hardware-configuration.nix

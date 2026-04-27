@@ -1,12 +1,12 @@
-{ config, lib, ... }:
+{ lib, ... }:
 
-let
-  inherit (config.user) userFullName userEmaail;
-in
 {
   flake.modules = {
     homeManager.dev =
-      { pkgs, ... }:
+      { config, pkgs, ... }:
+      let
+        inherit (config.user) userFullName userEmail;
+      in
       {
         home.sessionVariables = {
           "EDITOR" = "nvim";
@@ -16,7 +16,7 @@ in
           enable = true;
           settings = {
             user.name = userFullName;
-            user.email = userEmaail;
+            user.email = userEmail;
             init.defaultBranch = "main";
           };
           signing.format = "openpgp";

@@ -1,12 +1,15 @@
-{ config, ... }:
-
-let
-  username = config.user.username;
-in
 {
   flake.modules = {
     darwin.macbook =
-      { self, pkgs, ... }:
+      {
+        config,
+        self,
+        pkgs,
+        ...
+      }:
+      let
+        username = config.user.username;
+      in
       {
         nixpkgs.config.allowUnfree = true;
 
