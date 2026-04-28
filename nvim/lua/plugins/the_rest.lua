@@ -48,6 +48,7 @@ return {
         go = { "golangcilint" },
         lua = { "luacheck" },
         sh = { "shellcheck" },
+        bash = { "shellcheck" },
         zsh = { "shellcheck" },
         fish = { "fish" },
         clojure = { "clj-kondo" },

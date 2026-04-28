@@ -38,6 +38,7 @@
         };
 
         home.packages = with pkgs; [
+          apko
           babashka
           balena-cli
           bash-language-server
@@ -52,8 +53,8 @@
           curl
           dive
           erlang
-          fish-lsp
           fd
+          fish-lsp
           flyctl
           gettext
           github-cli
@@ -63,18 +64,21 @@
           htmx-lsp2
           htop
           k9s
+          kind
           lazygit
           lua-language-server
           luajitPackages.luacheck
+          melange
           neil
           neovim
           ninja
           nixd
           nixfmt
           pass
+          podman-desktop
           ripgrep
-          shfmt
           shellcheck
+          shfmt
           skopeo
           sqlc
           stow

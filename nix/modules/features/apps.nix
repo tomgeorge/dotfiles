@@ -19,7 +19,6 @@
           "claude"
           "mozilla-vpn"
           "rectangle"
-          "zoom"
           "spotify"
         ];
       };
