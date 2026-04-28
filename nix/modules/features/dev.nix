@@ -75,6 +75,8 @@
           nixd
           nixfmt
           pass
+          podman-tui
+          podman
           podman-desktop
           ripgrep
           shellcheck
