@@ -65,6 +65,8 @@
           htop
           k9s
           kind
+          kubectl
+          kubectx
           lazygit
           lua-language-server
           luajitPackages.luacheck
