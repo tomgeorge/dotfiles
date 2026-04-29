@@ -13,7 +13,6 @@
         fish
         fonts
         shellTools
-        terminal
       ];
 
       networking.hostName = "Toms-MacBook-Pro";

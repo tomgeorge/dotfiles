@@ -6,12 +6,12 @@
     {
       imports = [
         ./_hardware-configuration.nix
-      ] ++ (with inputs.self.modules.nixos; [
+      ]
+      ++ (with inputs.self.modules.nixos; [
         home-manager
         tom
         desktop
         fish
-        terminal
       ]);
 
       # Add Hyprland/noctalia HM modules for this host (not on macbooks)
