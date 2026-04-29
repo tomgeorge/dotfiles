@@ -1,7 +1,5 @@
 {
   inputs,
-  config,
-  lib,
   ...
 }:
 
@@ -18,30 +16,17 @@
     nixos.desktop =
       { pkgs, ... }:
       {
-        environment.systemPackages = [ pkgs.hyprpaper ];
-
         services.displayManager.ly.enable = true;
-
         programs.firefox.enable = true;
-
-        programs.hyprland = {
-          enable = true;
-          withUWSM = true;
-          xwayland.enable = true;
-        };
-        programs.hyprlock.enable = true;
-        services.hypridle.enable = true;
-
-        # Pull in Linux-only HM config through the system module
-        home-manager.sharedModules = [
-          inputs.noctalia.homeModules.default
-          inputs.self.modules.homeManager.nixosDesktop
-        ];
       };
 
-    homeManager.nixosDesktop =
+    homeManager.desktop =
       { ... }:
       {
+        imports = with inputs.self.modules.homeManager; [
+          noctalia
+        ];
+
         programs.bash = {
           enable = true;
         };
