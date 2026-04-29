@@ -10,8 +10,11 @@ let
   hm = inputs.self.modules.homeManager;
   commonHmImports = with hm; [
     base
+    containers
     dev
+    editing
     fish
+    langs
     shellTools
     terminal
   ];

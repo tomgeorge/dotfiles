@@ -41,60 +41,23 @@
         };
 
         home.packages = with pkgs; [
-          apko
-          babashka
-          balena-cli
-          bash-language-server
           bat
           bitwarden-cli
           claude-code
-          clj-kondo
-          clojure-lsp
-          cmake
           coreutils
-          cosign
           curl
-          dive
-          erlang
           fd
-          fish-lsp
           flyctl
-          gettext
           github-cli
           gnupg
           gnutls
-          golangci-lint
-          htmx-lsp2
           htop
-          k9s
-          kind
-          kubectl
-          kubectx
           lazygit
-          lua-language-server
-          luajitPackages.luacheck
-          melange
-          neil
           neovim
-          ninja
-          nixd
-          nixfmt
           pass
-          podman-tui
-          podman
-          podman-desktop
           ripgrep
-          shellcheck
-          shfmt
-          skopeo
-          sqlc
           stow
-          tailwindcss-language-server
-          templ
-          terraform-ls
           tmux
-          tree-sitter
-          typescript-language-server
           yazi
         ];
       };
