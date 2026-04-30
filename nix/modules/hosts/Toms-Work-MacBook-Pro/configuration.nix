@@ -1,8 +1,12 @@
-{ inputs, ... }:
+{ inputs, lib, ... }:
 
 {
   flake.modules.darwin."Toms-Work-MacBook-Pro" =
-    { self, pkgs, ... }:
+    {
+      self,
+      pkgs,
+      ...
+    }:
     {
       imports = with inputs.self.modules.darwin; [
         home-manager
@@ -19,11 +23,13 @@
       home-manager.users."tom.george" = {
         programs.git = {
           signing = {
-            format = "x509";
-            program = "gitsign";
+            format = lib.mkForce "x509";
+            signer = "gitsign";
           };
-          extraConfig = {
-            commit.gpgsign = true;
+          settings = {
+            user.name = "Tom George";
+            user.email = "thomas.george@chainguard.dev";
+            commit.gpgsign = lib.mkForce true;
             gitsign.connectorID = "https://accounts.google.com";
           };
         };
