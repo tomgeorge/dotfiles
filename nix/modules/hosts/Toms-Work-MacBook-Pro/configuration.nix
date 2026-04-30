@@ -16,6 +16,20 @@
         shellTools
       ];
 
+      home-manager.users."tom.george" = {
+        programs.git = {
+          signing = {
+            format = "x509";
+            program = "gitsign";
+          };
+          extraConfig = {
+            commit.gpgsign = true;
+            gitsign.connectorID = "https://accounts.google.com";
+          };
+        };
+        home.packages = [ pkgs.gitsign ];
+      };
+
       networking.hostName = "Toms-Work-MacBook-Pro";
 
       nixpkgs.config.allowUnfree = true;
