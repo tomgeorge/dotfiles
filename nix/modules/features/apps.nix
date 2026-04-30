@@ -12,6 +12,7 @@
 
         homebrew.enable = true;
         homebrew.casks = [
+          "betterdisplay"
           "todoist-app"
           "fantastical"
           "visual-studio-code"
