@@ -33,7 +33,10 @@
             gitsign.connectorID = "https://accounts.google.com";
           };
         };
-        home.packages = [ pkgs.gitsign ];
+        home.packages = [
+          pkgs.google-cloud-sdk
+          pkgs.gitsign
+        ];
       };
 
       networking.hostName = "Toms-Work-MacBook-Pro";

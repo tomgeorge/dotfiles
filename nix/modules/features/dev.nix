@@ -52,6 +52,7 @@
           gnupg
           gnutls
           htop
+          jq
           lazygit
           neovim
           pass
@@ -59,6 +60,7 @@
           stow
           tmux
           yazi
+          yq-go
         ];
       };
   };
