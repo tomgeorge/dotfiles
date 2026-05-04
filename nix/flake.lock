@@ -73,6 +73,22 @@
         "type": "github"
       }
     },
+    "homebrew-chainguard": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1777915334,
+        "narHash": "sha256-tjq6dUHntR28waRUM6LVQZocgVSxjqiyPFwu1Hm5ftg=",
+        "owner": "chainguard-dev",
+        "repo": "homebrew-tap",
+        "rev": "1770a5ee70e54e57f6d5b71f054abdb26c34cbe4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "chainguard-dev",
+        "repo": "homebrew-tap",
+        "type": "github"
+      }
+    },
     "homebrew-core": {
       "flake": false,
       "locked": {
@@ -208,6 +224,7 @@
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "homebrew-cask": "homebrew-cask",
+        "homebrew-chainguard": "homebrew-chainguard",
         "homebrew-core": "homebrew-core",
         "import-tree": "import-tree",
         "nix-darwin": "nix-darwin",

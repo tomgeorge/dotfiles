@@ -18,6 +18,7 @@
         fish
         fonts
         shellTools
+        qemu
       ];
 
       home-manager.users."tom.george" = {
