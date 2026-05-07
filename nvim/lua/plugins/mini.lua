@@ -1,3 +1,5 @@
+---@module 'lazy'
+---@type LazySpec[]
 return {
   {
     "nvim-mini/mini.statusline",
@@ -12,7 +14,7 @@ return {
     config = true,
   },
   {
-    "echasnovski/mini.bufremove",
+    "nvim-mini/mini.bufremove",
     keys = {
       {
         "<leader>bd",
@@ -38,7 +40,7 @@ return {
     },
   },
   {
-    "echasnovski/mini.clue",
+    "nvim-mini/mini.clue",
     config = function()
       require("mini.clue").setup({
         window = {
@@ -100,7 +102,7 @@ return {
     config = true,
   },
   {
-    "echasnovski/mini.ai",
+    "nvim-mini/mini.ai",
     event = "InsertEnter",
     config = function()
       local ai = require("mini.ai")
@@ -114,7 +116,7 @@ return {
           c = ai.gen_spec.treesitter({ a = "@class.outer", i = "@class.inner" }, {}),
           t = { "<([%p%w]-)%f[^<%w][^<>]->.-</%1>", "^<.->().*()</[^/]->$" },
           d = { "%f[%d]%d+" }, -- digits
-          e = { -- Word with case
+          e = {                -- Word with case
             {
               "%u[%l%d]+%f[^%l%d]",
               "%f[%S][%l%d]+%f[^%l%d]",
@@ -131,7 +133,7 @@ return {
             }
             return { from = from, to = to }
           end,
-          u = ai.gen_spec.function_call(), -- u for "Usage"
+          u = ai.gen_spec.function_call(),                           -- u for "Usage"
           U = ai.gen_spec.function_call({ name_pattern = "[%w_]" }), -- without dot in function name
         },
       })
@@ -139,25 +141,25 @@ return {
     lazy = false,
   },
   {
-    "echasnovski/mini.jump",
+    "nvim-mini/mini.jump",
     version = false,
     lazy = false,
     config = true,
   },
   {
-    "echasnovski/mini.tabline",
+    "nvim-mini/mini.tabline",
     version = "*",
     lazy = false,
     config = true,
   },
   {
-    "echasnovski/mini.pairs",
+    "nvim-mini/mini.pairs",
     version = "*",
     lazy = false,
     config = true,
   },
   {
-    "echasnovski/mini.files",
+    "nvim-mini/mini.files",
     keys = {
       {
         "<leader>o",
@@ -168,41 +170,65 @@ return {
     },
   },
   {
-    "echasnovski/mini.surround",
+    "nvim-mini/mini.surround",
     event = "BufEnter",
     config = true,
   },
   {
-    "echasnovski/mini.operators",
+    "nvim-mini/mini.operators",
     event = "BufEnter",
     config = true,
   },
   {
-    "echasnovski/mini.test",
+    "nvim-mini/mini.test",
     ft = "lua",
     config = true,
   },
-  -- {
-  --   "echasnovski/mini.indentscope",
-  --   version = false,
-  --   event = { "BufReadPre", "BufNewFile" },
-  --   opts = {
-  --     symbol = "│",
-  --     options = { true_as_border = true },
-  --   },
-  --   init = function()
-  --     vim.api.nvim_create_autocmd("FileType", {
-  --       pattern = {
-  --         "help",
-  --         "dashboard",
-  --         "Trouble",
-  --         "lazy",
-  --         "toggleterm",
-  --       },
-  --       callback = function()
-  --         vim.b.miniindentscope_disable = true
-  --       end,
-  --     })
-  --   end,
-  -- },
+  {
+    "nvim-mini/mini.indentscope",
+    version = false,
+    event = { "BufReadPre", "BufNewFile" },
+    opts = {
+      symbol = "│",
+      options = { true_as_border = true },
+    },
+    init = function()
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = {
+          "help",
+          "dashboard",
+          "Trouble",
+          "lazy",
+          "toggleterm",
+        },
+        callback = function()
+          vim.b.miniindentscope_disable = true
+        end,
+      })
+    end,
+  },
+  {
+    "nvim-mini/mini.completion",
+    config = function()
+      require("mini.completion").setup()
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = "snacks_picker_input",
+        callback = function()
+          vim.b.minicompletion_disable = true
+        end,
+      })
+    end,
+    version = false,
+    dependencies = {
+      "antonk52/filepaths_ls.nvim",
+      {
+        "nvim-mini/mini.icons",
+        config = function()
+          require("mini.icons").setup()
+          MiniIcons.tweak_lsp_kind()
+        end,
+      },
+      "nvim-mini/mini.snippets",
+    },
+  }
 }

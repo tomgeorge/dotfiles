@@ -1,7 +1,7 @@
 ---@module 'lazy'
 ---@type LazySpec[]
 return {
-  enabled = true,
+  enabled = false,
   "saghen/blink.cmp",
   event = "InsertEnter",
   dependencies = {

@@ -23,7 +23,7 @@ return {
     dim = { enabled = false },
     dasboard = { enabled = false },
     explorer = { enabled = false },
-    indent = { enabled = true },
+    indent = { enabled = false },
     input = { enabled = false },
     picker = { enabled = true },
     profiler = { enabled = true },
