@@ -10,7 +10,6 @@
       {
         homebrew.casks = [
           "tailscale-app"
-          "ddpm"
         ];
       };
 

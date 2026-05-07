@@ -41,7 +41,9 @@
             CHAINCTL_CONFIG="$HOME/.config/chainctl/devenv.yaml" exec docker-credential-cgr "$@"
           '')
         ];
-
+        programs.fish.shellAliases = {
+          chaindev = "CHAINCTL_CONFIG=$HOME/.config/chainctl/devenv.yaml chainctl";
+        };
       };
 
       networking.hostName = "Toms-Work-MacBook-Pro";
