@@ -37,7 +37,11 @@
         home.packages = [
           pkgs.google-cloud-sdk
           pkgs.gitsign
+          (pkgs.writeShellScriptBin "docker-credential-cgrdev" ''
+            CHAINCTL_CONFIG="$HOME/.config/chainctl/devenv.yaml" exec docker-credential-cgr "$@"
+          '')
         ];
+
       };
 
       networking.hostName = "Toms-Work-MacBook-Pro";
