@@ -11,6 +11,7 @@
           golangci-lint
           htmx-lsp2
           lua-language-server
+          stylua
           luajitPackages.luacheck
           nixd
           nixfmt
