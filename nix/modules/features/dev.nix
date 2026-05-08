@@ -7,6 +7,7 @@
       let
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
+        hunk = pkgs.callPackage ../../pkgs/hunk.nix { };
       in
       {
         home.sessionVariables = {
@@ -52,6 +53,7 @@
           gnupg
           gnutls
           htop
+          hunk
           jq
           lazygit
           neovim
