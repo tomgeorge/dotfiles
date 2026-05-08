@@ -23,20 +23,13 @@
 
       home-manager.users."tom.george" = {
         programs.git = {
-          signing = {
-            format = lib.mkForce "x509";
-            signer = "gitsign";
-          };
           settings = {
             user.name = "Tom George";
             user.email = "thomas.george@chainguard.dev";
-            commit.gpgsign = lib.mkForce true;
-            gitsign.connectorID = "https://accounts.google.com";
           };
         };
         home.packages = [
           pkgs.google-cloud-sdk
-          pkgs.gitsign
           (pkgs.writeShellScriptBin "docker-credential-cgrdev" ''
             CHAINCTL_CONFIG="$HOME/.config/chainctl/devenv.yaml" exec docker-credential-cgr "$@"
           '')
