@@ -1,9 +1,4 @@
 return {
-  {
-    "numToStr/Comment.nvim",
-    config = true,
-    lazy = false,
-  },
   -- {
   --   "neovim/nvim-lspconfig",
   --   dependencies = {
