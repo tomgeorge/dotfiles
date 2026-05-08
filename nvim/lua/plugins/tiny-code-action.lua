@@ -6,18 +6,8 @@ return {
     "rachartier/tiny-code-action.nvim",
     -- dev = true,
     -- dir = "~/git/tiny-code-action.nvim/",
-    dependencies = {
-      { "nvim-lua/plenary.nvim" },
-      {
-        "folke/snacks.nvim",
-        opts = {
-          terminal = {},
-        },
-      },
-    },
+    dependencies = {},
     event = "LspAttach",
-    opts = { picker = "snacks" },
+    opts = { backend = "vim", picker = "buffer" },
   },
 }
-
---- [[ *a [bb] ]]

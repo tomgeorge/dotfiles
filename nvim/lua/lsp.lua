@@ -23,6 +23,12 @@ local function on_attach(client, bufnr)
   keymap("n", "<leader>ld", function()
     require("commands").lsp_document_symbols()
   end, "LSP Document Symbols")
+  keymap("n", "gai", function()
+    require("commands").lsp_incoming_calls()
+  end, "LSP Incoming Calls")
+  keymap("n", "gao", function()
+    require("commands").lsp_outgoing_calls()
+  end, "LSP Outgoing Calls")
 
   vim.diagnostic.config({
     signs = {

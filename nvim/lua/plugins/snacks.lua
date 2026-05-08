@@ -38,9 +38,6 @@ return {
     {
       "<leader>ps",
       function()
-        while true do
-          print("hi")
-        end
         Snacks.profiler.toggle()
       end,
       desc = "Toggle profiler",
@@ -71,7 +68,7 @@ return {
     {
       "<leader>n",
       function()
-        Snacks.picker.notifications({ confirm = { "yank", "focus_preview" } })
+        require("commands").notifications()
       end,
       desc = "Search notifications",
     },
@@ -115,6 +112,7 @@ return {
       function()
         Snacks.picker.lsp_symbols()
       end,
+      desc = "LSP symbols",
     },
   },
 }

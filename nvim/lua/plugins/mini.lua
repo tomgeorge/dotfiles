@@ -212,7 +212,7 @@ return {
     config = function()
       require("mini.completion").setup()
       vim.api.nvim_create_autocmd("FileType", {
-        pattern = "snacks_picker_input",
+        pattern = { "snacks_picker_input", "minifiles" },
         callback = function()
           vim.b.minicompletion_disable = true
         end,
@@ -230,5 +230,5 @@ return {
       },
       "nvim-mini/mini.snippets",
     },
-  }
+  },
 }

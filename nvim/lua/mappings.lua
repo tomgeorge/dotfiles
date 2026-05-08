@@ -95,127 +95,127 @@ M.telescope = {
   },
 }
 
-M.lspconfig = {
-  plugin = true,
-
-  -- See `<cmd> :help vim.lsp.*` for documentation on any of the below functions
-
-  n = {
-    ["gD"] = {
-      function()
-        vim.lsp.buf.declaration()
-      end,
-      "LSP declaration",
-    },
-
-    ["C-]"] = {
-      function()
-        require("snacks").picker.lsp_type_definitions()
-        -- require("telescope.builtin").lsp_type_definitions()
-      end,
-      "LSP definition",
-    },
-
-    ["K"] = {
-      function()
-        vim.lsp.buf.hover()
-      end,
-      "LSP hover",
-    },
-
-    ["gi"] = {
-      function()
-        require("snacks.picker").lsp_implementations()
-        -- require("telescope.builtin").lsp_implementations()
-      end,
-      "LSP implementation",
-    },
-
-    ["<leader>ls"] = {
-      function()
-        vim.lsp.buf.signature_help()
-      end,
-      "LSP signature help",
-    },
-
-    ["<leader>D"] = {
-      function()
-        require("telescope.builtin").lsp_type_definitions()
-      end,
-      "Jumps to the definition of the type of the symbol under cursor",
-    },
-
-    ["<leader>rn"] = {
-      function()
-        vim.lsp.buf.rename()
-      end,
-      "LSP rename",
-    },
-
-    ["<leader>r"] = {
-      function()
-        require("snacks.picker").lsp_references()
-        -- require("telescope.builtin").lsp_references()
-      end,
-      "LSP references",
-    },
-
-    ["<leader>e"] = {
-      function()
-        vim.diagnostic.open_float({ border = "rounded" })
-      end,
-      "Show diagnostic under cursor in floating window",
-    },
-
-    ["[d"] = {
-      function()
-        vim.diagnostic.jump({ count = -1, float = { border = "single" } })
-      end,
-      "Go to previous diagnostic",
-    },
-
-    ["]d"] = {
-      function()
-        vim.diagnostic.jump({ count = 1, float = { border = "single" } })
-      end,
-      "Go to next diagnostic",
-    },
-
-    ["<leader>q"] = {
-      function()
-        vim.diagnostic.setloclist()
-      end,
-      "Diagnostic setloclist",
-    },
-
-    ["<leader>wa"] = {
-      function()
-        vim.lsp.buf.add_workspace_folder()
-      end,
-      "Add workspace folder",
-    },
-
-    ["<leader>wr"] = {
-      function()
-        vim.lsp.buf.remove_workspace_folder()
-      end,
-      "Remove workspace folder",
-    },
-
-    ["<leader>wl"] = {
-      function()
-        vim.lsp.buf.list_workspace_folders()
-      end,
-      "List workspace folders",
-    },
-    -- ["<leader>f"] = {
-    --   function()
-    --     require("conform").format()
-    --   end,
-    --   "Format file",
-    -- },
-  },
-}
+-- M.lspconfig = {
+--   plugin = true,
+--
+--   -- See `<cmd> :help vim.lsp.*` for documentation on any of the below functions
+--
+--   n = {
+--     ["gD"] = {
+--       function()
+--         vim.lsp.buf.declaration()
+--       end,
+--       "LSP declaration",
+--     },
+--
+--     ["C-]"] = {
+--       function()
+--         require("snacks").picker.lsp_type_definitions()
+--         -- require("telescope.builtin").lsp_type_definitions()
+--       end,
+--       "LSP definition",
+--     },
+--
+--     ["K"] = {
+--       function()
+--         vim.lsp.buf.hover()
+--       end,
+--       "LSP hover",
+--     },
+--
+--     ["gi"] = {
+--       function()
+--         require("snacks.picker").lsp_implementations()
+--         -- require("telescope.builtin").lsp_implementations()
+--       end,
+--       "LSP implementation",
+--     },
+--
+--     ["<leader>ls"] = {
+--       function()
+--         vim.lsp.buf.signature_help()
+--       end,
+--       "LSP signature help",
+--     },
+--
+--     ["<leader>D"] = {
+--       function()
+--         require("telescope.builtin").lsp_type_definitions()
+--       end,
+--       "Jumps to the definition of the type of the symbol under cursor",
+--     },
+--
+--     ["<leader>rn"] = {
+--       function()
+--         vim.lsp.buf.rename()
+--       end,
+--       "LSP rename",
+--     },
+--
+--     ["<leader>r"] = {
+--       function()
+--         require("snacks.picker").lsp_references()
+--         -- require("telescope.builtin").lsp_references()
+--       end,
+--       "LSP references",
+--     },
+--
+--     ["<leader>e"] = {
+--       function()
+--         vim.diagnostic.open_float({ border = "rounded" })
+--       end,
+--       "Show diagnostic under cursor in floating window",
+--     },
+--
+--     ["[d"] = {
+--       function()
+--         vim.diagnostic.jump({ count = -1, float = { border = "single" } })
+--       end,
+--       "Go to previous diagnostic",
+--     },
+--
+--     ["]d"] = {
+--       function()
+--         vim.diagnostic.jump({ count = 1, float = { border = "single" } })
+--       end,
+--       "Go to next diagnostic",
+--     },
+--
+--     ["<leader>q"] = {
+--       function()
+--         vim.diagnostic.setloclist()
+--       end,
+--       "Diagnostic setloclist",
+--     },
+--
+--     ["<leader>wa"] = {
+--       function()
+--         vim.lsp.buf.add_workspace_folder()
+--       end,
+--       "Add workspace folder",
+--     },
+--
+--     ["<leader>wr"] = {
+--       function()
+--         vim.lsp.buf.remove_workspace_folder()
+--       end,
+--       "Remove workspace folder",
+--     },
+--
+--     ["<leader>wl"] = {
+--       function()
+--         vim.lsp.buf.list_workspace_folders()
+--       end,
+--       "List workspace folders",
+--     },
+--     -- ["<leader>f"] = {
+--     --   function()
+--     --     require("conform").format()
+--     --   end,
+--     --   "Format file",
+--     -- },
+--   },
+-- }
 
 M.gitsigns = {
   plugin = true,

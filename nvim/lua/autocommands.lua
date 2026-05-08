@@ -22,15 +22,6 @@ vim.api.nvim_create_autocmd("LspProgress", {
   end,
 })
 
-vim.api.nvim_create_user_command("DiffPick", function(args)
-  local branches = require("snacks").picker.git_branches({
-    confirm = function(picker, item)
-      picker:close()
-      if item then
-        vim.schedule(function()
-          vim.cmd(string.format("DiffviewOpen %s", item.branch))
-        end)
-      end
-    end,
-  })
+vim.api.nvim_create_user_command("DiffPick", function()
+  require("commands").compare_with()
 end, { desc = "Diffview" })
