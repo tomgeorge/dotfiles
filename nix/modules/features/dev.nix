@@ -59,6 +59,14 @@
           };
         };
 
+        services.gpg-agent = {
+          enable = true;
+          defaultCacheTtl = 600;
+          maxCacheTtl = 7200;
+          pinentry.package =
+            if pkgs.stdenv.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
+        };
+
         programs.mise = {
           enable = true;
           enableFishIntegration = true;

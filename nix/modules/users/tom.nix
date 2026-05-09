@@ -25,7 +25,7 @@ in
       name = "tom";
       username = "tgeorge";
       userFullName = "Tom George";
-      userEmail = "tg8490@gmail.com";
+      userEmail = "tom.george@hey.com";
       gpgKeyId = "5FA01E687B6E7C0E";
     })
     (factory.user {
@@ -36,7 +36,7 @@ in
       gpgKeyId = "5FA01E687B6E7C0E";
     })
     {
-      homeManager.tom.imports = commonHmImports;
+      homeManager.tom.imports = commonHmImports ++ [ hm.gpgTools ];
       homeManager.tom-work.imports = commonHmImports;
     }
   ];
