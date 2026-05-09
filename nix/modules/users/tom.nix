@@ -26,14 +26,14 @@ in
       username = "tgeorge";
       userFullName = "Tom George";
       userEmail = "tg8490@gmail.com";
-      gpgKeyId = "0C0F66910F1913B2";
+      gpgKeyId = "5FA01E687B6E7C0E";
     })
     (factory.user {
       name = "tom-work";
       username = "tom.george";
       userFullName = "Tom George";
       userEmail = "thomas.george@chainguard.dev";
-      gpgKeyId = "0C0F66910F1913B2";
+      gpgKeyId = "5FA01E687B6E7C0E";
     })
     {
       homeManager.tom.imports = commonHmImports;
