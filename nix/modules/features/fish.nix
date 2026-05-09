@@ -35,6 +35,11 @@
             diff = "nvim -d";
             cd = "z";
             hmh = "man home-configuration.nix";
+            ramdisk =
+              if pkgs.stdenv.isDarwin then
+                "diskutil erasevolume HFS+ 'RAMDisk' $(hdiutil attach -nomount ram://2048)"
+              else
+                "echo 'not implemented'";
             rebuild =
               if pkgs.stdenv.isDarwin then
                 "sudo darwin-rebuild switch --flake $HOME/git/dotfiles/nix"
