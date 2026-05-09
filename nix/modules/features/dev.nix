@@ -15,11 +15,6 @@
           "GPG_TTY" = "$(tty)";
         };
 
-        services.gpg-agent = {
-          enable = true;
-          pinentry.package = pkgs.pinentry_mac;
-        };
-
         programs.git = {
           enable = true;
           settings = {
@@ -63,8 +58,7 @@
           enable = true;
           defaultCacheTtl = 600;
           maxCacheTtl = 7200;
-          pinentry.package =
-            if pkgs.stdenv.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
+          pinentry.package = if pkgs.stdenv.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
         };
 
         programs.mise = {
