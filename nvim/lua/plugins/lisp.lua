@@ -2,7 +2,13 @@
 ---@type LazySpec[]
 return {
   {
+    dir = vim.fn.getenv("HOME") .. "/git/nrepl-lsp",
+    ft = { "clojure" },
+  },
+  {
     "Olical/conjure",
+    dev = true,
+    dir = vim.fn.getenv("HOME") .. "/git/conjure",
     ft = { "clojure", "fennel" },
     init = function()
       vim.g["conjure#log#hud#anchor"] = "NE"

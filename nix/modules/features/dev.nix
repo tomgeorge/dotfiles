@@ -92,6 +92,7 @@
           neovim
           pass
           ripgrep
+          rlwrap
           stow
           tmux
           yazi

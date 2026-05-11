@@ -200,6 +200,7 @@ return {
           "Trouble",
           "lazy",
           "toggleterm",
+          "sidekick_terminal",
         },
         callback = function()
           vim.b.miniindentscope_disable = true

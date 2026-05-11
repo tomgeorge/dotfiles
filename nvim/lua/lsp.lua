@@ -97,10 +97,11 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
       end)
       -- FIXME: copilot isn't working, NES is buggy and annoying
       :filter(function(server)
-        return server ~= "copilot"
+        return server ~= "copilot" and server ~= "conjure"
       end)
       :totable()
     vim.lsp.enable(server_configs)
+    print(vim.inspect(server_configs))
   end,
 })
 

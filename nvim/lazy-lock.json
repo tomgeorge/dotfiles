@@ -4,7 +4,6 @@
   "catppuccin": { "branch": "main", "commit": "426dbebe06b5c69fd846ceb17b42e12f890aedf1" },
   "codecompanion.nvim": { "branch": "main", "commit": "02b5a14926be3d37fbfa19de5e8336db8a5711e6" },
   "conform.nvim": { "branch": "master", "commit": "dca1a190aa85f9065979ef35802fb77131911106" },
-  "conjure": { "branch": "main", "commit": "2ddd752d43b35d72aa3e339c3ae051b8dbad8549" },
   "diffview.nvim": { "branch": "main", "commit": "4516612fe98ff56ae0415a259ff6361a89419b0a" },
   "dooing": { "branch": "main", "commit": "d4cc4daa821d8ef8bae0e8f2b60af8f49f1f40c6" },
   "edge": { "branch": "master", "commit": "7ec78c21bd8f0b2b0b47043bb1e730c561647c72" },

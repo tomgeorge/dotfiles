@@ -8,16 +8,6 @@
 let
   factory = config.flake.factory;
   hm = inputs.self.modules.homeManager;
-  commonHmImports = with hm; [
-    base
-    containers
-    dev
-    editing
-    fish
-    langs
-    shellTools
-    terminal
-  ];
 in
 {
   flake.modules = lib.mkMerge [
@@ -36,8 +26,11 @@ in
       gpgKeyId = "5FA01E687B6E7C0E";
     })
     {
-      homeManager.tom.imports = commonHmImports ++ [ hm.gpgTools ];
-      homeManager.tom-work.imports = commonHmImports;
+      homeManager.tom.imports = [
+        hm.default
+        hm.gpgTools
+      ];
+      homeManager.tom-work.imports = [ hm.default ];
     }
   ];
 }
