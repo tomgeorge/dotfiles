@@ -49,7 +49,9 @@ return {
         },
         triggers = {
           { mode = "n", keys = "<Leader>" },
+          { mode = "n", keys = "<LocalLeader>" },
           { mode = "x", keys = "<Leader>" },
+          { mode = "x", keys = "<LocalLeader>" },
 
           -- Built-in completion
           { mode = "i", keys = "<C-x>" },
@@ -116,7 +118,7 @@ return {
           c = ai.gen_spec.treesitter({ a = "@class.outer", i = "@class.inner" }, {}),
           t = { "<([%p%w]-)%f[^<%w][^<>]->.-</%1>", "^<.->().*()</[^/]->$" },
           d = { "%f[%d]%d+" }, -- digits
-          e = {                -- Word with case
+          e = { -- Word with case
             {
               "%u[%l%d]+%f[^%l%d]",
               "%f[%S][%l%d]+%f[^%l%d]",
@@ -133,7 +135,7 @@ return {
             }
             return { from = from, to = to }
           end,
-          u = ai.gen_spec.function_call(),                           -- u for "Usage"
+          u = ai.gen_spec.function_call(), -- u for "Usage"
           U = ai.gen_spec.function_call({ name_pattern = "[%w_]" }), -- without dot in function name
         },
       })
@@ -181,6 +183,11 @@ return {
   },
   {
     "nvim-mini/mini.test",
+    ft = "lua",
+    config = true,
+  },
+  {
+    "nvim-mini/mini.doc",
     ft = "lua",
     config = true,
   },

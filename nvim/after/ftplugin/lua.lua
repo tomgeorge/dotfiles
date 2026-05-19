@@ -4,3 +4,7 @@ end)
 vim.keymap.set("n", "<leader>ta", function()
   require("mini.test").run()
 end)
+
+vim.keymap.set("n", "<leader>td", function()
+  require("mini.doc").generate()
+end)

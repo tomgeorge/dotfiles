@@ -4,10 +4,14 @@ return {
   {
     dir = vim.fn.getenv("HOME") .. "/git/nrepl-lsp",
     ft = { "clojure" },
+    config = true,
+    opts = {},
   },
+  { "julienvincent/nvim-paredit", opts = {}, config = true },
   {
     "Olical/conjure",
     dev = true,
+    enabled = false,
     dir = vim.fn.getenv("HOME") .. "/git/conjure",
     ft = { "clojure", "fennel" },
     init = function()
@@ -21,21 +25,12 @@ return {
     end,
     lazy = true,
     dependencies = {
-      { "julienvincent/nvim-paredit", opts = {}, config = true },
       -- "tpope/vim-sexp-mappings-for-regular-people",
       "tpope/vim-repeat",
-      -- "guns/vim-sexp",
-      -- {
-      --   "akinsho/toggleterm.nvim",
-      --   version = "*",
-      --   config = true,
-      --   keys = {
-      --     {
-      --       "<leader>tt",
-      --       "<Cmd>ToggleTerm<CR>",
-      --     },
-      --   },
-      -- },
     },
   },
+  -- {
+  --   "tpope/vim-fireplace",
+  --   config = true,
+  -- },
 }
