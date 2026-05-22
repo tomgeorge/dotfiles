@@ -3,7 +3,7 @@
 {
   flake.modules = {
     darwin.apps =
-      { pkgs, ... }:
+      { pkgs, config, ... }:
       {
         environment.systemPackages = with pkgs; [
           discord
@@ -11,6 +11,8 @@
         ];
 
         homebrew.enable = true;
+        homebrew.taps = builtins.attrNames config.nix-homebrew.taps;
+        homebrew.onActivation.cleanup = "uninstall";
         homebrew.casks = [
           "betterdisplay"
           "todoist-app"
