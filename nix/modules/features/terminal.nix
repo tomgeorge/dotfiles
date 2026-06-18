@@ -6,7 +6,7 @@
       { pkgs, lib, ... }:
       {
         programs.wezterm = lib.mkIf pkgs.stdenv.isDarwin {
-          enable = true;
+          enable = false;
           enableBashIntegration = true;
           enableZshIntegration = true;
         };

@@ -23,6 +23,7 @@
           "mozilla-vpn"
           "rectangle"
           "spotify"
+          "wezterm@latest"
         ];
       };
   };

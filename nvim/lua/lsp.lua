@@ -101,7 +101,6 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
       end)
       :totable()
     vim.lsp.enable(server_configs)
-    print(vim.inspect(server_configs))
   end,
 })
 

@@ -41,14 +41,15 @@ local config = {
 
 notifications.apply_to_config(config)
 
-wezterm.on("window-config-reloaded", function(window)
-	window:set_left_status(wezterm.format({
-		{ Foreground = { Color = "#a6d189" } },
-		{ Text = " Config reloaded! " },
-	}))
-	wezterm.time.call_after(4, function()
-		window:set_left_status("")
-	end)
+wezterm.on("window-config-reloaded", function(window, pane)
+	window:toast_notification("wezterm", "configuration reloaded!!!", nil, 4000)
+	-- window:set_left_status(wezterm.format({
+	-- 	{ Foreground = { Color = "#a6d189" } },
+	-- 	{ Text = " Config reloaded! " },
+	-- }))
+	-- wezterm.time.call_after(4, function()
+	-- 	window:set_left_status("")
+	-- end)
 end)
 
 return config
