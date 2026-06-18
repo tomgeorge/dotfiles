@@ -19,6 +19,7 @@
         fonts
         shellTools
         qemu
+        krunkit-firmware
       ];
 
       home-manager.users."tom.george" = {

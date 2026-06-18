@@ -88,6 +88,7 @@
           hunk
           jq
           lazygit
+          mkcert
           neovim
           pass
           ripgrep
