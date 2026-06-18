@@ -16,6 +16,7 @@
         home.packages = with pkgs; [
           crane
           dive
+          grype
           k9s
           kind
           ko

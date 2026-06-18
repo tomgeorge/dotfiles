@@ -75,6 +75,7 @@
         home.packages = with pkgs; [
           bat
           bitwarden-cli
+          codex
           claude-code
           coreutils
           curl
