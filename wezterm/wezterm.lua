@@ -1,11 +1,8 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
+local notifications = require("notifications")
 
--- wezterm.on("update-right-status", function(window, pane)
--- 	window:set_right_status(pane:get_foreground_process_name())
--- end)
-
-return {
+local config = {
 	color_scheme = "Catppuccin Frappe",
 	-- color_scheme = "Everforest Dark Medium (Gogh)",
 	-- font = wezterm.font("JetBrains Mono"),
@@ -41,3 +38,11 @@ return {
 		{ key = "y", mods = "LEADER", action = act.QuickSelect },
 	},
 }
+
+notifications.apply_to_config(config)
+
+wezterm.on("window-config-reloaded", function(window, pane)
+	window:toast_notification("wezterm", "Configuration reloaded", nil, 4000)
+end)
+
+return config

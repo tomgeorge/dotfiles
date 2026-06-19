@@ -27,4 +27,5 @@ link() {
 
 link nvim ~/.config/nvim
 link wezterm ~/.config/wezterm
-link skills ~/.claude/skills
+link claude/hooks ~/.claude/hooks
+link claude/skills ~/.claude/skills
