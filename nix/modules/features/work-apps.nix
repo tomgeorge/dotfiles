@@ -8,12 +8,18 @@
           name = "chainguard-dev/tap";
           trusted = true;
         }
+        {
+          name = "schpet/tap";
+          trusted = true;
+        }
       ];
       homebrew.brews = [
         "chainctl"
+        # schpet/linear-cli — the `linear` command-line tool (not in nixpkgs).
+        "schpet/tap/linear"
       ];
       homebrew.casks = [
-        "linear-linear"
+        "linear"
       ];
     };
   };

@@ -33,6 +33,10 @@
       url = "github:chainguard-dev/homebrew-tap";
       flake = false;
     };
+    homebrew-schpet = {
+      url = "github:schpet/homebrew-tap";
+      flake = false;
+    };
     noctalia = {
       url = "github:noctalia-dev/noctalia-shell";
       inputs.nixpkgs.follows = "nixpkgs";

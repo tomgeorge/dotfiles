@@ -105,6 +105,22 @@
         "type": "github"
       }
     },
+    "homebrew-schpet": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1776285540,
+        "narHash": "sha256-0cIEJiOlfOyRU/w3TOGiyMeluoaVexzEJd7Og2DELeQ=",
+        "owner": "schpet",
+        "repo": "homebrew-tap",
+        "rev": "c256873d145d6a012165b89c28a1e8ce5256bec7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "schpet",
+        "repo": "homebrew-tap",
+        "type": "github"
+      }
+    },
     "import-tree": {
       "locked": {
         "lastModified": 1778781969,
@@ -202,6 +218,7 @@
         "homebrew-cask": "homebrew-cask",
         "homebrew-chainguard": "homebrew-chainguard",
         "homebrew-core": "homebrew-core",
+        "homebrew-schpet": "homebrew-schpet",
         "import-tree": "import-tree",
         "nix-darwin": "nix-darwin",
         "nix-homebrew": "nix-homebrew",
