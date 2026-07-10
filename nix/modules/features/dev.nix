@@ -79,9 +79,11 @@
           claude-code
           coreutils
           curl
+          cue
           fd
           flyctl
           github-cli
+          golangci-lint
           gnupg
           gnutls
           htop
