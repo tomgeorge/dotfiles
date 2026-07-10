@@ -95,6 +95,7 @@
           rlwrap
           stow
           tmux
+          tree-sitter
           yazi
           yq-go
         ];
