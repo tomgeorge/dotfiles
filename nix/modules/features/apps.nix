@@ -6,7 +6,6 @@
       { pkgs, config, ... }:
       {
         environment.systemPackages = with pkgs; [
-          discord
           raycast
         ];
 
@@ -15,6 +14,7 @@
         homebrew.onActivation.cleanup = "uninstall";
         homebrew.casks = [
           "betterdisplay"
+          "discord"
           "todoist-app"
           "fantastical"
           "visual-studio-code"
@@ -23,7 +23,7 @@
           "mozilla-vpn"
           "rectangle"
           "spotify"
-          "wezterm@latest"
+          "zoom"
         ];
       };
   };
