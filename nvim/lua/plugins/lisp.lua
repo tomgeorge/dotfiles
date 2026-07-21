@@ -2,6 +2,7 @@
 ---@type LazySpec[]
 return {
   {
+    enabled = false,
     dir = vim.fn.getenv("HOME") .. "/git/nrepl-lsp",
     ft = { "clojure" },
     config = true,

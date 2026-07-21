@@ -5,6 +5,7 @@ return {
   filetypes = { "go" },
   settings = {
     gopls = {
+      buildFlags = { "-tags=withauth,integration,e2e" },
       gofumpt = true,
       codelenses = {
         gc_details = false,
