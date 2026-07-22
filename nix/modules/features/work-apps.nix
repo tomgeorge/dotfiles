@@ -19,6 +19,7 @@
         "schpet/tap/linear"
       ];
       homebrew.casks = [
+        "orbstack"
         "linear"
       ];
     };
