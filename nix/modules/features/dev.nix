@@ -92,6 +92,7 @@
           lazygit
           mkcert
           neovim
+          oras
           pass
           ripgrep
           rlwrap
