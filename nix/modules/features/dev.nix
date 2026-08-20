@@ -75,17 +75,18 @@
         home.packages = with pkgs; [
           bat
           bitwarden-cli
-          codex
           claude-code
+          codex
           coreutils
-          curl
           cue
+          curl
           fd
           flyctl
           github-cli
-          golangci-lint
           gnupg
           gnutls
+          golangci-lint
+          herdr
           htop
           hunk
           jq
