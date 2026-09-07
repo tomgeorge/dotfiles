@@ -14,15 +14,16 @@
         homebrew.onActivation.cleanup = "uninstall";
         homebrew.casks = [
           "betterdisplay"
-          "discord"
-          "todoist-app"
-          "fantastical"
-          "visual-studio-code"
-          "hey-desktop"
           "claude"
+          "discord"
+          "fantastical"
+          "hey-desktop"
           "mozilla-vpn"
           "rectangle"
           "spotify"
+          "todoist-app"
+          "tomatobar"
+          "visual-studio-code"
           "zoom"
         ];
       };

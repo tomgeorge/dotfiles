@@ -37,6 +37,14 @@
           enableBashIntegration = true;
         };
 
+        programs.direnv = {
+          enable = true;
+          nix-direnv.enable = true;
+          enableFishIntegration = true;
+          enableZshIntegration = true;
+          enableBashIntegration = true;
+        };
+
         programs.bash = lib.mkIf (!pkgs.stdenv.isDarwin) {
           enable = true;
         };

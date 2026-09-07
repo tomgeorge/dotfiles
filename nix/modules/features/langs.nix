@@ -11,6 +11,7 @@
           cosign
           beamPackages.erlang
           gettext
+          maelstrom-clj
           melange
           neil
           ninja
