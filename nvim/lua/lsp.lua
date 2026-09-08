@@ -55,10 +55,17 @@ vim.api.nvim_create_autocmd("LspAttach", {
   group = vim.api.nvim_create_augroup("my.lsp", {}),
   callback = function(args)
     local bufnr = args.buf
+    ---@type vim.lsp.Client
     local client = assert(vim.lsp.get_client_by_id(args.data.client_id))
 
+    if client:supports_method("textDocument/inlayHint") then
+      vim.keymap.set("n", "<Leader>ch", function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+      end, { desc = "LSP: toggle inlay hints" })
+    end
+
     if client:supports_method(vim.lsp.protocol.Methods.textDocument_inlineCompletion, bufnr) then
-      -- vim.lsp.inline_completion.enable(true, { bufnr = bufnr })
+      vim.lsp.inline_completion.enable(true, { bufnr = bufnr })
 
       vim.keymap.set(
         "i",
