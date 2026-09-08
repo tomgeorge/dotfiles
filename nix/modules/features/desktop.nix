@@ -9,7 +9,6 @@
       { pkgs, ... }:
       {
         homebrew.casks = [
-          "tailscale-app"
         ];
       };
 
