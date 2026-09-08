@@ -14,6 +14,7 @@
           "homebrew/homebrew-cask" = inputs.homebrew-cask;
           "chainguard-dev/homebrew-tap" = inputs.homebrew-chainguard;
           "schpet/homebrew-tap" = inputs.homebrew-schpet;
+          "ArtemYurov/homebrew-tomobar" = inputs.homebrew-tomobar;
         };
         mutableTaps = false;
       };

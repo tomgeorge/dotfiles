@@ -121,6 +121,22 @@
         "type": "github"
       }
     },
+    "homebrew-tomobar": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772759692,
+        "narHash": "sha256-9Gl9Eo21cfKWXuzw+W1nOYUwhyAl14gaYP80AHv7k9s=",
+        "owner": "ArtemYurov",
+        "repo": "homebrew-tomobar",
+        "rev": "b4288d7f5d7d53799b9afd15941d352106d10494",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ArtemYurov",
+        "repo": "homebrew-tomobar",
+        "type": "github"
+      }
+    },
     "import-tree": {
       "locked": {
         "lastModified": 1778781969,
@@ -219,6 +235,7 @@
         "homebrew-chainguard": "homebrew-chainguard",
         "homebrew-core": "homebrew-core",
         "homebrew-schpet": "homebrew-schpet",
+        "homebrew-tomobar": "homebrew-tomobar",
         "import-tree": "import-tree",
         "nix-darwin": "nix-darwin",
         "nix-homebrew": "nix-homebrew",

@@ -37,6 +37,10 @@
       url = "github:schpet/homebrew-tap";
       flake = false;
     };
+    homebrew-tomobar = {
+      url = "github:ArtemYurov/homebrew-tomobar";
+      flake = false;
+    };
     noctalia = {
       url = "github:noctalia-dev/noctalia-shell";
       inputs.nixpkgs.follows = "nixpkgs";

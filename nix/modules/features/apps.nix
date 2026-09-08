@@ -22,7 +22,7 @@
           "rectangle"
           "spotify"
           "todoist-app"
-          "tomatobar"
+          "tomobar"
           "visual-studio-code"
           "zoom"
         ];
