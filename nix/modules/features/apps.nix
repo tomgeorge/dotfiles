@@ -10,7 +10,13 @@
         ];
 
         homebrew.enable = true;
-        homebrew.taps = builtins.attrNames config.nix-homebrew.taps;
+        homebrew.taps = builtins.attrNames config.nix-homebrew.taps ++ [
+          # Homebrew 6 refuses non-official taps unless marked trusted (see work-apps.nix).
+          {
+            name = "artemyurov/tomobar";
+            trusted = true;
+          }
+        ];
         homebrew.onActivation.cleanup = "uninstall";
         homebrew.casks = [
           "betterdisplay"

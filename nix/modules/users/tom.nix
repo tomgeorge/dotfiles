@@ -29,6 +29,12 @@ in
       homeManager.tom.imports = [
         hm.default
         hm.gpgTools
+        # docker -> podman only on personal machines; work uses orbstack
+        {
+          programs.fish.shellAliases.docker = "podman";
+          programs.zsh.shellAliases.docker = "podman";
+          programs.bash.shellAliases.docker = "podman";
+        }
       ];
       homeManager.tom-work.imports = [ hm.default ];
     }
