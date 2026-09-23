@@ -93,6 +93,7 @@
           lazygit
           mkcert
           neovim
+          nodejs
           oras
           pass
           ripgrep
