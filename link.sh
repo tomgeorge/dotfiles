@@ -32,3 +32,4 @@ link claude/hooks ~/.claude/hooks
 link claude/skills ~/.claude/skills
 link pi/settings.json ~/.pi/agent/settings.json
 link pi/AGENTS.md ~/.pi/agent/AGENTS.md
+link pi/extensions/subagent ~/.pi/agent/extensions/subagent
