@@ -94,10 +94,12 @@
           mkcert
           neovim
           nodejs
+          pi-coding-agent
           oras
           pass
           ripgrep
           rlwrap
+          slides
           stow
           tmux
           tree-sitter
