@@ -30,3 +30,5 @@ link wezterm ~/.config/wezterm
 link ghostty ~/.config/ghostty
 link claude/hooks ~/.claude/hooks
 link claude/skills ~/.claude/skills
+link pi/settings.json ~/.pi/agent/settings.json
+link pi/AGENTS.md ~/.pi/agent/AGENTS.md
