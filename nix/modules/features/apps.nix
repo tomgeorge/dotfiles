@@ -10,7 +10,7 @@
     homeManager.apps =
       { pkgs, ... }:
       {
-        home.packages = [ inputs.hey-cli.packages.${pkgs.system}.default ];
+        home.packages = [ inputs.hey-cli.packages.${pkgs.stdenv.hostPlatform.system}.default ];
       };
 
     darwin.apps =
