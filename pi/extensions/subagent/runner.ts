@@ -2,6 +2,10 @@ import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
 
 export const READ_TOOLS = ["read", "grep", "find", "ls"] as const;
+// Children run with --no-extensions; these are loaded explicitly anyway.
+// pi-anthropic-auth keeps Anthropic subscription auth on plan limits; without it,
+// Anthropic rejects requests with a 400 ("Third-party apps now draw from your extra usage").
+export const CHILD_EXTENSIONS = ["npm:@gotgenes/pi-anthropic-auth"] as const;
 export interface Job {
   task: string;
   provider: string;
@@ -25,10 +29,11 @@ export function validateJob(job: Job): void {
   }
 }
 
-export function buildArgs(job: Job): string[] {
+export function buildArgs(job: Job, extensions: readonly string[] = CHILD_EXTENSIONS): string[] {
   validateJob(job);
   return [
     "-p", "--mode", "json", "--no-session", "--no-extensions",
+    ...extensions.flatMap((source) => ["-e", source]),
     "--no-skills", "--no-prompt-templates", "--no-approve", "--offline",
     "--provider", job.provider, "--model", job.model,
     "--tools", job.tools.join(","),

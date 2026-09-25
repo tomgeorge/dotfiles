@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildArgs, runSubagent, type Job } from "./runner.ts";
+import { buildArgs, CHILD_EXTENSIONS, runSubagent, type Job } from "./runner.ts";
 
 const job: Job = {
   task: "--evil @file $(echo nope)", provider: "test", model: "exact/model",
@@ -25,6 +25,16 @@ test("explicit arguments, isolated reader, literal task", () => {
   assert.equal(args.at(-1), `Task: ${job.task}`);
   assert.equal(args[args.indexOf("--model") + 1], job.model);
   assert.equal(args[args.indexOf("--tools") + 1], "read,grep");
+});
+
+test("loads only the listed child extensions", () => {
+  const args = buildArgs(job);
+  for (const source of CHILD_EXTENSIONS) {
+    assert.equal(args[args.indexOf(source) - 1], "-e");
+  }
+  const custom = buildArgs(job, ["./a.ts", "npm:b"]);
+  assert.deepEqual(custom.filter((arg, i) => custom[i - 1] === "-e"), ["./a.ts", "npm:b"]);
+  assert.ok(!buildArgs(job, []).includes("-e"));
 });
 
 test("reject invalid jobs before spawning", async () => {

@@ -52,11 +52,14 @@ Shutdown/reload cancels the child. SIGTERM escalates to SIGKILL after one second
 - No parent conversation or session is copied; put needed context in the task.
 - Children use Pi's existing authentication, model catalog, and context files
   (`AGENTS.md` / `CLAUDE.md`). Global Pi settings/system prompts still apply.
-- Extensions, skills, and prompt-template discovery are disabled. Project-local
+- Extensions, skills, and prompt-template discovery are disabled, except for the
+  extensions in `CHILD_EXTENSIONS` (`runner.ts`), which are loaded with `-e`. It
+  includes `npm:@gotgenes/pi-anthropic-auth`, without which Anthropic subscription
+  auth fails with a 400 ("Third-party apps now draw from your extra usage"). Project-local
   resources are declined with `--no-approve`; no trust decision is auto-approved.
 - Startup network updates are disabled with `--offline`; model requests still run.
 - Unavailable model IDs fail, never intentionally fall back. Extension-only
-  providers are unsupported because child extensions are disabled.
+  providers are unsupported unless their extension is added to `CHILD_EXTENSIONS`.
 - Only `read`, `grep`, `find`, and `ls` are exposed. No bash, editing, worktree
   creation, commits, or recursion. This is **not an OS security sandbox**: reading
   can reach outside `cwd`, and Pi configuration itself can execute credential helpers.
