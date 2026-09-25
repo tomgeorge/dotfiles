@@ -4,6 +4,14 @@
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "medium",
+  "defaultProjectTrust": "ask",
+  "enableInstallTelemetry": false,
+  "compaction": {
+    "enabled": true
+  },
+  "retry": {
+    "enabled": true
+  }
   "skills": [
     "~/.claude/skills"
   ],
