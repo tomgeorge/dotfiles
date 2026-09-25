@@ -9,6 +9,12 @@ directory = "~/git/.worktrees"
 [session]
 resume_agents_on_restore = true
 
+# Default is "off", which silently drops plugin notification.show toasts
+# (the API still reports shown: true). Agent toasts only fire for tabs not
+# in view.
+[ui.toast]
+delivery = "herdr"
+
 [experimental]
 # Terminal output can contain secrets; do not persist screen history.
 pane_history = false
