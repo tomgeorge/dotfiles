@@ -28,6 +28,8 @@ link() {
 link nvim ~/.config/nvim
 link wezterm ~/.config/wezterm
 link ghostty ~/.config/ghostty
+# Only the config file: ~/.config/herdr also holds sockets, logs and plugins.json.
+link herdr/config.toml ~/.config/herdr/config.toml
 link claude/hooks ~/.claude/hooks
 link claude/skills ~/.claude/skills
 link pi/settings.json ~/.pi/agent/settings.json
