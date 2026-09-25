@@ -25,6 +25,7 @@
 - Never commit, push, rebase, or rewrite history unless asked.
 - Never commit secrets or credentials.
 - Commit messages: imperative mood, short subject line, body explains why.
+- Create worktrees under `~/git/worktrees/<repo>/<branch>` (replace `/` in the branch name with `-`), e.g. `git worktree add ~/git/worktrees/dotfiles/feat-go-herdrkit feat/go-herdrkit`.
 
 ## Shell
 - Prefer non-interactive commands. Avoid commands that hang (pagers, editors, watchers).
