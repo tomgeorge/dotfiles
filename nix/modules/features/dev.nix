@@ -73,6 +73,7 @@
         };
 
         home.packages = with pkgs; [
+          agent-browser
           bat
           bitwarden-cli
           claude-code
