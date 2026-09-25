@@ -1,1 +1,3 @@
 .direnv/
+# Plugin binaries are built locally, never committed.
+examples/*/bin/

@@ -1,0 +1,17 @@
+id = "go-herdrkit.ping"
+name = "ping"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Ping the Herdr server and show its version and protocol in a toast"
+platforms = ["macos", "linux"]
+
+# `herdr plugin link` doesn't run builds; this is for `herdr plugin install`.
+# For a linked checkout, run `make build` (or `make link`) in go-herdrkit/.
+[[build]]
+command = ["go", "build", "-o", "bin/herdr-ping", "."]
+
+[[actions]]
+id = "ping"
+title = "Ping Herdr"
+contexts = ["global", "workspace"]
+command = ["./bin/herdr-ping"]
