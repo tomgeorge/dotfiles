@@ -91,6 +91,7 @@
           htop
           hunk
           jq
+          ketch
           lazygit
           mkcert
           neovim
