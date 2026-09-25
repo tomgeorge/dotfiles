@@ -1,0 +1,22 @@
+onboarding = false
+
+[terminal]
+default_shell = "fish"
+
+[worktrees]
+directory = "~/git/.worktrees"
+
+[session]
+resume_agents_on_restore = true
+
+[experimental]
+# Terminal output can contain secrets; do not persist screen history.
+pane_history = false
+
+# Plugin actions are "<plugin id>.<action id>"; the plugin must be linked
+# (`make link` in go-herdrkit/) for the binding to resolve.
+[[keys.command]]
+key = "prefix+i"
+type = "plugin_action"
+command = "go-herdrkit.ping.ping"
+description = "ping herdr"
