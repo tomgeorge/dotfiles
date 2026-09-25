@@ -1,0 +1,47 @@
+id = "tg.nav"
+name = "nav"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "ctrl+hjkl and tab navigation shared between vim, herdr and WezTerm"
+platforms = ["macos", "linux"]
+
+# `herdr plugin link` doesn't run builds; this is for `herdr plugin install`.
+# For a linked checkout, run `make link` in herdr-plugins/.
+[[build]]
+command = ["make", "-C", "..", "build-nav"]
+
+[[actions]]
+id = "left"
+title = "Navigate left"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]
+
+[[actions]]
+id = "down"
+title = "Navigate down"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]
+
+[[actions]]
+id = "up"
+title = "Navigate up"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]
+
+[[actions]]
+id = "right"
+title = "Navigate right"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]
+
+[[actions]]
+id = "tab-next"
+title = "Next tab"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]
+
+[[actions]]
+id = "tab-prev"
+title = "Previous tab"
+contexts = ["workspace"]
+command = ["./bin/herdr-nav"]

@@ -223,6 +223,15 @@ tabMove(delta):
 - **Guard:** it does nothing, with a log line, when wezterm is missing or has
   no clients.
 
+**Done.** Notes:
+- `nextTab` falls back to the focused tab when `HERDR_TAB_ID` is missing
+  or not in the list.
+- A focus that didn't change for a reason other than `no_neighbor` stays put;
+  only the edge hands off.
+- `~/.local/bin` is **not** on PATH in bash or fish here, so the `link.sh`
+  entry doesn't make `herdr-nav` executable from nvim yet. Decide in
+  Phase 3: add `~/.local/bin` to PATH, or have nvim use the absolute path.
+
 **Check:** `make test lint`, then `make link`, then
 `herdr plugin action` (list) shows the six actions.
 
