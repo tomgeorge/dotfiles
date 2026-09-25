@@ -13,7 +13,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		// Herdr records stderr in the plugin log: herdr plugin log list --plugin go-herdrkit.ping
+		// Herdr records stderr in the plugin log: herdr plugin log list --plugin tg.ping
 		fmt.Fprintln(os.Stderr, "herdr-ping:", err)
 		os.Exit(1)
 	}

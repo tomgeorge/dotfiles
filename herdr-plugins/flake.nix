@@ -1,5 +1,5 @@
 {
-  description = "Go SDK for writing Herdr plugins";
+  description = "Herdr plugins and the go-herdrkit SDK";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 

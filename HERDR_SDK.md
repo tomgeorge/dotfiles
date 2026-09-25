@@ -94,9 +94,15 @@ first.
 
 ## 3. Package layout
 
+The SDK lives in `herdr-plugins/go-herdrkit/`, as its own module so it can be
+published later. Plugins built on it are sibling directories of
+`herdr-plugins/` (for example `ping/`, `nav/`), sharing one module; `go.work`
+ties the two together and `herdr-plugins/Makefile` builds, links and tests
+them.
+
 ```
-herdr-go/
-  go.mod                      module github.com/<you>/herdr-go
+herdr-plugins/go-herdrkit/
+  go.mod                      module github.com/tomgeorge/go-herdrkit
   schema/
     herdr-schema.json         vendored `herdr api schema --json` output
     README.md                 herdr version + protocol it was taken from
@@ -120,9 +126,6 @@ herdr-go/
     subscription.go           Subscription types (dotted names)
   herdrtest/                  package herdrtest — scripted fake server
     server.go                 Unix listener in t.TempDir(); Step{Expect, Reply}
-  examples/
-    nav/main.go               ctrl+hjkl directional focus
-    snapshot/main.go          dump workspaces/panes
 ```
 
 ---
