@@ -11,6 +11,7 @@ local config = {
 	-- font_size = 18,
 	font_size = 14,
 	term = "wezterm",
+	enable_kitty_graphics = true,
 	default_prog = { "/etc/profiles/per-user/" .. os.getenv("USER") .. "/bin/fish", "-l" },
 	window_background_opacity = 0.9,
 	window_decorations = "RESIZE",

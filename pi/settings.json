@@ -11,7 +11,7 @@
   },
   "retry": {
     "enabled": true
-  }
+  },
   "skills": [
     "~/.claude/skills"
   ],
