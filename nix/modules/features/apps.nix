@@ -1,7 +1,18 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  inputs,
+  ...
+}:
 
 {
   flake.modules = {
+    homeManager.apps =
+      { pkgs, ... }:
+      {
+        home.packages = [ inputs.hey-cli.packages.${pkgs.system}.default ];
+      };
+
     darwin.apps =
       { pkgs, config, ... }:
       {

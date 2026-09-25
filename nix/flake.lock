@@ -37,6 +37,24 @@
         "type": "github"
       }
     },
+    "hey-cli": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1788891569,
+        "narHash": "sha256-KinPIzXIfG2w3jwWoQRdWGu9Z8SHQXI9iAIDb1+w94M=",
+        "owner": "basecamp",
+        "repo": "hey-cli",
+        "rev": "19260a30637b13a00efcef1e3f340dcf2567e3fd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "basecamp",
+        "repo": "hey-cli",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -193,6 +211,22 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1788865024,
+        "narHash": "sha256-3YkAzvtt4LoE11IcBDzPshIF3fJ0aIoILqE7dAg8CLI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "422d1ae605d7fcd9896412b37dc065c456c0eefb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1784555310,
         "narHash": "sha256-/FCliTPgiuV1owejZFNx3Ch9irdvkOfOFl+HHZ+DrtM=",
         "owner": "NixOS",
@@ -230,6 +264,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
+        "hey-cli": "hey-cli",
         "home-manager": "home-manager",
         "homebrew-cask": "homebrew-cask",
         "homebrew-chainguard": "homebrew-chainguard",
@@ -239,7 +274,7 @@
         "import-tree": "import-tree",
         "nix-darwin": "nix-darwin",
         "nix-homebrew": "nix-homebrew",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "noctalia": "noctalia"
       }
     }
