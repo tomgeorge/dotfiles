@@ -99,6 +99,20 @@ test("cancellation terminates the child", async () => {
   } finally { clearTimeout(timer); }
 });
 
+test("concurrent jobs keep separate output and cancel independently", async () => {
+  const slow = (text: string) => `setTimeout(() => { ${emit(message(text))} }, 200);`;
+  const controller = new AbortController();
+  const [a, b, c] = await Promise.all([
+    run(slow("from A")),
+    run(slow("from B")),
+    run("setInterval(() => {}, 1000)", { signal: controller.signal }),
+    new Promise((resolve) => setTimeout(resolve, 50)).then(() => controller.abort()),
+  ]);
+  assert.deepEqual(a, { status: "ok", text: "from A", error: null });
+  assert.deepEqual(b, { status: "ok", text: "from B", error: null });
+  assert.equal(c.status, "cancelled");
+});
+
 test("timeout escalates if child ignores SIGTERM", async () => {
   const result = await run('process.on("SIGTERM", () => {}); setInterval(() => {}, 1000);', { timeoutMs: 300 });
   assert.equal(result.status, "error");

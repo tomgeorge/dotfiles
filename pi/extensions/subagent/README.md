@@ -21,7 +21,7 @@ No additional dependencies.
 ```text
 /subagent
 /subagent anthropic/claude-sonnet-4-6 Review src/auth.ts for security problems
-/subagent-cancel
+/subagent-cancel [label|number|all]
 ```
 
 With no arguments, select an authenticated model and enter a task. With arguments,
@@ -34,6 +34,7 @@ The parent can also call the `subagent` tool when you request/approve delegation
 
 ```json
 {
+  "label": "auth-review",
   "task": "Review src/auth.ts for security problems",
   "provider": "anthropic",
   "model": "claude-sonnet-4-6",
@@ -42,10 +43,29 @@ The parent can also call the `subagent` tool when you request/approve delegation
 }
 ```
 
-Only one job runs at a time per parent session. Additional requests fail rather
-than queue. Each job has a five-minute timeout. `/subagent-cancel` cancels either
-entry point; Pi's normal tool cancellation also aborts tool-launched jobs.
-Shutdown/reload cancels the child. SIGTERM escalates to SIGKILL after one second.
+To run jobs in parallel, the parent makes several `subagent` calls in the same
+turn; Pi runs sibling tool calls concurrently. Up to 10 jobs run at once per
+parent session; set `PI_SUBAGENT_MAX_CONCURRENT` to change the limit (invalid
+values fall back to 10 with a warning). Requests over the limit fail rather than
+queue. Each job has a five-minute timeout.
+
+The parent names each tool job with `label`: 1–64 lowercase letters, digits, or
+hyphens, not `all` or only digits, and unique among running jobs. Jobs started
+with `/subagent` are named `job-<number>`. Numbers are never reused in a session.
+A widget above the editor lists running jobs with a spinner and elapsed time.
+
+`/subagent-cancel auth-review` or `/subagent-cancel 3` cancels one job, and
+`/subagent-cancel all` cancels every job. With no argument it cancels the only
+running job, or opens a picker when several are running (cancels all without a
+UI). Cancelling one job fails only that tool call. Pi's normal tool cancellation
+(Esc) aborts all tool-launched jobs in the turn. Shutdown/reload cancels every
+child. SIGTERM escalates to SIGKILL after one second.
+
+While idle, Pi waits for a `/subagent` command to finish before handling further
+input, including `/subagent-cancel`; commands run immediately while the parent
+is mid-turn.
+
+Each parallel job is a separate paid model session and a separate `pi` process.
 
 ## Boundaries
 
@@ -73,9 +93,10 @@ Shutdown/reload cancels the child. SIGTERM escalates to SIGKILL after one second
 ## Checks
 
 ```sh
-node --test pi/extensions/subagent/runner.test.ts
+node --test pi/extensions/subagent/*.test.ts
 bash -n link.sh
 ```
 
-Tests use local Node subprocesses, not paid model calls. The runner is separate
-from Pi registration so process behavior can be tested without loading Pi.
+Tests use local Node subprocesses, not paid model calls. The runner and job
+registry are separate from Pi registration so they can be tested without
+loading Pi.
