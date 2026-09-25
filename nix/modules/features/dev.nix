@@ -58,7 +58,7 @@
           enable = true;
           defaultCacheTtl = 600;
           maxCacheTtl = 7200;
-          pinentry.package = if pkgs.stdenv.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
+          pinentry.package = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
         };
 
         programs.mise = {
@@ -68,7 +68,7 @@
           enableZshIntegration = true;
         };
 
-        programs.claude-code = lib.mkIf pkgs.stdenv.isDarwin {
+        programs.claude-code = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
           enable = true;
         };
 

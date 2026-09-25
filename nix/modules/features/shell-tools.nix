@@ -45,7 +45,7 @@
           enableBashIntegration = true;
         };
 
-        programs.bash = lib.mkIf (!pkgs.stdenv.isDarwin) {
+        programs.bash = lib.mkIf (!pkgs.stdenv.hostPlatform.isDarwin) {
           enable = true;
         };
       };

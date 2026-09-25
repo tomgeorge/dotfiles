@@ -36,12 +36,12 @@
             cd = "z";
             hmh = "man home-configuration.nix";
             ramdisk =
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 "diskutil erasevolume HFS+ 'RAMDisk' $(hdiutil attach -nomount ram://2048)"
               else
                 "echo 'not implemented'";
             rebuild =
-              if pkgs.stdenv.isDarwin then
+              if pkgs.stdenv.hostPlatform.isDarwin then
                 "sudo darwin-rebuild switch --flake $HOME/git/dotfiles/nix"
               else
                 "sudo nixos-rebuild switch --flake $HOME/git/dotfiles/nix#meerkat";
