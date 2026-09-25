@@ -8,6 +8,10 @@
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
         hunk = pkgs.callPackage ../../pkgs/hunk.nix { };
+        # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
+        # ignores on macOS, so they write to the read-only sandbox $HOME and
+        # fail. The binary itself is fine. Drop once nixpkgs fixes the package.
+        ketch = pkgs.ketch.overrideAttrs { doCheck = false; };
       in
       {
         home.sessionVariables = {
