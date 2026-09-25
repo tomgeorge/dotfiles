@@ -134,6 +134,16 @@ fields, and `result()` rejects a missing field.
 - **Tests:** `fakeServer` cases per method (success, wrong tag, missing
   required field, `APIError`), plus table tests for the name lists.
 
+**Done.** Differences from the table above:
+- Enums live in `enums.go`: `FocusReason` and `AgentStatus` (needed by
+  `TabInfo`), both mapping unknown values to an `Unknown` constant.
+  `Direction` stays in `ids.go`; it's only ever sent, never decoded.
+- `FocusResult` also carries `SourcePaneID` and `FocusedPaneID`. `layout` is
+  required by the schema, so its presence is checked, but it isn't decoded.
+- An empty `PaneID`/`WorkspaceID` is omitted from the request, so the server
+  uses the caller's pane/workspace.
+- `HERDR_LIVE=1` adds read-only live tests for `ProcessInfo` and `ListTabs`.
+
 **Check:** `make test lint` (in `herdr-plugins/`).
 
 ---

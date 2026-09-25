@@ -72,3 +72,23 @@ func TestLiveOneRequestPerConnection(t *testing.T) {
 	}
 	t.Logf("no second reply, as expected: %v", err)
 }
+
+// Read-only: reports what runs in the test's own pane.
+func TestLiveProcessInfo(t *testing.T) {
+	c := liveClient(t)
+	info, err := c.ProcessInfo(context.Background(), PaneID(os.Getenv("HERDR_PANE_ID")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%+v", info)
+}
+
+// Read-only: lists the tabs of the focused workspace.
+func TestLiveListTabs(t *testing.T) {
+	c := liveClient(t)
+	tabs, err := c.ListTabs(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%+v", tabs)
+}
