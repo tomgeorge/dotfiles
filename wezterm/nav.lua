@@ -33,6 +33,12 @@ function M.accepts_vim_navigation(name)
 	return vim_names[name] == true or name:match("^vim%.[%w_]+$") ~= nil
 end
 
+-- Programs that carry a pane to another host, where WezTerm can't see what
+-- runs. nvim there says it's in front with the tg_nav_vim user var
+-- (nvim/lua/nav.lua). Only trusted while one of these is in front: if the
+-- connection drops, the var is left over but the local shell is in front.
+local remote_names = { ssh = true, mosh = true, ["mosh-client"] = true, et = true }
+
 -- front is "herdr" or "vim" when that program is in the pane's foreground,
 -- else nil.
 function M.front(pane)
@@ -43,7 +49,24 @@ function M.front(pane)
 	if M.accepts_vim_navigation(name) then
 		return "vim"
 	end
+	if remote_names[name] and (pane:get_user_vars() or {}).tg_nav_vim == "1" then
+		return "vim"
+	end
 	return nil
+end
+
+local edge_dirs = { left = "Left", down = "Down", up = "Up", right = "Right" }
+
+-- on_user_var handles nvim outside herdr (here or over ssh) at its edge: it
+-- sets tg_nav_edge to "<direction>:<counter>" and WezTerm moves on for it.
+function M.on_user_var(window, pane, name, value)
+	if name ~= "tg_nav_edge" then
+		return
+	end
+	local dir = edge_dirs[(value or ""):match("^(%a+):")]
+	if dir then
+		window:perform_action(act.ActivatePaneDirection(dir), pane)
+	end
 end
 
 M.directions = {
@@ -95,11 +118,13 @@ local function perform(choose)
 end
 
 -- apply_to_config binds ctrl+a (to leader_keys, a one-shot key table, when
--- herdr isn't in front), ctrl+hjkl and cmd+]/[.
+-- herdr isn't in front), ctrl+hjkl and cmd+]/[, and handles nvim's edge
+-- user var.
 function M.apply_to_config(config, leader_keys)
 	config.keys = config.keys or {}
 	config.key_tables = config.key_tables or {}
 	config.key_tables.leader = leader_keys
+	wezterm.on("user-var-changed", M.on_user_var)
 	table.insert(config.keys, { key = "a", mods = "CTRL", action = perform(M.leader_action) })
 	for _, d in ipairs(M.directions) do
 		local function choose(pane)

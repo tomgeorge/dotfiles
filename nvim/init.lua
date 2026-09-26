@@ -3,6 +3,7 @@ vim.g.maplocalleader = ","
 
 require("options")
 require("utils").load_mappings()
+require("nav").setup()
 
 if vim.env.PROF then
   -- example for lazy.nvim

@@ -15,6 +15,10 @@ package.loaded.wezterm = {
 	action_callback = function(fn)
 		return { "callback", fn }
 	end,
+	handlers = {},
+	on = function(event, fn)
+		package.loaded.wezterm.handlers[event] = fn
+	end,
 }
 -- By path, not require: nvim searches its runtimepath first, where
 -- ~/.config/nvim/lua/nav.lua (nvim's own nav module) would win.
@@ -29,10 +33,13 @@ local function eq(got, want, what)
 	print(("FAIL %s:\n  got  %s\n  want %s"):format(what, vim.inspect(got), vim.inspect(want)))
 end
 
-local function pane(process)
+local function pane(process, user_vars)
 	return {
 		get_foreground_process_name = function()
 			return process
+		end,
+		get_user_vars = function()
+			return user_vars or {}
 		end,
 	}
 end
@@ -51,6 +58,18 @@ for process, want in pairs({
 	eq(nav.front(pane(process)) or false, want, "front(" .. process .. ")")
 end
 eq(nav.front(pane(nil)), nil, "front(nil)") -- mux panes may not report one
+
+-- nvim over ssh announces itself; the var is only trusted while ssh is in
+-- front, so one left behind by a dropped connection doesn't trap the keys.
+eq(nav.front(pane("/usr/bin/ssh", { tg_nav_vim = "1" })), "vim", "front(ssh, nvim announced)")
+eq(nav.front(pane("/usr/bin/ssh", { tg_nav_vim = "" })), nil, "front(ssh, nvim gone)")
+eq(nav.front(pane("/usr/bin/ssh")), nil, "front(ssh)")
+eq(nav.front(pane("/bin/fish", { tg_nav_vim = "1" })), nil, "front(fish, stale var)")
+eq(
+	nav.nav_action(pane("/usr/bin/ssh", { tg_nav_vim = "1" }), "h", "Left"),
+	{ "SendKey", { key = "h", mods = "CTRL" } },
+	"ctrl+h to remote nvim"
+)
 
 -- ctrl+hjkl
 local send_h = { "SendKey", { key = "h", mods = "CTRL" } }
@@ -93,6 +112,24 @@ local window = {
 local fish = pane("/bin/fish")
 config.keys[4].action[2](window, fish) -- ctrl+j
 eq(performed, { { "ActivatePaneDirection", "Down" }, fish }, "ctrl+j callback")
+
+-- nvim's edge user var moves WezTerm focus.
+local on_var = package.loaded.wezterm.handlers["user-var-changed"]
+eq(on_var, nav.on_user_var, "user-var-changed handler registered")
+local remote = pane("/usr/bin/ssh", { tg_nav_vim = "1" })
+for value, want in pairs({
+	["left:1"] = { { "ActivatePaneDirection", "Left" }, remote },
+	["down:12"] = { { "ActivatePaneDirection", "Down" }, remote },
+	["sideways:1"] = false,
+	["left"] = false,
+}) do
+	performed = false
+	on_var(window, remote, "tg_nav_edge", value)
+	eq(performed, want, "tg_nav_edge=" .. value)
+end
+performed = false
+on_var(window, remote, "other", "left:1")
+eq(performed, false, "other user vars ignored")
 
 if failures > 0 then
 	print(failures .. " failure(s)")
