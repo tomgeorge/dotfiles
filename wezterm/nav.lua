@@ -69,6 +69,24 @@ function M.leader_action(pane)
 	return act.ActivateKeyTable({ name = "leader", one_shot = true, timeout_milliseconds = 1000 })
 end
 
+-- tab_action moves one tab. herdr gets its own prefix+]/[ (tg.nav), which
+-- hands off to WezTerm's tabs past its last/first tab; a raw ctrl+[ would
+-- reach herdr as Esc.
+function M.tab_action(pane, key, delta)
+	if M.front(pane) == "herdr" then
+		return act.Multiple({
+			act.SendKey({ key = "a", mods = "CTRL" }),
+			act.SendKey({ key = key }),
+		})
+	end
+	return act.ActivateTabRelative(delta)
+end
+
+M.tabs = {
+	{ key = "]", delta = 1 },
+	{ key = "[", delta = -1 },
+}
+
 -- perform binds a key to whatever action choose(pane) picks at press time.
 local function perform(choose)
 	return wezterm.action_callback(function(window, pane)
@@ -77,7 +95,7 @@ local function perform(choose)
 end
 
 -- apply_to_config binds ctrl+a (to leader_keys, a one-shot key table, when
--- herdr isn't in front) and ctrl+hjkl.
+-- herdr isn't in front), ctrl+hjkl and cmd+]/[.
 function M.apply_to_config(config, leader_keys)
 	config.keys = config.keys or {}
 	config.key_tables = config.key_tables or {}
@@ -88,6 +106,12 @@ function M.apply_to_config(config, leader_keys)
 			return M.nav_action(pane, d.key, d.dir)
 		end
 		table.insert(config.keys, { key = d.key, mods = "CTRL", action = perform(choose) })
+	end
+	for _, t in ipairs(M.tabs) do
+		local function choose(pane)
+			return M.tab_action(pane, t.key, t.delta)
+		end
+		table.insert(config.keys, { key = t.key, mods = "SUPER", action = perform(choose) })
 	end
 end
 

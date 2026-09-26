@@ -74,7 +74,15 @@ local bound = {}
 for _, k in ipairs(config.keys) do
 	bound[#bound + 1] = k.key .. (k.mods and ("/" .. k.mods) or "")
 end
-eq(bound, { "q", "a/CTRL", "h/CTRL", "j/CTRL", "k/CTRL", "l/CTRL" }, "bound keys")
+eq(bound, { "q", "a/CTRL", "h/CTRL", "j/CTRL", "k/CTRL", "l/CTRL", "]/SUPER", "[/SUPER" }, "bound keys")
+
+-- cmd+]/[: herdr gets its prefix+]/[ (tg.nav); elsewhere WezTerm's tabs.
+eq(
+	nav.tab_action(pane("/bin/herdr"), "]", 1),
+	{ "Multiple", { { "SendKey", { key = "a", mods = "CTRL" } }, { "SendKey", { key = "]" } } } },
+	"cmd+] to herdr"
+)
+eq(nav.tab_action(pane("/bin/fish"), "[", -1), { "ActivateTabRelative", -1 }, "cmd+[ in fish")
 
 local performed
 local window = {

@@ -9,6 +9,10 @@ directory = "~/git/worktrees"
 [session]
 resume_agents_on_restore = true
 
+[ui]
+tab_bar_position = "bottom"
+status_indicators = "symbols"
+
 # Default is "off", which silently drops plugin notification.show toasts
 # (the API still reports shown: true). Agent toasts only fire for tabs not
 # in view.
