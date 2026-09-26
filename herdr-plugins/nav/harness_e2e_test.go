@@ -181,7 +181,13 @@ func (h *harness) at(t *testing.T) *harness {
 
 func (h *harness) close() {
 	if os.Getenv("HN_KEEP") != "" {
-		h.t.Logf("HN_KEEP set; left running: HOME=%s tmux -L %s", h.home, h.tmux)
+		h.t.Logf("HN_KEEP set; left running. Attach, then detach with ctrl+b d:\n"+
+			"  tmux -L %[2]s attach\n"+
+			"Query it (env -i keeps your live herdr out of it):\n"+
+			"  env -i HOME=%[1]s PATH=\"$PATH\" herdr pane list\n"+
+			"Clean up:\n"+
+			"  env -i HOME=%[1]s PATH=\"$PATH\" herdr server stop; tmux -L %[2]s kill-server; rm -rf %[1]s",
+			h.home, h.tmux)
 		return
 	}
 	_, _ = h.tryHerdr("server", "stop")

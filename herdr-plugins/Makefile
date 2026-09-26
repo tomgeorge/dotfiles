@@ -31,9 +31,10 @@ test-lua:
 	nvim --headless -u NONE -l ../wezterm/nav_test.lua
 
 # Real herdr + tmux, isolated under a temp HOME; skips if either is missing.
-# HN_KEEP=1 leaves the environment running after the run, for debugging.
+# HN_KEEP=1 leaves the environment running after the run, for debugging;
+# -v because go test hides a passing test's log, including how to attach.
 test-e2e: build
-	go test -tags e2e -count=1 ./nav/...
+	go test -tags e2e -count=1 $(if $(HN_KEEP),-v -run TestE2E) ./nav/...
 
 test-all: test test-lua test-e2e
 
