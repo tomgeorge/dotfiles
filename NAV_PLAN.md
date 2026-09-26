@@ -32,7 +32,13 @@ tabs.
 - herdr panes inherit a **stale** `WEZTERM_PANE` from wherever the server
   started. Instead,
   `wezterm cli list-clients --format json` returns `focused_pane_id` for the
-  focused WezTerm pane, and it works without `WEZTERM_PANE`.
+  focused WezTerm pane, and it works without `WEZTERM_PANE`. (Superseded
+  after the third review: see "WezTerm side" and "Risks".)
+- `client.window_title.set {title}` makes herdr's *foreground* client write
+  that title to its outer terminal (`reason: no_foreground_client` when
+  there's none), and `client.window_title.clear` restores `ui.window_title`.
+  `wezterm cli list --format json` shows it as the pane's `title` on the
+  first poll (checked live, ~85 ms including the CLI's startup).
 - `wezterm cli activate-pane-direction --pane-id N <Dir>` and
   `wezterm cli activate-tab --tab-relative ±1 [--no-wrap] --pane-id N` exist.
 - nvim can't use `herdr plugin action` at its edge. The plugin would see nvim
@@ -180,6 +186,8 @@ command = ["./bin/herdr-nav"]
 - **Args `pane <dir>`** (nvim at its edge): `paneMove(dir, forward=false)`.
   - With no `HERDR_SOCKET_PATH`, this is plain nvim in WezTerm. It goes
     straight to WezTerm using `$WEZTERM_PANE`, which is correct outside herdr.
+    (Since the third review nvim outside herdr tells WezTerm through a user
+    var instead, and herdr-nav always needs a herdr socket.)
 - **General:** 2-second context timeout. Errors go to stderr, which herdr keeps
   in `herdr plugin log`. Exit non-zero on error.
 
@@ -223,6 +231,9 @@ tabMove(delta):
   - for tabs, runs `activate-tab --tab-relative ±1 --pane-id N`
 - **Guard:** it does nothing, with a log line, when wezterm is missing or has
   no clients.
+- Since the third review the pane id comes from a title handshake instead:
+  herdr sets a unique title on its foreground client's terminal, nav finds
+  the WezTerm pane showing it, then restores the title (`findHost`).
 
 **Done.** Notes:
 - `nextTab` falls back to the focused tab when `HERDR_TAB_ID` is missing
@@ -498,23 +509,73 @@ user var that WezTerm reads) would replace process-name sniffing and fix
 the ssh and unconfigured-vim cases, but **herdr 0.9.1 doesn't pass OSC
 1337 `SetUserVar` through** to the outer terminal (checked by capturing the
 herdr client's raw output), and has no passthrough setting. Revisit if
-herdr adds one.
+herdr adds one. (Used outside herdr since the third review; see below.)
+
+Third review (GPT-6 Astra, adversarial, 2026-09), fixed:
+- **Bursts through nvim's edge:** herdr-nav forwards ctrl+h to nvim and
+  lets go of the lock; nvim's handoff runs later from its own pane. Two
+  quick ctrl+h's both reached nvim, both handoffs started from nvim's pane,
+  and focus moved once. The lock file now records the pane nav last moved
+  to, and nvim's edge call (`edge`) checks focus first: still on nvim's
+  pane, move from there; on the pane nav last moved to, an earlier key in
+  the burst moved it, so carry on from there; anywhere else the user moved,
+  so drop the key. e2e case 12b fails 6/6 without this.
+- **Check and act on one pane:** after `process_info` on the server's
+  focus, `send_keys` and `focus_direction` name the pane it reported
+  rather than asking for "the focused pane" again.
+- **Handoff to the wrong WezTerm pane:** the most recently active WezTerm
+  client plus "some herdr on its tty" matched a suspended herdr, or another
+  herdr in WezTerm while this one ran in Ghostty. Now herdr puts a unique
+  title on *its foreground client's* terminal and nav hands off from the
+  WezTerm pane showing it; herdr in another terminal, over ssh or with no
+  client matches nothing. The e2e harness runs the same handshake against
+  tmux (`HERDR_NAV_OUTER_TMUX`), so it's tested end to end. The title shows
+  in the tab bar for a moment at each handoff.
+- **Lock timeout ran with an expired context:** fixed by the second review
+  (lock wait has its own budget). Kept its choice to run unlocked, with a
+  log line, when the lock file can't be used: a lost burst beats a dead key.
+- **nvim over ssh:** outside herdr nvim sets the `tg_nav_vim` user var while
+  it's in front and `tg_nav_edge` at its edge, and WezTerm passes ctrl+hjkl
+  to an `ssh`/`mosh`/`et` pane announcing nvim, and moves on `tg_nav_edge`.
+  Only trusted while the remote program is in front, so a var left by a
+  dropped connection doesn't trap the keys. Local nvim uses the same path,
+  so herdr-nav no longer handles "outside herdr" at all.
+- **Install:** `make link` also links `~/.local/bin/herdr-nav`, which
+  `link.sh` skipped when it wasn't built yet and nothing linked later. nvim
+  warns once when it can't find herdr-nav instead of doing nothing.
+- **`wezterm cli` hangs:** commands get a `WaitDelay`, so a child holding the
+  output pipe can't keep one past its context.
+- **Tests:** case 12 waited for a focus that was already right; it now waits
+  for both runs to finish. `make test-all` fails instead of skipping when
+  tmux, herdr, nvim or fzf is missing (`HN_REQUIRE`). The lock
+  re-acquisition check no longer demands 20 ms.
 
 Known limitations (not fixing now):
-- **ssh:** WezTerm sees `ssh` in front, not herdr, so a remote herdr gets
-  neither ctrl+hjkl nor ctrl+a; WezTerm handles them locally. A fix would be
-  an opt-in pass-through list in `wezterm/nav.lua`.
+- **Nav keys can overtake typing, and each other.** Only herdr can fix these:
+  - A nav key goes through a plugin process; other keys go straight to the
+    pane. Type ctrl+h then `i` fast in nvim and `i` can arrive first, making
+    ctrl+h a backspace in insert mode.
+  - herdr starts one process per key, at once, with no sequence number
+    (`HERDR_PLUGIN_CONTEXT_JSON`'s `correlation_id` is just `"keybinding"`),
+    so the lock serves them in whatever order they reach it: ctrl+h then
+    ctrl+l can run as l then h.
+  Both need herdr to run a binding's actions in order (or give them a
+  sequence number to queue by).
+- **Remote herdr over ssh** gets ctrl+hjkl only if nvim isn't running
+  there; WezTerm sees `ssh` and handles them locally. ctrl+a ctrl+a sends a
+  literal ctrl+a, so the remote prefix still works. A remote herdr-nav has
+  no way back to the local WezTerm at its edges, and herdr swallows user
+  vars, so forwarding more would trap the keys.
 - **Unconfigured vim** (`vim -u NONE`, a bare `vi` as git editor) is sent
   ctrl+hjkl but has no mappings for them, so ctrl+h moves the cursor
   instead. vim-tmux-navigator behaves the same. Only configured nvim in
   normal mode hands back at its edge; nvim terminal mode doesn't.
 - **Nested herdr** isn't supported: the outer herdr takes ctrl+hjkl and
-  ctrl+a first.
-- **Several herdr clients or WezTerm windows:** server focus is global, and
-  `list-clients` picks the most recently active WezTerm client. The plugin
-  can't tell which client pressed the key (`HERDR_PLUGIN_CONTEXT_JSON` has
-  no client id), so with herdr open in both WezTerm and Ghostty an edge in
-  Ghostty can still move WezTerm focus.
+  ctrl+a first. Forwarding to the inner one would trap the keys: the inner
+  server's herdr-nav can't reach the outer server at its edges.
+- **Several herdr clients:** server focus is global, and handoffs go from
+  herdr's *foreground* client, which is normally the one that pressed the
+  key (`HERDR_PLUGIN_CONTEXT_JSON` has no client id to check).
 - **SDK strictness:** replies must carry every schema-required field, even
   ones nav ignores (`agent_status`, `label`, …). A herdr release that drops
   one breaks navigation with `ErrMissingField` until the SDK is updated.
