@@ -16,9 +16,13 @@ build-%:
 	tmp=$$(mktemp $*/bin/.herdr-$*.XXXXXX) && trap 'rm -f "$$tmp"' EXIT && \
 		go build -o "$$tmp" ./$* && mv "$$tmp" $*/bin/herdr-$*
 
-# Registers each plugin with Herdr (~/.config/herdr/plugins.json). Idempotent.
+# Everything nav needs at runtime; idempotent. Registers each plugin with
+# Herdr (~/.config/herdr/plugins.json), and puts herdr-nav where nvim looks
+# for it (nvim/lua/nav.lua): without it nvim can't hand off at its edges.
 # A failed link is fatal: when nav isn't linked, ctrl+hjkl does nothing.
 link: build
+	mkdir -p $(HOME)/.local/bin
+	ln -sfn $(CURDIR)/nav/bin/herdr-nav $(HOME)/.local/bin/herdr-nav
 	@command -v herdr >/dev/null || { echo "herdr not installed, skipping plugin link"; exit 0; }
 	@for p in $(PLUGINS); do herdr plugin link $(CURDIR)/$$p || exit 1; done
 
@@ -31,12 +35,14 @@ test-lua:
 	nvim --headless -u NONE -l ../nvim/tests/nav_test.lua
 	nvim --headless -u NONE -l ../wezterm/nav_test.lua
 
-# Real herdr + tmux, isolated under a temp HOME; skips if either is missing.
+# Real herdr + tmux, isolated under a temp HOME; skips if either is missing,
+# except under test-all (HN_REQUIRE=1), where a skip would hide lost coverage.
 # HN_KEEP=1 leaves the environment running after the run, for debugging;
 # -v because go test hides a passing test's log, including how to attach.
 test-e2e: build
 	go test -tags e2e -count=1 $(if $(HN_KEEP),-v -run TestE2E) ./nav/...
 
+test-all: export HN_REQUIRE = 1
 test-all: test test-lua test-e2e
 
 lint:
