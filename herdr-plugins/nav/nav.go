@@ -15,6 +15,7 @@ type herdrAPI interface {
 	ProcessInfo(ctx context.Context, pane herdr.PaneID) (herdr.ProcessInfo, error)
 	SendKeys(ctx context.Context, pane herdr.PaneID, keys ...string) error
 	FocusDirection(ctx context.Context, pane herdr.PaneID, dir herdr.Direction) (herdr.FocusResult, error)
+	ListWorkspaces(ctx context.Context) ([]herdr.WorkspaceInfo, error)
 	ListTabs(ctx context.Context, workspace herdr.WorkspaceID) ([]herdr.TabInfo, error)
 	FocusTab(ctx context.Context, tab herdr.TabID) (herdr.TabInfo, error)
 }
@@ -22,17 +23,15 @@ type herdrAPI interface {
 // navigator moves focus from one pane/tab, handing off to the outer
 // terminal (WezTerm) past herdr's edge.
 //
-// Empty pane/tab/workspace mean "whatever the server has focused now".
-// Keybinding actions use that rather than the ids herdr passes them: those
-// are the client's view, which lags, so a fast second ctrl+h would start
-// from where the first began.
+// An empty pane means "whatever the server has focused now", and tab moves
+// always start from the server's focus. Keybinding actions use that rather
+// than the ids herdr passes them: those are the client's view, which lags,
+// so a fast second key would start from where the first began.
 type navigator struct {
-	api       herdrAPI
-	outer     Outer
-	pane      herdr.PaneID
-	tab       herdr.TabID
-	workspace herdr.WorkspaceID
-	log       io.Writer // non-fatal problems; herdr keeps stderr in the plugin log
+	api   herdrAPI
+	outer Outer
+	pane  herdr.PaneID
+	log   io.Writer // non-fatal problems; herdr keeps stderr in the plugin log
 }
 
 // action is what to do with a directional key.
@@ -89,22 +88,52 @@ func (n navigator) paneMove(ctx context.Context, dir herdr.Direction, forward bo
 	return nil
 }
 
-// tabMove focuses the tab delta places away, or hands off to the outer
-// terminal past the first/last tab.
+// tabMove steps through tabs in sidebar order across workspaces: past a
+// workspace's last tab to the next workspace's first, past its first to
+// the previous workspace's last. Past the first or last workspace it hands
+// off to the outer terminal. delta is +1 or -1.
 func (n navigator) tabMove(ctx context.Context, delta int) error {
-	tabs, err := n.api.ListTabs(ctx, n.workspace)
+	wss, err := n.api.ListWorkspaces(ctx)
 	if err != nil {
 		return err
 	}
-	next, ok, err := nextTab(tabs, n.tab, delta)
+	wss = slices.SortedFunc(slices.Values(wss), func(a, b herdr.WorkspaceInfo) int { return cmp.Compare(a.Number, b.Number) })
+	i := slices.IndexFunc(wss, func(w herdr.WorkspaceInfo) bool { return w.Focused })
+	if i < 0 {
+		return fmt.Errorf("no workspace is focused")
+	}
+
+	tabs, err := n.api.ListTabs(ctx, wss[i].WorkspaceID)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		return n.outer.Tab(ctx, delta)
+	next, ok, err := nextTab(tabs, wss[i].ActiveTabID, delta)
+	if err != nil {
+		return err
 	}
-	_, err = n.api.FocusTab(ctx, next)
-	return err
+	if ok {
+		_, err = n.api.FocusTab(ctx, next)
+		return err
+	}
+
+	// tab.focus switches workspace too.
+	for j := i + delta; j >= 0 && j < len(wss); j += delta {
+		tabs, err := n.api.ListTabs(ctx, wss[j].WorkspaceID)
+		if err != nil {
+			return err
+		}
+		if len(tabs) == 0 {
+			continue
+		}
+		tabs = slices.SortedFunc(slices.Values(tabs), func(a, b herdr.TabInfo) int { return cmp.Compare(a.Number, b.Number) })
+		target := tabs[0]
+		if delta < 0 {
+			target = tabs[len(tabs)-1]
+		}
+		_, err = n.api.FocusTab(ctx, target.TabID)
+		return err
+	}
+	return n.outer.Tab(ctx, delta)
 }
 
 // nextTab returns the tab delta places from current in number order, or

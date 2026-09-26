@@ -3,6 +3,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"reflect"
 	"regexp"
@@ -210,6 +211,54 @@ func TestE2E(t *testing.T) {
 		h.focusDir("l", c, 2)
 		h.keys("C-h", "C-l")
 		h.poll("settle", waitFor, func() bool { return h.focused() == c })
+		wantOuter(t)
+	})
+
+	// Runs last: a second workspace would change where 6-8's edges are.
+	t.Run("13 prefix+]/[ continue into the next/previous workspace", func(t *testing.T) {
+		h := h.at(t)
+		ws1Last, _ := h.newTab() // ws1's last tab, focused
+		ws1Number := h.focusedTabNumber()
+
+		var created struct {
+			Workspace struct {
+				WorkspaceID string `json:"workspace_id"`
+			}
+			Tab struct {
+				TabID string `json:"tab_id"`
+			}
+		}
+		h.herdrJSON(&created, "workspace", "create", "--cwd", h.home) // not focused
+		ws2, ws2First := created.Workspace.WorkspaceID, created.Tab.TabID
+		t.Cleanup(func() {
+			if os.Getenv("HN_KEEP") == "" {
+				_, _ = h.tryHerdr("workspace", "close", ws2)
+			}
+		})
+		var second struct {
+			Tab struct {
+				TabID string `json:"tab_id"`
+			}
+		}
+		h.herdrJSON(&second, "tab", "create", "--workspace", ws2, "--cwd", h.home)
+		ws2Last := second.Tab.TabID
+
+		step := func(key, wantTab string, wantNumber int) {
+			t.Helper()
+			h.keys("C-a", key)
+			h.poll("tab "+wantTab, waitFor, func() bool { return h.focusedTab() == wantTab })
+			h.waitClient(wantNumber, 0)
+		}
+		step("]", ws2First, 1)
+		step("]", ws2Last, 2)
+
+		h.keys("C-a", "]") // past the last workspace
+		h.poll("handoff", waitFor, func() bool { return len(h.outer()) > 0 })
+		wantOuter(t, "tab +1")
+
+		h.resetOuter()
+		step("[", ws2First, 1)
+		step("[", ws1Last, ws1Number)
 		wantOuter(t)
 	})
 }

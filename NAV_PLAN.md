@@ -6,7 +6,7 @@ currently holds the pane.
 | Keys | nvim | herdr | WezTerm |
 |---|---|---|---|
 | `ctrl+h/j/k/l` | `wincmd`; at its edge, run `herdr-nav pane <dir>` | nav plugin: send the key to vim/fzf, else move pane focus; at the edge, go to WezTerm | Send through if herdr or nvim is in front, else `ActivatePaneDirection` |
-| `ctrl+a ]` / `ctrl+a [` | (herdr sees the prefix first) | nav plugin: next/previous herdr tab; past the last/first tab, go to WezTerm | Send `ctrl+a` through if herdr is in front, else a one-shot leader table |
+| `ctrl+a ]` / `ctrl+a [` | (herdr sees the prefix first) | nav plugin: next/previous herdr tab, continuing into the next/previous workspace in sidebar order; past the last/first workspace, go to WezTerm | Send `ctrl+a` through if herdr is in front, else a one-shot leader table |
 
 Each layer handles the key if it can and otherwise passes it outward.
 herdr doesn't cover `]t`/`[t` from nvim tabs yet (see "Later").

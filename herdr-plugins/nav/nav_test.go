@@ -19,7 +19,9 @@ type fakeAPI struct {
 	infoErr  error
 	focus    herdr.FocusResult
 	focusErr error
-	tabs     []herdr.TabInfo
+	// workspaces in any order; tabs per workspace
+	workspaces []herdr.WorkspaceInfo
+	tabs       map[herdr.WorkspaceID][]herdr.TabInfo
 }
 
 func (f *fakeAPI) ProcessInfo(_ context.Context, pane herdr.PaneID) (herdr.ProcessInfo, error) {
@@ -43,9 +45,14 @@ func (f *fakeAPI) FocusDirection(_ context.Context, pane herdr.PaneID, dir herdr
 	return f.focus, f.focusErr
 }
 
+func (f *fakeAPI) ListWorkspaces(context.Context) ([]herdr.WorkspaceInfo, error) {
+	f.calls = append(f.calls, "list_workspaces")
+	return f.workspaces, nil
+}
+
 func (f *fakeAPI) ListTabs(_ context.Context, ws herdr.WorkspaceID) ([]herdr.TabInfo, error) {
 	f.calls = append(f.calls, "list_tabs "+string(ws))
-	return f.tabs, nil
+	return f.tabs[ws], nil
 }
 
 func (f *fakeAPI) FocusTab(_ context.Context, tab herdr.TabID) (herdr.TabInfo, error) {
@@ -206,33 +213,68 @@ func TestNextTab(t *testing.T) {
 	}
 }
 
+// session builds workspaces w1..wN in sidebar order, listed out of order,
+// with tabs[i] tabs in workspace i+1 (ids "w<i>:t<n>"). focusWs/focusTab
+// (1-based) say what's focused.
+func session(focusWs, focusTab int, tabs ...int) *fakeAPI {
+	api := &fakeAPI{tabs: map[herdr.WorkspaceID][]herdr.TabInfo{}}
+	for i := len(tabs) - 1; i >= 0; i-- { // reversed: order must come from Number
+		ws := herdr.WorkspaceID(fmt.Sprintf("w%d", i+1))
+		active := herdr.TabID(fmt.Sprintf("%s:t1", ws))
+		for n := tabs[i]; n >= 1; n-- {
+			id := herdr.TabID(fmt.Sprintf("%s:t%d", ws, n))
+			focused := i+1 == focusWs && n == focusTab
+			if focused {
+				active = id
+			}
+			api.tabs[ws] = append(api.tabs[ws], herdr.TabInfo{TabID: id, WorkspaceID: ws, Number: uint(n), Focused: focused})
+		}
+		api.workspaces = append(api.workspaces, herdr.WorkspaceInfo{
+			WorkspaceID: ws, Number: uint(i + 1), Focused: i+1 == focusWs, ActiveTabID: active, TabCount: uint(tabs[i]),
+		})
+	}
+	return api
+}
+
 func TestTabMove(t *testing.T) {
 	for name, tt := range map[string]struct {
+		api       *fakeAPI
 		delta     int
-		wantCalls []string
+		wantFocus string // "" = no focus_tab call
 		wantOuter []string
 	}{
-		"next": {1, []string{"list_tabs w1", "focus_tab t3"}, nil},
-		"prev": {-1, []string{"list_tabs w1", "focus_tab t1"}, nil},
+		"next within workspace":          {session(1, 2, 3, 2), 1, "w1:t3", nil},
+		"prev within workspace":          {session(1, 2, 3, 2), -1, "w1:t1", nil},
+		"past last tab to next ws":       {session(1, 3, 3, 2), 1, "w2:t1", nil},
+		"before first tab to prev ws":    {session(2, 1, 3, 2), -1, "w1:t3", nil},
+		"past last ws hands off":         {session(2, 2, 3, 2), 1, "", []string{"tab +1"}},
+		"before first ws hands off":      {session(1, 1, 3, 2), -1, "", []string{"tab -1"}},
+		"single tab, single ws":          {session(1, 1, 1), 1, "", []string{"tab +1"}},
+		"skips a workspace with no tabs": {session(1, 1, 1, 0, 2), 1, "w3:t1", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			api, outer := &fakeAPI{tabs: tabs(2, "t1", "t2", "t3")}, &fakeOuter{}
-			n := navigator{api: api, outer: outer, tab: "t2", workspace: "w1", log: io.Discard}
+			outer := &fakeOuter{}
+			n := navigator{api: tt.api, outer: outer, log: io.Discard}
 			if err := n.tabMove(context.Background(), tt.delta); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(api.calls, tt.wantCalls) || !reflect.DeepEqual(outer.calls, tt.wantOuter) {
-				t.Errorf("api %q outer %q; want %q %q", api.calls, outer.calls, tt.wantCalls, tt.wantOuter)
+			var focus string
+			for _, c := range tt.api.calls {
+				if f, ok := strings.CutPrefix(c, "focus_tab "); ok {
+					focus = f
+				}
+			}
+			if focus != tt.wantFocus || !reflect.DeepEqual(outer.calls, tt.wantOuter) {
+				t.Errorf("focused %q, outer %q; want %q, %q (calls %q)", focus, outer.calls, tt.wantFocus, tt.wantOuter, tt.api.calls)
 			}
 		})
 	}
+}
 
-	api, outer := &fakeAPI{tabs: tabs(1, "t1", "t2")}, &fakeOuter{}
-	n := navigator{api: api, outer: outer, tab: "t2", log: io.Discard}
-	if err := n.tabMove(context.Background(), 1); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(outer.calls, []string{"tab +1"}) {
-		t.Errorf("past last tab: outer %q, want [tab +1]", outer.calls)
+func TestTabMoveNoFocusedWorkspace(t *testing.T) {
+	api := session(0, 0, 2)
+	n := navigator{api: api, outer: &fakeOuter{}, log: io.Discard}
+	if err := n.tabMove(context.Background(), 1); err == nil {
+		t.Error("want error")
 	}
 }

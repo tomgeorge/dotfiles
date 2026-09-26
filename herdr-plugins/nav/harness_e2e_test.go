@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ type harness struct {
 	env      []string
 	tmux     string // tmux -L socket name
 	outerLog string
+	accent   string // "r;g;b" the client marks focus with; see clientView
 }
 
 const (
@@ -129,6 +131,14 @@ func newHarness(t *testing.T) *harness {
 	// The server answering doesn't mean the client is drawing and reading
 	// keys yet; keys sent before then are lost.
 	h.poll("herdr client to draw", startupFor, func() bool { return strings.Contains(h.clientScreen(), "spaces") })
+	// With one tab, its label's background must be the focus colour.
+	h.poll("focus colour", waitFor, func() bool {
+		labels := h.tabLabels()
+		if len(labels) == 1 && labels[0].bg != "" {
+			h.accent = labels[0].bg
+		}
+		return h.accent != ""
+	})
 	// Warm up: the first exec of a freshly built binary is slow on macOS
 	// (signature checks), which would land on the first latency check. In
 	// a lone pane this is a no-op move that hands off; drop the record.
@@ -508,39 +518,49 @@ func (h *harness) clientScreen() string {
 	return string(out)
 }
 
+type tabLabel struct {
+	n  int
+	bg string
+}
+
+// tabLabels are the numbered tab labels on the client's first line.
+func (h *harness) tabLabels() []tabLabel {
+	h.t.Helper()
+	out, err := h.tmuxCmd("capture-pane", "-p", "-e")
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	first, _, _ := strings.Cut(string(out), "\n")
+	var labels []tabLabel
+	for _, seg := range sgrSegments(first) {
+		text := strings.TrimSpace(seg.text)
+		if n, err := strconv.Atoi(text); err == nil {
+			labels = append(labels, tabLabel{n, seg.bg})
+		}
+	}
+	return labels
+}
+
 // clientView reads what the herdr client shows as focused: the 1-based
 // number of the active tab, and the 0-based index (left to right) of the
-// focused pane. The active tab label is the one drawn with a background no
-// other label has; the focused pane's top border is drawn in that colour.
-// Only side-by-side layouts are read, which is all these tests build.
+// focused pane. Both are drawn in the focus colour (h.accent, read at
+// startup): the active tab's label background, and the focused pane's top
+// border. Only side-by-side layouts are read, which is all these tests
+// build; a lone pane has no border and counts as index 0.
 func (h *harness) clientView() (tab, pane int) {
 	h.t.Helper()
+	for _, l := range h.tabLabels() {
+		if l.bg == h.accent {
+			tab = l.n
+		}
+	}
 	out, err := h.tmuxCmd("capture-pane", "-p", "-e")
 	if err != nil {
 		h.t.Fatal(err)
 	}
 	lines := strings.SplitN(string(out), "\n", 3)
 	if len(lines) < 2 {
-		return 0, -1
-	}
-	type label struct {
-		n  int
-		bg string
-	}
-	var labels []label
-	bgCount := map[string]int{}
-	for _, seg := range sgrSegments(lines[0]) {
-		var n int
-		if _, err := fmt.Sscanf(strings.TrimSpace(seg.text), "%d", &n); err == nil && strings.TrimSpace(seg.text) == fmt.Sprint(n) {
-			labels = append(labels, label{n, seg.bg})
-			bgCount[seg.bg]++
-		}
-	}
-	accent := ""
-	for _, l := range labels {
-		if bgCount[l.bg] == 1 && (len(labels) == 1 || l.bg != "") {
-			tab, accent = l.n, l.bg
-		}
+		return tab, -1
 	}
 	pane = -1
 	i := 0
@@ -549,14 +569,14 @@ func (h *harness) clientView() (tab, pane int) {
 			if r != '┌' {
 				continue
 			}
-			if accent != "" && seg.fg == accent {
+			if seg.fg == h.accent {
 				pane = i
 			}
 			i++
 		}
 	}
 	if i == 0 {
-		pane = 0 // a lone pane has no border
+		pane = 0
 	}
 	return tab, pane
 }

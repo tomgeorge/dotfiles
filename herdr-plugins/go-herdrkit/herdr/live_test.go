@@ -92,3 +92,13 @@ func TestLiveListTabs(t *testing.T) {
 	}
 	t.Logf("%+v", tabs)
 }
+
+// Read-only: lists workspaces.
+func TestLiveListWorkspaces(t *testing.T) {
+	c := liveClient(t)
+	wss, err := c.ListWorkspaces(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%+v", wss)
+}
