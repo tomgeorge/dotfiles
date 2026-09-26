@@ -140,7 +140,7 @@ Only what plugins actually need. This covers roughly what herdrkit uses.
 | Session | `session.snapshot` | `session_snapshot` |
 | Workspace | `workspace.list`, `workspace.get`, `workspace.create`, `workspace.focus`, `workspace.close`, `workspace.report_metadata` | `workspace_list`, `workspace_info`, `workspace_created`, `ok` |
 | Worktree | `worktree.list`, `worktree.create`, `worktree.open`, `worktree.remove` | `worktree_*` |
-| Tab | `tab.create`, `tab.focus`, `tab.close` | `tab_created`, `ok` |
+| Tab | `tab.create`, `tab.list`, `tab.focus`, `tab.close` | `tab_created`, `tab_list`, `tab_info` (focus; checked against 0.9.1), `ok` |
 | Pane | `pane.list`, `pane.get`, `pane.current`, `pane.read`, `pane.send_keys`, `pane.send_text`, `pane.neighbor`, `pane.focus_direction`, `pane.process_info`, `pane.report_metadata` | `pane_list`, `pane_info`, `pane_current`, `pane_read`, `pane_neighbor`, `pane_focus_direction`, `pane_process_info`, `ok` |
 | Agent | `agent.list`, `agent.start`, `agent.focus`, `agent.prompt` (with and without `wait`), `agent.wait` | `agent_list`, `agent_started`, `agent_prompted`, `wait_matched`, `ok` |
 | Wait | `pane.wait_for_output`, `events.wait` | `output_matched`, `wait_matched` |

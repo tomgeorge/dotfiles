@@ -16,7 +16,7 @@ type herdrAPI interface {
 	SendKeys(ctx context.Context, pane herdr.PaneID, keys ...string) error
 	FocusDirection(ctx context.Context, pane herdr.PaneID, dir herdr.Direction) (herdr.FocusResult, error)
 	ListTabs(ctx context.Context, workspace herdr.WorkspaceID) ([]herdr.TabInfo, error)
-	FocusTab(ctx context.Context, tab herdr.TabID) error
+	FocusTab(ctx context.Context, tab herdr.TabID) (herdr.TabInfo, error)
 }
 
 // navigator moves focus from one pane/tab, handing off to the outer
@@ -96,7 +96,8 @@ func (n navigator) tabMove(ctx context.Context, delta int) error {
 	if !ok {
 		return n.outer.Tab(ctx, delta)
 	}
-	return n.api.FocusTab(ctx, next)
+	_, err = n.api.FocusTab(ctx, next)
+	return err
 }
 
 // nextTab returns the tab delta places from current in number order, or

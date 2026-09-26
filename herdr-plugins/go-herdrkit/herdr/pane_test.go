@@ -181,7 +181,7 @@ func TestAPIErrors(t *testing.T) {
 		"pane.send_keys":       func(c *Client) error { return c.SendKeys(ctx, "p", "ctrl+h") },
 		"pane.focus_direction": func(c *Client) error { _, err := c.FocusDirection(ctx, "p", Down); return err },
 		"tab.list":             func(c *Client) error { _, err := c.ListTabs(ctx, "w1"); return err },
-		"tab.focus":            func(c *Client) error { return c.FocusTab(ctx, "w1:t1") },
+		"tab.focus":            func(c *Client) error { _, err := c.FocusTab(ctx, "w1:t1"); return err },
 	} {
 		t.Run(method, func(t *testing.T) {
 			c, _ := fakeServer(t, func(r sent) []byte {

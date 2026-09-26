@@ -23,13 +23,23 @@ func (c *Client) ListTabs(ctx context.Context, workspace WorkspaceID) ([]TabInfo
 	return call[tabListWire, []TabInfo](ctx, c, "tab.list", "tab_list", params, DefaultTimeout)
 }
 
-// FocusTab focuses a tab.
-func (c *Client) FocusTab(ctx context.Context, tab TabID) error {
+// FocusTab focuses a tab and returns it as it now is.
+func (c *Client) FocusTab(ctx context.Context, tab TabID) (TabInfo, error) {
 	params := struct {
 		TabID TabID `json:"tab_id"`
 	}{tab}
-	_, err := call[okWire, struct{}](ctx, c, "tab.focus", "ok", params, DefaultTimeout)
-	return err
+	return call[tabInfoResultWire, TabInfo](ctx, c, "tab.focus", "tab_info", params, DefaultTimeout)
+}
+
+type tabInfoResultWire struct {
+	Tab *tabInfoWire `json:"tab"`
+}
+
+func (w tabInfoResultWire) result(method string) (TabInfo, error) {
+	if w.Tab == nil {
+		return TabInfo{}, missing(method, "tab")
+	}
+	return w.Tab.info(method, "tab.")
 }
 
 type tabListWire struct {
@@ -52,7 +62,7 @@ func (w tabListWire) result(method string) ([]TabInfo, error) {
 	}
 	tabs := make([]TabInfo, 0, len(*w.Tabs))
 	for _, t := range *w.Tabs {
-		info, err := t.info(method)
+		info, err := t.info(method, "tabs[].")
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +71,8 @@ func (w tabListWire) result(method string) ([]TabInfo, error) {
 	return tabs, nil
 }
 
-func (t tabInfoWire) info(method string) (TabInfo, error) {
+// info validates required fields; prefix locates them in error messages.
+func (t tabInfoWire) info(method, prefix string) (TabInfo, error) {
 	for _, f := range []struct {
 		name   string
 		absent bool
@@ -75,7 +86,7 @@ func (t tabInfoWire) info(method string) (TabInfo, error) {
 		{"agent_status", t.AgentStatus == nil},
 	} {
 		if f.absent {
-			return TabInfo{}, missing(method, "tabs[]."+f.name)
+			return TabInfo{}, missing(method, prefix+f.name)
 		}
 	}
 	return TabInfo{

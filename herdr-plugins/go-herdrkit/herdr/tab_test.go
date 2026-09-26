@@ -48,31 +48,38 @@ func TestListTabsFocusedWorkspace(t *testing.T) {
 }
 
 func TestFocusTab(t *testing.T) {
-	c, got := fakeServer(t, answer(`{"type":"ok"}`))
-	if err := c.FocusTab(context.Background(), "w1:t3"); err != nil {
+	c, got := fakeServer(t, answer(`{"type":"tab_info","tab":`+tabJSON(`,"agent_status":"idle"`)+`}`))
+	tab, err := c.FocusTab(context.Background(), "w1:t3")
+	if err != nil {
 		t.Fatal(err)
 	}
 	req := <-got
 	if req.Method != "tab.focus" || string(req.Params) != `{"tab_id":"w1:t3"}` {
 		t.Errorf("request = %s %s", req.Method, req.Params)
 	}
+	want := TabInfo{TabID: "w1:t2", WorkspaceID: "w1", Number: 2, Label: "2", Focused: true, PaneCount: 3, AgentStatus: AgentIdle}
+	if tab != want {
+		t.Errorf("tab = %+v, want %+v", tab, want)
+	}
 }
 
 func TestTabRejects(t *testing.T) {
 	list := func(c *Client) error { _, err := c.ListTabs(context.Background(), "w1"); return err }
-	focus := func(c *Client) error { return c.FocusTab(context.Background(), "w1:t1") }
+	focus := func(c *Client) error { _, err := c.FocusTab(context.Background(), "w1:t1"); return err }
 
 	for name, tt := range map[string]struct {
 		call   func(*Client) error
 		result string
 		want   error
 	}{
-		"list wrong tag":     {list, `{"type":"ok"}`, ErrWrongResult},
-		"list missing tabs":  {list, `{"type":"tab_list"}`, ErrMissingField},
-		"list null tabs":     {list, `{"type":"tab_list","tabs":null}`, ErrMissingField},
-		"tab missing status": {list, `{"type":"tab_list","tabs":[` + tabJSON(``) + `]}`, ErrMissingField},
-		"tab missing tab_id": {list, `{"type":"tab_list","tabs":[{"workspace_id":"w1"}]}`, ErrMissingField},
-		"focus wrong tag":    {focus, `{"type":"tab_list","tabs":[]}`, ErrWrongResult},
+		"list wrong tag":          {list, `{"type":"ok"}`, ErrWrongResult},
+		"list missing tabs":       {list, `{"type":"tab_list"}`, ErrMissingField},
+		"list null tabs":          {list, `{"type":"tab_list","tabs":null}`, ErrMissingField},
+		"tab missing status":      {list, `{"type":"tab_list","tabs":[` + tabJSON(``) + `]}`, ErrMissingField},
+		"tab missing tab_id":      {list, `{"type":"tab_list","tabs":[{"workspace_id":"w1"}]}`, ErrMissingField},
+		"focus wrong tag":         {focus, `{"type":"ok"}`, ErrWrongResult},
+		"focus missing tab":       {focus, `{"type":"tab_info"}`, ErrMissingField},
+		"focus tab missing field": {focus, `{"type":"tab_info","tab":` + tabJSON(``) + `}`, ErrMissingField},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, _ := fakeServer(t, answer(tt.result))

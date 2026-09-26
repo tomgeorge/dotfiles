@@ -42,9 +42,9 @@ func (f *fakeAPI) ListTabs(_ context.Context, ws herdr.WorkspaceID) ([]herdr.Tab
 	return f.tabs, nil
 }
 
-func (f *fakeAPI) FocusTab(_ context.Context, tab herdr.TabID) error {
+func (f *fakeAPI) FocusTab(_ context.Context, tab herdr.TabID) (herdr.TabInfo, error) {
 	f.calls = append(f.calls, "focus_tab "+string(tab))
-	return nil
+	return herdr.TabInfo{TabID: tab, Focused: true}, nil
 }
 
 type fakeOuter struct{ calls []string }
