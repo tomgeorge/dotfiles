@@ -20,18 +20,23 @@ type herdrAPI interface {
 	FocusTab(ctx context.Context, tab herdr.TabID) (herdr.TabInfo, error)
 }
 
-// navigator moves focus from one pane/tab, handing off to the outer
+// navigator moves focus between panes and tabs, handing off to the outer
 // terminal (WezTerm) past herdr's edge.
 //
-// An empty pane means "whatever the server has focused now", and tab moves
-// always start from the server's focus. Keybinding actions use that rather
-// than the ids herdr passes them: those are the client's view, which lags,
-// so a fast second key would start from where the first began.
+// Keybinding actions start from the server's focus, not the ids herdr passes
+// them: those are the client's view, which lags, so a fast second key would
+// start from where the first began.
 type navigator struct {
 	api   herdrAPI
 	outer Outer
-	pane  herdr.PaneID
+	moves moveLog
 	log   io.Writer // non-fatal problems; herdr keeps stderr in the plugin log
+}
+
+// moveLog remembers the pane nav last moved focus to; *navLock is one.
+type moveLog interface {
+	lastMove() herdr.PaneID
+	recordMove(pane herdr.PaneID)
 }
 
 // action is what to do with a directional key.
@@ -62,27 +67,77 @@ var chords = map[herdr.Direction]string{
 	herdr.Right: "ctrl+l",
 }
 
-// paneMove moves focus one pane in dir. With forward set (the key came from
-// a herdr binding) a program that handles the key itself gets it instead.
-// forward is false when that program already declined it: nvim at its own
-// edge, which would otherwise get the key back and loop.
-func (n navigator) paneMove(ctx context.Context, dir herdr.Direction, forward bool) error {
-	if forward {
-		info, err := n.api.ProcessInfo(ctx, n.pane)
-		if err != nil {
-			// Moving focus is the better failure than swallowing the key.
-			_, _ = fmt.Fprintf(n.log, "process info: %v; moving focus\n", err)
-		} else if decide(dir, info) == forwardKey {
-			// info.PaneID, not n.pane: with n.pane empty the server picked
-			// the pane, and send_keys needs it named.
-			return n.api.SendKeys(ctx, info.PaneID, chords[dir])
-		}
-	}
-	r, err := n.api.FocusDirection(ctx, n.pane, dir)
+// key handles a directional key from a herdr binding: the program in the
+// focused pane gets it if it wants it, otherwise focus moves.
+func (n navigator) key(ctx context.Context, dir herdr.Direction) error {
+	info, err := n.api.ProcessInfo(ctx, "")
 	if err != nil {
+		// Moving focus is the better failure than swallowing the key.
+		_, _ = fmt.Fprintf(n.log, "process info: %v; moving focus\n", err)
+		return n.move(ctx, "", dir)
+	}
+	return n.keyAt(ctx, info, dir)
+}
+
+// keyAt is key with the focused pane already looked up. Every step names
+// that pane, so a focus change in between (a click, another client) can't
+// make the check and the action refer to different panes.
+func (n navigator) keyAt(ctx context.Context, info herdr.ProcessInfo, dir herdr.Direction) error {
+	if decide(dir, info) == forwardKey {
+		// Any edge call this leads to starts from info.PaneID; an older
+		// record could only make a stale one look current (see edge).
+		n.moves.recordMove("")
+		return n.api.SendKeys(ctx, info.PaneID, chords[dir])
+	}
+	return n.move(ctx, info.PaneID, dir)
+}
+
+// edge handles nvim in origin finding no window in dir. nvim hands off
+// asynchronously, after herdr-nav forwarded it the key and let go of the
+// lock, so by now focus may have moved on:
+//
+//   - Still on origin: move from there.
+//   - On the pane nav last moved to: an earlier key in the same burst (two
+//     ctrl+h's both forwarded to nvim before either handed off) moved it.
+//     Carry on from there, as the key would have if it had arrived later.
+//   - Anywhere else: the user moved (a click, herdr's own keys). Applying the
+//     key there would jump somewhere they didn't ask for, so drop it.
+func (n navigator) edge(ctx context.Context, origin herdr.PaneID, dir herdr.Direction) error {
+	if origin == "" {
+		// Not started from a herdr pane; nothing to check against.
+		return n.move(ctx, "", dir)
+	}
+	info, err := n.api.ProcessInfo(ctx, "")
+	if err != nil {
+		_, _ = fmt.Fprintf(n.log, "process info: %v; moving from %s\n", err, origin)
+		return n.move(ctx, origin, dir)
+	}
+	switch focused := info.PaneID; {
+	case focused == origin:
+		return n.move(ctx, origin, dir)
+	case focused == n.moves.lastMove():
+		_, _ = fmt.Fprintf(n.log, "nav moved focus from %s to %s before nvim handed off; continuing from there\n", origin, focused)
+		return n.keyAt(ctx, info, dir)
+	default:
+		_, _ = fmt.Fprintf(n.log, "focus moved from %s to %s since nvim got the key; dropping it\n", origin, focused)
+		return nil
+	}
+}
+
+// move moves focus one pane in dir from pane ("" for the server's focus),
+// handing off to the outer terminal at herdr's edge.
+func (n navigator) move(ctx context.Context, pane herdr.PaneID, dir herdr.Direction) error {
+	r, err := n.api.FocusDirection(ctx, pane, dir)
+	if err != nil {
+		n.moves.recordMove("")
 		return err
 	}
-	if !r.Changed && r.Reason == herdr.FocusNoNeighbor {
+	if r.Changed {
+		n.moves.recordMove(r.FocusedPaneID)
+		return nil
+	}
+	n.moves.recordMove("")
+	if r.Reason == herdr.FocusNoNeighbor {
 		return n.outer.PaneDirection(ctx, dir)
 	}
 	return nil
@@ -93,6 +148,8 @@ func (n navigator) paneMove(ctx context.Context, dir herdr.Direction, forward bo
 // the previous workspace's last. Past the first or last workspace it hands
 // off to the outer terminal. delta is +1 or -1.
 func (n navigator) tabMove(ctx context.Context, delta int) error {
+	// Whatever happens, focus isn't on a pane nav moved to.
+	n.moves.recordMove("")
 	wss, err := n.api.ListWorkspaces(ctx)
 	if err != nil {
 		return err

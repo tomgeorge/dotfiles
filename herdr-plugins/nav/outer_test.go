@@ -9,117 +9,145 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tomgeorge/go-herdrkit/herdr"
 )
 
-func TestActiveClientPane(t *testing.T) {
+// fakeTitles is herdr's window title: it records calls, and when a pane is
+// set it "shows" the title there, after late lists, as a client that draws
+// on its next frame would.
+type fakeTitles struct {
+	calls  []string
+	reason herdr.WindowTitleReason // for set; "set" when empty
+	err    error
+	title  string
+}
+
+func (f *fakeTitles) SetWindowTitle(_ context.Context, title string) (herdr.WindowTitleResult, error) {
+	f.calls = append(f.calls, "set")
+	if f.err != nil {
+		return herdr.WindowTitleResult{}, f.err
+	}
+	r := herdr.WindowTitleResult{Changed: true, Reason: herdr.WindowTitleSet}
+	if f.reason != "" {
+		r = herdr.WindowTitleResult{Reason: f.reason}
+	} else {
+		f.title = title
+	}
+	return r, nil
+}
+
+func (f *fakeTitles) ClearWindowTitle(context.Context) (herdr.WindowTitleResult, error) {
+	f.calls = append(f.calls, "clear")
+	f.title = ""
+	return herdr.WindowTitleResult{Changed: true, Reason: herdr.WindowTitleCleared}, nil
+}
+
+// terminal fakes an outer terminal with panes 3 and 7. host, when set, is
+// the pane herdr's client runs in: it shows the herdr title from the late'th
+// list on. Pane 3 always shows a decoy: another herdr, titled like one.
+type terminal struct {
+	titles *fakeTitles
+	host   string
+	late   int
+	lists  int
+	err    error
+}
+
+func (term *terminal) list(context.Context) ([]termPane, error) {
+	term.lists++
+	if term.err != nil {
+		return nil, term.err
+	}
+	seven := "fish"
+	if term.host == "7" && term.titles.title != "" && term.lists > term.late {
+		seven = term.titles.title
+	}
+	return []termPane{{ID: "3", Title: "herdr-nav 1.2"}, {ID: "7", Title: seven}}, nil
+}
+
+func TestFindHost(t *testing.T) {
 	for name, tt := range map[string]struct {
-		json   string
-		want   string
-		wantOK bool
+		titles    fakeTitles
+		term      terminal
+		want      string
+		wantOK    bool
+		wantErr   bool
+		wantCalls []string
 	}{
-		"one":       {`[{"idle_time":{"secs":9,"nanos":0},"focused_pane_id":9}]`, "9", true},
-		"none":      {`[]`, "", false},
-		"no pane":   {`[{"idle_time":{"secs":0,"nanos":0}}]`, "", false},
-		"most idle": {`[{"idle_time":{"secs":5,"nanos":0},"focused_pane_id":1},{"idle_time":{"secs":0,"nanos":9},"focused_pane_id":2},{"idle_time":{"secs":0,"nanos":10},"focused_pane_id":3}]`, "2", true},
-		"pane 0":    {`[{"idle_time":{"secs":1,"nanos":0},"focused_pane_id":0}]`, "0", true},
+		"finds the pane with the title":      {term: terminal{host: "7"}, want: "7", wantOK: true, wantCalls: []string{"set", "clear"}},
+		"waits for the client to draw it":    {term: terminal{host: "7", late: 3}, want: "7", wantOK: true, wantCalls: []string{"set", "clear"}},
+		"client in another terminal: no":     {term: terminal{}, wantCalls: []string{"set", "clear"}},
+		"no foreground client: no":           {titles: fakeTitles{reason: herdr.WindowTitleNoForegroundClient}, term: terminal{host: "7"}, wantCalls: []string{"set", "clear"}},
+		"set fails: error, nothing to clear": {titles: fakeTitles{err: errors.New("boom")}, term: terminal{host: "7"}, wantErr: true, wantCalls: []string{"set"}},
+		"list fails: error, title cleared":   {term: terminal{host: "7", err: errors.New("boom")}, wantErr: true, wantCalls: []string{"set", "clear"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, ok, err := activeClientPane([]byte(tt.json))
-			if err != nil {
-				t.Fatal(err)
+			titles, term := tt.titles, tt.term
+			term.titles = &titles
+			got, ok, err := findHost(context.Background(), &titles, term.list, io.Discard)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, want error %v", err, tt.wantErr)
 			}
 			if got != tt.want || ok != tt.wantOK {
 				t.Errorf("= %q, %v; want %q, %v", got, ok, tt.want, tt.wantOK)
 			}
+			if !reflect.DeepEqual(titles.calls, tt.wantCalls) {
+				t.Errorf("title calls = %q, want %q", titles.calls, tt.wantCalls)
+			}
 		})
 	}
-	if _, _, err := activeClientPane([]byte("not json")); err == nil {
-		t.Error("bad json: want error")
+}
+
+// With no pane ever showing the title it gives up after hostWait.
+func TestFindHostGivesUp(t *testing.T) {
+	titles := &fakeTitles{}
+	term := &terminal{titles: titles}
+	start := time.Now()
+	if _, ok, err := findHost(context.Background(), titles, term.list, io.Discard); ok || err != nil {
+		t.Fatalf("ok %v, err %v", ok, err)
+	}
+	if waited := time.Since(start); waited < hostWait || waited > hostWait+time.Second {
+		t.Errorf("waited %v, want about %v", waited, hostWait)
 	}
 }
 
-// recorder fakes wezterm and ps: it logs each command and answers
-// list-clients, list (pane 7 is on ttys007) and ps (what runs on it).
+// recorder fakes `wezterm cli`: it logs each call and answers list with
+// panes 3 and 7, 7 showing whatever title herdr set.
 type recorder struct {
-	calls   []string
-	clients string
-	onTTY   string // ps -o comm= output for ttys007
-	err     error
+	calls  []string
+	titles *fakeTitles
+	err    error
 }
 
-func (r *recorder) run(_ context.Context, bin string, args ...string) ([]byte, error) {
-	r.calls = append(r.calls, bin+" "+strings.Join(args, " "))
-	switch {
-	case bin == "ps":
-		return []byte(r.onTTY), r.err
-	case args[2] == "list-clients":
-		return []byte(r.clients), r.err
-	case args[2] == "list":
-		return []byte(`[{"pane_id":3,"tty_name":"/dev/ttys003"},{"pane_id":7,"tty_name":"/dev/ttys007"}]`), r.err
+func (r *recorder) run(_ context.Context, args ...string) ([]byte, error) {
+	r.calls = append(r.calls, strings.Join(args, " "))
+	if args[0] == "list" {
+		return []byte(`[{"pane_id":3,"title":"fish"},{"pane_id":7,"title":"` + r.titles.title + `"}]`), r.err
 	}
 	return nil, r.err
 }
 
-var checkHerdr = []string{"wz cli --no-auto-start list-clients --format json", "wz cli --no-auto-start list --format json", "ps -t ttys007 -o comm="}
-
-const herdrOnTTY = "/bin/fish\n/etc/profiles/per-user/me/bin/herdr\n"
-
 func TestWezterm(t *testing.T) {
-	const clients = `[{"idle_time":{"secs":0,"nanos":1},"focused_pane_id":7}]`
+	const list = "list --format json"
 	for name, tt := range map[string]struct {
-		w    wezterm
-		rec  recorder
+		bin  string
 		do   func(context.Context, *wezterm) error
 		want []string
 	}{
-		"inside herdr asks for the active pane": {
-			wezterm{bin: "wz", pane: "99", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
-			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
-			append(checkHerdr, "wz cli --no-auto-start activate-pane-direction --pane-id 7 Left"),
-		},
-		"herdr attached elsewhere (Ghostty, ssh) does nothing": {
-			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: "/bin/fish\n/usr/bin/nvim\n"},
-			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
-			checkHerdr,
-		},
-		"pane without a tty does nothing": {
-			wezterm{bin: "wz", insideHerdr: true},
-			recorder{clients: `[{"idle_time":{"secs":0,"nanos":1},"focused_pane_id":42}]`},
-			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, 1) },
-			[]string{"wz cli --no-auto-start list-clients --format json", "wz cli --no-auto-start list --format json"},
-		},
-		"outside herdr trusts WEZTERM_PANE": {
-			wezterm{bin: "wz", pane: "3"}, recorder{},
-			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Down) },
-			[]string{"wz cli --no-auto-start activate-pane-direction --pane-id 3 Down"},
-		},
-		"tab": {
-			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
-			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, -1) },
-			append(checkHerdr, "wz cli --no-auto-start activate-tab --tab-relative -1 --pane-id 7"),
-		},
-		"no clients does nothing": {
-			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: `[]`},
-			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, 1) },
-			[]string{"wz cli --no-auto-start list-clients --format json"},
-		},
-		"no wezterm does nothing": {
-			wezterm{insideHerdr: true}, recorder{},
-			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Up) },
-			nil,
-		},
-		"outside herdr without WEZTERM_PANE does nothing": {
-			wezterm{bin: "wz"}, recorder{},
-			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Up) },
-			nil,
-		},
+		"pane": {"wz", func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
+			[]string{list, "activate-pane-direction --pane-id 7 Left"}},
+		"tab": {"wz", func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, -1) },
+			[]string{list, "activate-tab --tab-relative -1 --pane-id 7"}},
+		"no wezterm does nothing": {"", func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Up) },
+			nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			w, rec := tt.w, tt.rec
-			w.run, w.log = rec.run, io.Discard
-			if err := tt.do(context.Background(), &w); err != nil {
+			titles := &fakeTitles{}
+			rec := &recorder{titles: titles}
+			w := &wezterm{bin: tt.bin, titles: titles, log: io.Discard, run: rec.run}
+			if err := tt.do(context.Background(), w); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(rec.calls, tt.want) {
@@ -130,10 +158,49 @@ func TestWezterm(t *testing.T) {
 }
 
 func TestWeztermError(t *testing.T) {
-	rec := &recorder{err: errors.New("no gui")}
-	w := wezterm{bin: "wz", insideHerdr: true, run: rec.run, log: io.Discard}
+	titles := &fakeTitles{}
+	rec := &recorder{titles: titles, err: errors.New("no gui")}
+	w := &wezterm{bin: "wz", titles: titles, log: io.Discard, run: rec.run}
 	if err := w.PaneDirection(context.Background(), herdr.Left); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+// newWezterm's commands start with the flags every call needs.
+func TestNewWeztermArgs(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	bin := filepath.Join(dir, "wezterm")
+	script := "#!/bin/sh\necho \"$@\" > " + argsFile + "\necho \"${WEZTERM_UNIX_SOCKET-unset}\" >> " + argsFile + "\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WEZTERM_UNIX_SOCKET", "/gone")
+	w := newWezterm(&fakeTitles{}, io.Discard)
+	w.bin = bin
+	if _, err := w.run(context.Background(), "list"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(b), "cli --no-auto-start list\nunset\n"; got != want {
+		t.Errorf("ran %q, want %q", got, want)
+	}
+}
+
+// A child that leaves the output pipe open doesn't hold command past ctx.
+func TestCommandWaitDelay(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := runCmd(ctx, nil, "sh", "-c", "sleep 5 & sleep 5")
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if waited := time.Since(start); waited > 2*time.Second {
+		t.Errorf("returned after %v", waited)
 	}
 }
 
@@ -155,17 +222,25 @@ func TestLogOuter(t *testing.T) {
 	}
 }
 
-// Inside herdr the inherited WEZTERM_UNIX_SOCKET (stale after a WezTerm
-// restart) must not reach wezterm; outside herdr it's the right one.
-func TestWeztermDropsStaleSocket(t *testing.T) {
-	t.Setenv("WEZTERM_UNIX_SOCKET", "/stale/gui-sock-1")
-	for inside, want := range map[bool]bool{true: false, false: true} {
-		out, err := newWezterm(inside, io.Discard).run(context.Background(), "/usr/bin/env")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := strings.Contains(string(out), "WEZTERM_UNIX_SOCKET="); got != want {
-			t.Errorf("insideHerdr=%v: socket passed = %v, want %v", inside, got, want)
-		}
+// With a terminal to search, the log names the host pane, and skips the
+// handoff when there's none.
+func TestLogOuterFindsHost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "outer.log")
+	titles := &fakeTitles{}
+	term := &terminal{titles: titles, host: "7"}
+	o := &logOuter{path: path, titles: titles, list: term.list, log: io.Discard}
+	if err := o.PaneDirection(context.Background(), herdr.Left); err != nil {
+		t.Fatal(err)
+	}
+	term.host = ""
+	if err := o.Tab(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(b), "pane left 7\n"; got != want {
+		t.Errorf("log = %q, want %q", got, want)
 	}
 }

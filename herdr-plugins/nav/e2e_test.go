@@ -21,8 +21,13 @@ const maxLatency = 250 * time.Millisecond
 func TestE2E(t *testing.T) {
 	h := newHarness(t)
 
+	// want is "pane left" and the like; every handoff must also have found
+	// the tmux pane the client runs in.
 	wantOuter := func(t *testing.T, want ...string) {
 		t.Helper()
+		for i := range want {
+			want[i] += " " + h.host
+		}
 		if got := h.outer(); !reflect.DeepEqual(got, want) {
 			t.Errorf("WezTerm handoffs = %q, want %q", got, want)
 		}
@@ -97,7 +102,7 @@ func TestE2E(t *testing.T) {
 
 	t.Run("5 fzf gets ctrl+j/k but not ctrl+h", func(t *testing.T) {
 		if _, err := exec.LookPath("fzf"); err != nil {
-			t.Skip("fzf not on PATH")
+			skip(t, "fzf not on PATH")
 		}
 		h := h.at(t)
 		_, p1 := h.newTab()
@@ -209,8 +214,27 @@ func TestE2E(t *testing.T) {
 
 		h.focusDir("l", b, 1)
 		h.focusDir("l", c, 2)
-		h.keys("C-h", "C-l")
-		h.poll("settle", waitFor, func() bool { return h.focused() == c })
+		// Focus starts on c and should end there, so wait for both runs to
+		// finish rather than for focus: it's already right before either.
+		h.keysDone("C-h", "C-l")
+		if got := h.focused(); got != c {
+			t.Errorf("focused %s, want %s", got, c)
+		}
+		wantOuter(t)
+	})
+
+	// Both keys reach nvim before its first handoff runs, so both handoffs
+	// start from nvim's pane; the second must carry on from where the first
+	// moved focus, not repeat the same move.
+	t.Run("12b a burst through nvim's edge moves once per key", func(t *testing.T) {
+		h := h.at(t)
+		_, a := h.newTab()
+		h.splitRight()
+		c := h.splitRight()
+		nv := h.nvim(c, "")
+		nv.waitWin("1")
+		h.keys("C-h", "C-h")
+		h.waitFocused(a)
 		wantOuter(t)
 	})
 

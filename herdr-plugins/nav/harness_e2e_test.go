@@ -20,7 +20,9 @@ import (
 
 // harness runs a real herdr server and client, isolated under a temp HOME,
 // inside a private tmux server so tests can press real keys. WezTerm
-// handoffs go to outer.log (HERDR_NAV_OUTER_LOG) instead of a GUI.
+// handoffs go to outer.log (HERDR_NAV_OUTER_LOG) instead of a GUI; nav finds
+// the tmux pane the herdr client runs in (HERDR_NAV_OUTER_TMUX) the way it
+// finds the WezTerm one, by the title herdr gives it, and logs its id.
 type harness struct {
 	t        *testing.T
 	home     string
@@ -28,6 +30,7 @@ type harness struct {
 	env      []string
 	tmux     string // tmux -L socket name
 	outerLog string
+	host     string // tmux pane id the herdr client runs in
 	accent   string // "r;g;b" the client marks focus with; see clientView
 }
 
@@ -64,11 +67,21 @@ func (h *harness) tmuxCmd(args ...string) ([]byte, error) {
 	return command(nil, "tmux", append([]string{"-L", h.tmux}, args...)...)
 }
 
+// skip skips t, or fails it under `make test-all` (HN_REQUIRE set), where a
+// missing tool would otherwise pass the run with coverage quietly lost.
+func skip(t *testing.T, why string) {
+	t.Helper()
+	if os.Getenv("HN_REQUIRE") != "" {
+		t.Fatalf("%s (HN_REQUIRE is set)", why)
+	}
+	t.Skip(why)
+}
+
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	for _, bin := range []string{"herdr", "tmux"} {
 		if _, err := exec.LookPath(bin); err != nil {
-			t.Skipf("%s not on PATH; skipping e2e", bin)
+			skip(t, bin+" not on PATH")
 		}
 	}
 	repo, err := filepath.Abs("../..")
@@ -102,6 +115,7 @@ func newHarness(t *testing.T) *harness {
 		"LANG=en_US.UTF-8",
 		"PATH=" + testPath(navBin),
 		"HERDR_NAV_OUTER_LOG=" + h.outerLog,
+		"HERDR_NAV_OUTER_TMUX=-L " + h.tmux,
 		"HERDR_SOCKET_PATH=" + h.socket(),
 	}
 	t.Cleanup(h.close)
@@ -124,6 +138,11 @@ func newHarness(t *testing.T) *harness {
 	if _, err := h.tmuxCmd(args...); err != nil {
 		t.Fatalf("start tmux: %v", err)
 	}
+	host, err := h.tmuxCmd("display-message", "-p", "#{pane_id}")
+	if err != nil {
+		t.Fatalf("tmux pane id: %v", err)
+	}
+	h.host = strings.TrimSpace(string(host))
 	h.poll("herdr server to start", startupFor, func() bool {
 		_, err := h.tryHerdr("pane", "list")
 		return err == nil
@@ -376,6 +395,30 @@ func (h *harness) outer() []string {
 		}
 	}
 	return lines
+}
+
+// actionsDone counts tg.nav plugin runs that have finished.
+func (h *harness) actionsDone() int {
+	var r struct {
+		Logs []struct{ Status string }
+	}
+	h.herdrJSON(&r, "plugin", "log", "list", "--plugin", "tg.nav")
+	n := 0
+	for _, l := range r.Logs {
+		if l.Status != "running" {
+			n++
+		}
+	}
+	return n
+}
+
+// keysDone presses keys, each of which runs one tg.nav action, and waits
+// for all of those runs to finish.
+func (h *harness) keysDone(keys ...string) {
+	h.t.Helper()
+	before := h.actionsDone()
+	h.keys(keys...)
+	h.poll(fmt.Sprintf("%d nav runs", len(keys)), waitFor, func() bool { return h.actionsDone() >= before+len(keys) })
 }
 
 func (h *harness) resetOuter() {
@@ -646,7 +689,7 @@ func (h *harness) waitClient(tab, pane int) {
 func (h *harness) nvim(pane, extra string) *nvimRemote {
 	h.t.Helper()
 	if _, err := exec.LookPath("nvim"); err != nil {
-		h.t.Skip("nvim not on PATH")
+		skip(h.t, "nvim not on PATH")
 	}
 	init := filepath.Join(h.home, "init.lua")
 	if _, err := os.Stat(init); err != nil {

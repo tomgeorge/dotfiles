@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tomgeorge/go-herdrkit/herdr"
 )
 
 func TestRunArgs(t *testing.T) {
@@ -32,21 +34,12 @@ func TestRunArgs(t *testing.T) {
 	}
 }
 
-// Outside herdr, nvim's edge goes straight to the outer terminal.
+// Outside herdr nvim hands off to WezTerm itself (a user var), never here.
 func TestRunOutsideHerdr(t *testing.T) {
-	log := filepath.Join(t.TempDir(), "outer.log")
 	t.Setenv("HERDR_SOCKET_PATH", "")
 	t.Setenv("HERDR_PLUGIN_ACTION_ID", "")
-	t.Setenv("HERDR_NAV_OUTER_LOG", log)
-	if err := run([]string{"pane", "right"}, io.Discard); err != nil {
-		t.Fatal(err)
-	}
-	b, err := os.ReadFile(log)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(b) != "pane right\n" {
-		t.Errorf("outer log = %q", b)
+	if err := run([]string{"pane", "right"}, io.Discard); !errors.Is(err, herdr.ErrNoSocket) {
+		t.Errorf("err = %v, want ErrNoSocket", err)
 	}
 }
 
@@ -118,8 +111,9 @@ func TestRunArgsBeatInheritedActionID(t *testing.T) {
 	if err := run([]string{"pane", "left"}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if got := methods(); !reflect.DeepEqual(got, []string{"pane.focus_direction"}) {
-		t.Errorf("calls = %q, want only pane.focus_direction", got)
+	// Checks focus is still on nvim's pane, then moves; no send_keys.
+	if got, want := methods(), []string{"pane.process_info", "pane.focus_direction"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("calls = %q, want %q", got, want)
 	}
 }
 
@@ -141,7 +135,7 @@ func TestRunActionForwardsToNvim(t *testing.T) {
 // lockWait is dropped rather than run late.
 func TestLockNav(t *testing.T) {
 	socket := filepath.Join(t.TempDir(), "s")
-	unlock, err := lockNav(context.Background(), socket, io.Discard)
+	lock, err := lockNav(context.Background(), socket, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,23 +148,61 @@ func TestLockNav(t *testing.T) {
 		t.Errorf("waited %v, want about %v", waited, lockWait)
 	}
 
-	unlock()
+	lock.unlock()
 	start = time.Now()
-	unlock2, err := lockNav(context.Background(), socket, io.Discard)
+	lock2, err := lockNav(context.Background(), socket, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unlock2()
-	if waited := time.Since(start); waited > 20*time.Millisecond {
+	lock2.unlock()
+	// Generous: this is "not waiting for lockWait", not a latency check.
+	if waited := time.Since(start); waited > lockWait/2 {
 		t.Errorf("released lock still blocked (%v)", waited)
+	}
+}
+
+// The last move survives from one run to the next, and can be cleared.
+func TestLockNavRecordsMoves(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "s")
+	take := func() *navLock {
+		t.Helper()
+		l, err := lockNav(context.Background(), socket, io.Discard)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+	l := take()
+	if got := l.lastMove(); got != "" {
+		t.Errorf("fresh lastMove = %q", got)
+	}
+	l.recordMove("w1:p12")
+	l.recordMove("w1:p3") // shorter: must not leave "w1:p32"
+	l.unlock()
+
+	l = take()
+	if got := l.lastMove(); got != "w1:p3" {
+		t.Errorf("lastMove = %q, want w1:p3", got)
+	}
+	l.recordMove("")
+	l.unlock()
+
+	l = take()
+	defer l.unlock()
+	if got := l.lastMove(); got != "" {
+		t.Errorf("cleared lastMove = %q", got)
 	}
 }
 
 // No lock file (unwritable dir): run anyway rather than lose every key.
 func TestLockNavUnusable(t *testing.T) {
-	unlock, err := lockNav(context.Background(), "/nonexistent/dir/s", io.Discard)
+	lock, err := lockNav(context.Background(), "/nonexistent/dir/s", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unlock()
+	lock.recordMove("p1")
+	if got := lock.lastMove(); got != "" {
+		t.Errorf("unlocked lastMove = %q", got)
+	}
+	lock.unlock()
 }

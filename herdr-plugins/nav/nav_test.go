@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 // fakeAPI records calls as strings and answers from its fields.
 type fakeAPI struct {
 	calls    []string
+	focused  herdr.PaneID // the server's focus; "p1" when empty
 	info     herdr.ProcessInfo
 	infoErr  error
 	focus    herdr.FocusResult
@@ -30,7 +32,7 @@ func (f *fakeAPI) ProcessInfo(_ context.Context, pane herdr.PaneID) (herdr.Proce
 	info := f.info
 	info.PaneID = pane
 	if pane == "" {
-		info.PaneID = "focused"
+		info.PaneID = cmp.Or(f.focused, "p1")
 	}
 	return info, f.infoErr
 }
@@ -59,6 +61,12 @@ func (f *fakeAPI) FocusTab(_ context.Context, tab herdr.TabID) (herdr.TabInfo, e
 	f.calls = append(f.calls, "focus_tab "+string(tab))
 	return herdr.TabInfo{TabID: tab, Focused: true}, nil
 }
+
+// fakeMoves is an in-memory moveLog.
+type fakeMoves struct{ last herdr.PaneID }
+
+func (m *fakeMoves) lastMove() herdr.PaneID       { return m.last }
+func (m *fakeMoves) recordMove(pane herdr.PaneID) { m.last = pane }
 
 type fakeOuter struct{ calls []string }
 
@@ -104,37 +112,78 @@ func TestDecide(t *testing.T) {
 	}
 }
 
-func TestPaneMove(t *testing.T) {
-	moved := herdr.FocusResult{Changed: true}
+func TestKey(t *testing.T) {
+	moved := herdr.FocusResult{Changed: true, FocusedPaneID: "p2"}
 	edge := herdr.FocusResult{Reason: herdr.FocusNoNeighbor}
 	for name, tt := range map[string]struct {
 		dir       herdr.Direction
-		forward   bool
 		api       fakeAPI
 		wantCalls []string
 		wantOuter []string
+		wantLast  herdr.PaneID
 	}{
-		"shell moves focus": {herdr.Left, true, fakeAPI{info: running("fish"), focus: moved},
-			[]string{"process_info p1", "focus_direction p1 left"}, nil},
-		"nvim gets the key": {herdr.Down, true, fakeAPI{info: running("nvim")},
-			[]string{"process_info p1", "send_keys p1 ctrl+j"}, nil},
-		"edge hands off": {herdr.Right, true, fakeAPI{info: running("fish"), focus: edge},
-			[]string{"process_info p1", "focus_direction p1 right"}, []string{"pane right"}},
-		"unchanged for another reason stays": {herdr.Up, true,
+		// Everything after process_info names the pane it reported, not "".
+		"shell moves focus": {herdr.Left, fakeAPI{info: running("fish"), focus: moved},
+			[]string{"process_info ", "focus_direction p1 left"}, nil, "p2"},
+		"nvim gets the key": {herdr.Down, fakeAPI{info: running("nvim")},
+			[]string{"process_info ", "send_keys p1 ctrl+j"}, nil, ""},
+		"edge hands off": {herdr.Right, fakeAPI{info: running("fish"), focus: edge},
+			[]string{"process_info ", "focus_direction p1 right"}, []string{"pane right"}, ""},
+		"unchanged for another reason stays": {herdr.Up,
 			fakeAPI{info: running("fish"), focus: herdr.FocusResult{Reason: herdr.FocusReasonUnknown}},
-			[]string{"process_info p1", "focus_direction p1 up"}, nil},
-		"process info error still moves": {herdr.Left, true, fakeAPI{infoErr: errors.New("boom"), focus: moved},
-			[]string{"process_info p1", "focus_direction p1 left"}, nil},
-		// From nvim at its edge: never look at (and send back to) nvim.
-		"not forwarding skips process info": {herdr.Left, false, fakeAPI{info: running("nvim"), focus: moved},
-			[]string{"focus_direction p1 left"}, nil},
-		"not forwarding, edge hands off": {herdr.Up, false, fakeAPI{info: running("nvim"), focus: edge},
-			[]string{"focus_direction p1 up"}, []string{"pane up"}},
+			[]string{"process_info ", "focus_direction p1 up"}, nil, ""},
+		"process info error still moves": {herdr.Left, fakeAPI{infoErr: errors.New("boom"), focus: moved},
+			[]string{"process_info ", "focus_direction  left"}, nil, "p2"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			api, outer, moves := tt.api, &fakeOuter{}, &fakeMoves{last: "old"}
+			n := navigator{api: &api, outer: outer, moves: moves, log: io.Discard}
+			if err := n.key(context.Background(), tt.dir); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(api.calls, tt.wantCalls) {
+				t.Errorf("api calls = %q, want %q", api.calls, tt.wantCalls)
+			}
+			if !reflect.DeepEqual(outer.calls, tt.wantOuter) {
+				t.Errorf("outer calls = %q, want %q", outer.calls, tt.wantOuter)
+			}
+			if moves.last != tt.wantLast {
+				t.Errorf("last move = %q, want %q", moves.last, tt.wantLast)
+			}
+		})
+	}
+}
+
+// nvim in p1 found no window that way. What happens depends on where focus
+// is by the time its call runs.
+func TestEdge(t *testing.T) {
+	moved := herdr.FocusResult{Changed: true, FocusedPaneID: "p3"}
+	edge := herdr.FocusResult{Reason: herdr.FocusNoNeighbor}
+	for name, tt := range map[string]struct {
+		api       fakeAPI
+		last      herdr.PaneID
+		wantCalls []string
+		wantOuter []string
+	}{
+		"still on nvim's pane: moves from it": {fakeAPI{focused: "p1", info: running("nvim"), focus: moved}, "",
+			[]string{"process_info ", "focus_direction p1 left"}, nil},
+		"still on nvim's pane at herdr's edge: hands off": {fakeAPI{focused: "p1", info: running("nvim"), focus: edge}, "",
+			[]string{"process_info ", "focus_direction p1 left"}, []string{"pane left"}},
+		// ctrl+h ctrl+h, both forwarded to nvim before it handed off: the
+		// first handoff moved p1 -> p2, so the second carries on from p2.
+		"nav moved on: continues from there": {fakeAPI{focused: "p2", info: running("fish"), focus: moved}, "p2",
+			[]string{"process_info ", "focus_direction p2 left"}, nil},
+		"nav moved on to another nvim: it gets the key": {fakeAPI{focused: "p2", info: running("nvim")}, "p2",
+			[]string{"process_info ", "send_keys p2 ctrl+h"}, nil},
+		"user moved: dropped": {fakeAPI{focused: "p9", info: running("fish"), focus: moved}, "p2",
+			[]string{"process_info "}, nil},
+		"focus unknown: moves from nvim's pane": {fakeAPI{infoErr: errors.New("boom"), focus: moved}, "",
+			[]string{"process_info ", "focus_direction p1 left"}, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			api, outer := tt.api, &fakeOuter{}
-			n := navigator{api: &api, outer: outer, pane: "p1", log: io.Discard}
-			if err := n.paneMove(context.Background(), tt.dir, tt.forward); err != nil {
+			n := navigator{api: &api, outer: outer, moves: &fakeMoves{last: tt.last}, log: io.Discard}
+			if err := n.edge(context.Background(), "p1", herdr.Left); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(api.calls, tt.wantCalls) {
@@ -147,27 +196,17 @@ func TestPaneMove(t *testing.T) {
 	}
 }
 
-// Keybinding actions pass no pane: the server's focus is the origin, and
-// the key goes to the pane it named.
-func TestPaneMoveFromServerFocus(t *testing.T) {
-	api, outer := &fakeAPI{info: running("nvim")}, &fakeOuter{}
-	n := navigator{api: api, outer: outer, log: io.Discard}
-	if err := n.paneMove(context.Background(), herdr.Left, true); err != nil {
-		t.Fatal(err)
-	}
-	if want := []string{"process_info ", "send_keys focused ctrl+h"}; !reflect.DeepEqual(api.calls, want) {
-		t.Errorf("calls = %q, want %q", api.calls, want)
-	}
-}
-
-func TestPaneMoveFocusError(t *testing.T) {
-	api, outer := &fakeAPI{info: running("fish"), focusErr: errors.New("boom")}, &fakeOuter{}
-	n := navigator{api: api, outer: outer, pane: "p1", log: io.Discard}
-	if err := n.paneMove(context.Background(), herdr.Left, true); err == nil {
+func TestMoveFocusError(t *testing.T) {
+	api, outer, moves := &fakeAPI{focusErr: errors.New("boom")}, &fakeOuter{}, &fakeMoves{last: "p2"}
+	n := navigator{api: api, outer: outer, moves: moves, log: io.Discard}
+	if err := n.move(context.Background(), "p1", herdr.Left); err == nil {
 		t.Fatal("want error")
 	}
 	if outer.calls != nil {
 		t.Errorf("handed off after an error: %q", outer.calls)
+	}
+	if moves.last != "" {
+		t.Errorf("last move = %q after an error, want cleared", moves.last)
 	}
 }
 
@@ -266,8 +305,8 @@ func TestTabMove(t *testing.T) {
 		"unplaceable current tab moves on": {unplaceable(), 1, "w2:t1", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			outer := &fakeOuter{}
-			n := navigator{api: tt.api, outer: outer, log: io.Discard}
+			outer, moves := &fakeOuter{}, &fakeMoves{last: "p1"}
+			n := navigator{api: tt.api, outer: outer, moves: moves, log: io.Discard}
 			if err := n.tabMove(context.Background(), tt.delta); err != nil {
 				t.Fatal(err)
 			}
@@ -276,6 +315,9 @@ func TestTabMove(t *testing.T) {
 				if f, ok := strings.CutPrefix(c, "focus_tab "); ok {
 					focus = f
 				}
+			}
+			if moves.last != "" {
+				t.Errorf("last move = %q after a tab move, want cleared", moves.last)
 			}
 			if focus != tt.wantFocus || !reflect.DeepEqual(outer.calls, tt.wantOuter) {
 				t.Errorf("focused %q, outer %q; want %q, %q (calls %q)", focus, outer.calls, tt.wantFocus, tt.wantOuter, tt.api.calls)
@@ -286,7 +328,7 @@ func TestTabMove(t *testing.T) {
 
 func TestTabMoveNoFocusedWorkspace(t *testing.T) {
 	api := session(0, 0, 2)
-	n := navigator{api: api, outer: &fakeOuter{}, log: io.Discard}
+	n := navigator{api: api, outer: &fakeOuter{}, moves: &fakeMoves{}, log: io.Discard}
 	if err := n.tabMove(context.Background(), 1); err == nil {
 		t.Error("want error")
 	}

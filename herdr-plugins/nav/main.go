@@ -2,8 +2,9 @@
 // of keys. Each layer handles a key if it can and otherwise passes it out.
 //
 // As a herdr plugin action (HERDR_PLUGIN_ACTION_ID set) it runs for
-// ctrl+h/j/k/l and the tab keys. Run as `herdr-nav pane <dir>` it's nvim
-// handing off at its own edge.
+// ctrl+h/j/k/l and the tab keys. Run as `herdr-nav pane <dir>` it's nvim in
+// a herdr pane handing off at its own edge. (nvim outside herdr hands off
+// to WezTerm itself; see nvim/lua/nav.lua.)
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/tomgeorge/go-herdrkit/herdr"
@@ -30,66 +32,69 @@ var directions = map[string]herdr.Direction{
 	"left": herdr.Left, "down": herdr.Down, "up": herdr.Up, "right": herdr.Right,
 }
 
+// runBudget bounds one key's work once it holds the lock. Waiting for the
+// lock has its own, shorter, budget (lockWait).
+const runBudget = 2 * time.Second
+
 func run(args []string, log io.Writer) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	socket := os.Getenv("HERDR_SOCKET_PATH")
-	var outer Outer = newWezterm(socket != "", log)
-	if p := os.Getenv("HERDR_NAV_OUTER_LOG"); p != "" {
-		outer = &logOuter{path: p}
-	}
-
 	// Arguments win over HERDR_PLUGIN_ACTION_ID: nvim started from a plugin
 	// action can inherit it, and treating nvim's edge call as a herdr key
 	// would forward ctrl+h straight back to nvim, looping forever.
-	if action := os.Getenv("HERDR_PLUGIN_ACTION_ID"); action != "" && len(args) == 0 {
-		if socket == "" {
-			return herdr.ErrNoSocket
+	action := os.Getenv("HERDR_PLUGIN_ACTION_ID")
+	fromNvim := action == "" || len(args) != 0
+	var dir herdr.Direction
+	if fromNvim {
+		if len(args) != 2 || args[0] != "pane" {
+			return fmt.Errorf("%s", usage)
 		}
-		unlock, err := lockNav(ctx, socket, log)
-		if err != nil {
-			return err
+		var ok bool
+		if dir, ok = directions[args[1]]; !ok {
+			return fmt.Errorf("unknown direction %q; %s", args[1], usage)
 		}
-		defer unlock()
-		// Server focus, not HERDR_PANE_ID/HERDR_TAB_ID (see navigator).
-		n := navigator{api: herdr.New(socket), outer: outer, log: log}
-		switch action {
-		case "tab-next":
-			return n.tabMove(ctx, 1)
-		case "tab-prev":
-			return n.tabMove(ctx, -1)
-		}
-		dir, ok := directions[action]
-		if !ok {
+	} else if action != "tab-next" && action != "tab-prev" {
+		var ok bool
+		if dir, ok = directions[action]; !ok {
 			return fmt.Errorf("unknown action %q", action)
 		}
-		return n.paneMove(ctx, dir, true)
 	}
 
-	if len(args) != 2 || args[0] != "pane" {
-		return fmt.Errorf("%s", usage)
-	}
-	dir, ok := directions[args[1]]
-	if !ok {
-		return fmt.Errorf("unknown direction %q; %s", args[1], usage)
-	}
+	socket := os.Getenv("HERDR_SOCKET_PATH")
 	if socket == "" {
-		// Plain nvim in WezTerm: nothing between them.
-		return outer.PaneDirection(ctx, dir)
+		return herdr.ErrNoSocket
 	}
-	unlock, err := lockNav(ctx, socket, log)
+	lock, err := lockNav(context.Background(), socket, log)
 	if err != nil {
 		return err
 	}
-	defer unlock()
-	// nvim's own pane is the right origin here, and HERDR_PANE_ID in nvim's
-	// environment names it exactly.
-	n := navigator{
-		api:   herdr.New(socket),
-		outer: outer,
-		pane:  herdr.PaneID(os.Getenv("HERDR_PANE_ID")),
-		log:   log,
+	defer lock.unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), runBudget)
+	defer cancel()
+
+	api := herdr.New(socket)
+	n := navigator{api: api, outer: newOuter(api, log), moves: lock, log: log}
+	switch {
+	case fromNvim:
+		// HERDR_PANE_ID in nvim's environment names nvim's own pane.
+		return n.edge(ctx, herdr.PaneID(os.Getenv("HERDR_PANE_ID")), dir)
+	case action == "tab-next":
+		return n.tabMove(ctx, 1)
+	case action == "tab-prev":
+		return n.tabMove(ctx, -1)
 	}
-	return n.paneMove(ctx, dir, false)
+	// Server focus, not HERDR_PANE_ID/HERDR_TAB_ID (see navigator).
+	return n.key(ctx, dir)
+}
+
+// newOuter is WezTerm, or for the e2e tests a log (HERDR_NAV_OUTER_LOG)
+// that finds the host pane in tmux (HERDR_NAV_OUTER_TMUX: tmux's server
+// arguments, e.g. "-L name").
+func newOuter(api *herdr.Client, log io.Writer) Outer {
+	if p := os.Getenv("HERDR_NAV_OUTER_LOG"); p != "" {
+		o := &logOuter{path: p, titles: api, log: log}
+		if t := os.Getenv("HERDR_NAV_OUTER_TMUX"); t != "" {
+			o.list = tmuxPanes(strings.Fields(t))
+		}
+		return o
+	}
+	return newWezterm(api, log)
 }
