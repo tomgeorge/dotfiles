@@ -118,6 +118,7 @@ herdr-plugins/go-herdrkit/
     agent.go
     metadata.go               report_metadata + Tokens validation
     notify.go
+    window.go                 client.window_title.set/clear
     wait.go                   blocking calls (deadline = timeout + slack)
   plugin/                     package plugin — invocation context
     env.go                    Invocation, Kind (Action|PaneEntrypoint|Startup|Event)
