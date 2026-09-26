@@ -2,7 +2,6 @@
 -- WezTerm's GUI can't be driven headlessly, so this stubs the wezterm module
 -- and checks which action each key resolves to.
 local dir = debug.getinfo(1, "S").source:match("^@(.*)/[^/]*$") or "."
-package.path = dir .. "/?.lua;" .. package.path
 
 -- Actions become { name, arg } so tests can compare them.
 package.loaded.wezterm = {
@@ -17,7 +16,9 @@ package.loaded.wezterm = {
 		return { "callback", fn }
 	end,
 }
-local nav = require("nav")
+-- By path, not require: nvim searches its runtimepath first, where
+-- ~/.config/nvim/lua/nav.lua (nvim's own nav module) would win.
+local nav = dofile(dir .. "/nav.lua")
 
 local failures = 0
 local function eq(got, want, what)

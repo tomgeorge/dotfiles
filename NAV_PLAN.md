@@ -463,26 +463,41 @@ Only the steps that cross WezTerm need a human: 1 (the WezTerm parts), 2 and
 
 ## Risks / open questions
 
-- **herdr under Ghostty:** reaching herdr's edge would shift focus in a
-  background WezTerm window. Possible guard: only go to WezTerm when the
-  plugin's environment has `TERM_PROGRAM=WezTerm`. Not yet checked whether
-  herdr passes that through.
-- **Two WezTerm tabs attached to one herdr server:** not yet checked whether
-  `HERDR_TAB_ID` / `focused` is tracked for each client.
+Updated after an adversarial review (Codex, 2026-09).
+
+Fixed:
+- **Inherited `HERDR_PLUGIN_ACTION_ID`** could turn nvim's edge call into a
+  herdr keypress and loop forever. Arguments now win over the env var.
+- **Key repeat used stale focus:** actions got the client's lagging
+  pane/tab ids, so a fast second ctrl+h started where the first began.
+  Keybinding actions now use the server's current focus, and a per-server
+  lock (`<socket>.tg-nav.lock`) runs herdr-nav invocations one at a time.
+  e2e case 12 fails 5/5 without this. Order between *different* keys in
+  one burst (ctrl+h then ctrl+l) is still whichever process locks first.
+- **herdr under Ghostty / over ssh:** before handing off, nav checks that
+  the target WezTerm pane has a herdr client on its tty; otherwise it does
+  nothing. It can't tell *which* herdr server that client belongs to.
+
+Known limitations (not fixing now):
+- **ssh:** WezTerm sees `ssh` in front, not herdr, so a remote herdr gets
+  neither ctrl+hjkl nor ctrl+a; WezTerm handles them locally. A fix would be
+  an opt-in pass-through list in `wezterm/nav.lua`.
+- **Unconfigured vim** (`vim -u NONE`, a bare `vi` as git editor) is sent
+  ctrl+hjkl but has no mappings for them, so ctrl+h moves the cursor
+  instead. vim-tmux-navigator behaves the same. Only configured nvim in
+  normal mode hands back at its edge; nvim terminal mode doesn't.
+- **Nested herdr** isn't supported: the outer herdr takes ctrl+hjkl and
+  ctrl+a first.
+- **Several herdr clients or WezTerm windows:** server focus is global, and
+  `list-clients` picks the most recently active WezTerm client.
 - **Race:** the foreground process can change between `process_info` and
-  `send_keys`. herdr has no single call that does both (herdrkit has the same
-  problem).
-- **Moving from WezTerm into herdr** lands on herdr's last focused tab or pane,
-  not the one nearest the direction of travel.
-- **`list-clients` picks by smallest idle time.** With several GUI windows or
-  mux clients, this can pick the wrong one.
-- **e2e flakiness:** the herdr client inside tmux sees a plain tmux terminal,
-  not WezTerm, so key encoding can differ (for example `C-h` vs Backspace).
-  Poll instead of sleeping. If a key is ambiguous, set
-  `tmux set -g extended-keys always` in the test session.
-- **e2e against a live machine:** the `env -i` scrub is the only thing
-  between the test and the live server. The harness asserts that
-  `HERDR_SOCKET_PATH` points under `T` before sending any key.
+  `send_keys`. herdr has no single call that does both.
+- **Moving from WezTerm into herdr** lands on herdr's last focused tab or
+  pane, not the one nearest the direction of travel.
+- **e2e safety:** the harness builds its environment from scratch (no
+  inherited `HERDR_SOCKET_PATH`), checks the socket is under its temp HOME,
+  and bounds every external command (5 s) so a hang fails instead of
+  wedging; cleanup always kills tmux.
 
 ## Later
 

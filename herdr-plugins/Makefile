@@ -9,11 +9,12 @@ all: build
 build: $(addprefix build-,$(PLUGINS))
 
 # Build to a temp name and rename, so a key press mid-build never execs a
-# half-written binary.
+# half-written binary. The temp name is unique so concurrent builds (make
+# and `herdr plugin install`, say) don't rename each other's output.
 build-%:
 	mkdir -p $*/bin
-	go build -o $*/bin/.herdr-$*.tmp ./$*
-	mv $*/bin/.herdr-$*.tmp $*/bin/herdr-$*
+	tmp=$$(mktemp $*/bin/.herdr-$*.XXXXXX) && trap 'rm -f "$$tmp"' EXIT && \
+		go build -o "$$tmp" ./$* && mv "$$tmp" $*/bin/herdr-$*
 
 # Registers each plugin with Herdr (~/.config/herdr/plugins.json). Idempotent.
 # A failed link is fatal: when nav isn't linked, ctrl+hjkl does nothing.

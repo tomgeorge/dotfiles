@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -33,6 +34,33 @@ const (
 	waitFor    = 2 * time.Second
 	startupFor = 20 * time.Second
 )
+
+// cmdTimeout bounds every external command, so a hung herdr, tmux or nvim
+// fails the poll that called it instead of hanging the run: poll can only
+// check its deadline between calls.
+const cmdTimeout = 5 * time.Second
+
+// command runs name with a timeout and returns stdout, and stderr folded
+// into the error. env nil means inherit (only tmux, which gets an explicit
+// env -i for herdr itself).
+func command(env []string, name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = env
+	cmd.WaitDelay = time.Second // don't wait on pipes a killed child left open
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return out, fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, bytes.TrimSpace(stderr.Bytes()))
+	}
+	return out, nil
+}
+
+func (h *harness) tmuxCmd(args ...string) ([]byte, error) {
+	return command(nil, "tmux", append([]string{"-L", h.tmux}, args...)...)
+}
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
@@ -89,10 +117,10 @@ func newHarness(t *testing.T) *harness {
 	h.herdr("plugin", "link", filepath.Join(repo, "herdr-plugins/nav"))
 
 	// The client (and so the server it spawns) gets h.env only.
-	args := []string{"-L", h.tmux, "-f", "/dev/null", "new-session", "-d", "-x", "160", "-y", "40", "--", "/usr/bin/env", "-i"}
+	args := []string{"-f", "/dev/null", "new-session", "-d", "-x", "160", "-y", "40", "--", "/usr/bin/env", "-i"}
 	args = append(append(args, h.env...), "herdr")
-	if out, err := exec.Command("tmux", args...).CombinedOutput(); err != nil {
-		t.Fatalf("start tmux: %v: %s", err, out)
+	if _, err := h.tmuxCmd(args...); err != nil {
+		t.Fatalf("start tmux: %v", err)
 	}
 	h.poll("herdr server to start", startupFor, func() bool {
 		_, err := h.tryHerdr("pane", "list")
@@ -190,8 +218,13 @@ func (h *harness) close() {
 			h.home, h.tmux)
 		return
 	}
-	_, _ = h.tryHerdr("server", "stop")
-	_ = exec.Command("tmux", "-L", h.tmux, "kill-server").Run()
+	// Every step runs even if an earlier one fails or times out.
+	if _, err := h.tryHerdr("server", "stop"); err != nil {
+		h.t.Logf("cleanup: %v (a herdr server under %s may be left running)", err, h.home)
+	}
+	if _, err := h.tmuxCmd("kill-server"); err != nil {
+		h.t.Logf("cleanup: %v", err)
+	}
 	// kill-server leaves the socket file behind; tmux keeps it in
 	// $TMUX_TMPDIR (default /tmp)/tmux-<uid>/<name>.
 	dir := os.Getenv("TMUX_TMPDIR")
@@ -204,7 +237,7 @@ func (h *harness) close() {
 
 // dump logs what the screen and plugin log looked like, for failures.
 func (h *harness) dump() {
-	screen, _ := exec.Command("tmux", "-L", h.tmux, "capture-pane", "-p").Output()
+	screen, _ := h.tmuxCmd("capture-pane", "-p")
 	h.t.Logf("screen:\n%s", screen)
 	var r struct {
 		Logs []struct {
@@ -223,13 +256,9 @@ func (h *harness) dump() {
 }
 
 func (h *harness) tryHerdr(args ...string) ([]byte, error) {
-	cmd := exec.Command("herdr", args...)
-	cmd.Env = h.env
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := command(h.env, "herdr", args...)
 	if err != nil {
-		return out, fmt.Errorf("herdr %s: %w: %s%s", strings.Join(args, " "), err, out, stderr.Bytes())
+		return out, err
 	}
 	// The CLI reports API errors in the JSON body with exit status 0.
 	var body struct {
@@ -268,9 +297,8 @@ func (h *harness) herdrJSON(v any, args ...string) {
 // keys presses keys in the herdr client, through herdr's keybindings.
 func (h *harness) keys(keys ...string) {
 	h.t.Helper()
-	args := append([]string{"-L", h.tmux, "send-keys"}, keys...)
-	if out, err := exec.Command("tmux", args...).CombinedOutput(); err != nil {
-		h.t.Fatalf("tmux send-keys: %v: %s", err, out)
+	if _, err := h.tmuxCmd(append([]string{"send-keys"}, keys...)...); err != nil {
+		h.t.Fatal(err)
 	}
 }
 
@@ -372,8 +400,23 @@ func (h *harness) splitRight() string {
 	before := h.focused()
 	h.keys("C-a", "v")
 	h.poll("split", waitFor, func() bool { return h.focused() != before })
-	h.waitClient(h.focusedTabNumber(), 1)
+	// Splitting the rightmost pane (all these tests do) adds a new rightmost.
+	h.waitClient(h.focusedTabNumber(), h.panesInFocusedTab()-1)
 	return h.focused()
+}
+
+func (h *harness) panesInFocusedTab() int {
+	h.t.Helper()
+	tab := h.focusedTab()
+	var r struct{ Panes []paneInfo }
+	h.herdrJSON(&r, "pane", "list")
+	n := 0
+	for _, p := range r.Panes {
+		if p.TabID == tab {
+			n++
+		}
+	}
+	return n
 }
 
 // focusDir moves focus with herdr's own prefix+h/j/k/l, not tg.nav, to the
@@ -458,7 +501,7 @@ func (h *harness) screen(pane string) string {
 // clientScreen is what the herdr client draws, including its mode bar.
 func (h *harness) clientScreen() string {
 	h.t.Helper()
-	out, err := exec.Command("tmux", "-L", h.tmux, "capture-pane", "-p").Output()
+	out, err := h.tmuxCmd("capture-pane", "-p")
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -472,7 +515,7 @@ func (h *harness) clientScreen() string {
 // Only side-by-side layouts are read, which is all these tests build.
 func (h *harness) clientView() (tab, pane int) {
 	h.t.Helper()
-	out, err := exec.Command("tmux", "-L", h.tmux, "capture-pane", "-p", "-e").Output()
+	out, err := h.tmuxCmd("capture-pane", "-p", "-e")
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -608,9 +651,7 @@ type nvimRemote struct {
 }
 
 func (n *nvimRemote) tryExpr(expr string) (string, error) {
-	cmd := exec.Command("nvim", "--server", n.socket, "--remote-expr", expr)
-	cmd.Env = n.h.env
-	out, err := cmd.Output()
+	out, err := command(n.h.env, "nvim", "--server", n.socket, "--remote-expr", expr)
 	return strings.TrimSpace(string(out)), err
 }
 
@@ -625,10 +666,8 @@ func (n *nvimRemote) expr(expr string) string {
 
 func (n *nvimRemote) send(keys string) {
 	n.h.t.Helper()
-	cmd := exec.Command("nvim", "--server", n.socket, "--remote-send", keys)
-	cmd.Env = n.h.env
-	if out, err := cmd.CombinedOutput(); err != nil {
-		n.h.t.Fatalf("nvim send %s: %v: %s", keys, err, out)
+	if _, err := command(n.h.env, "nvim", "--server", n.socket, "--remote-send", keys); err != nil {
+		n.h.t.Fatal(err)
 	}
 }
 

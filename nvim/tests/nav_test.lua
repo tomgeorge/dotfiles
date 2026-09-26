@@ -1,8 +1,9 @@
 -- Run: nvim --headless -u NONE -l nvim/tests/nav_test.lua
 -- Checks that nav.go moves between windows and hands off only at an edge.
 local root = debug.getinfo(1, "S").source:match("^@(.*)/tests/[^/]*$") or "nvim"
-package.path = root .. "/lua/?.lua;" .. package.path
-local nav = require("nav")
+-- By path: require would search nvim's runtimepath, i.e. whatever
+-- ~/.config/nvim points at, not necessarily this checkout.
+local nav = dofile(root .. "/lua/nav.lua")
 
 local handoffs = {}
 nav.handoff = function(direction)

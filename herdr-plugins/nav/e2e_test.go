@@ -192,4 +192,24 @@ func TestE2E(t *testing.T) {
 		h.keys("C-a", "'")
 		h.poll("split from prefix+'", waitFor, func() bool { return count() == 3 })
 	})
+
+	// Key repeat and fast typing: no waiting between keys, so each action
+	// may start before the client has drawn the previous move.
+	t.Run("12 bursts of ctrl+h/l land where one-at-a-time would", func(t *testing.T) {
+		h := h.at(t)
+		_, a := h.newTab()
+		b := h.splitRight()
+		c := h.splitRight()
+
+		h.keys("C-h", "C-h")
+		h.waitFocused(a)
+		wantOuter(t)
+		h.waitClient(h.focusedTabNumber(), 0) // before herdr's own prefix+l below
+
+		h.focusDir("l", b, 1)
+		h.focusDir("l", c, 2)
+		h.keys("C-h", "C-l")
+		h.poll("settle", waitFor, func() bool { return h.focused() == c })
+		wantOuter(t)
+	})
 }
