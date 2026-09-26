@@ -478,6 +478,27 @@ Fixed:
   the target WezTerm pane has a herdr client on its tty; otherwise it does
   nothing. It can't tell *which* herdr server that client belongs to.
 
+Second review (Fable 5, 2026-09), fixed:
+- **Lock budget:** waiting for the lock shared the 2 s run budget, so a
+  timed-out run carried on with an expired context and a late one ran out
+  of order. The wait is now capped at 250 ms, after which the key is
+  dropped (`errBusy` in the plugin log).
+- **Stale `WEZTERM_UNIX_SOCKET`:** inherited from the herdr server and named
+  after the GUI's pid. After a WezTerm restart, `wezterm cli` took ~5 s and
+  spawned a stray `wezterm-mux-server`. nav drops the variable inside herdr
+  and passes `--no-auto-start` (a stale socket now fails in ~25 ms).
+- **Unplaceable current tab** moves on to the neighbouring workspace
+  instead of failing.
+- Not a bug: the review expected nvim floats to hand off; `wincmd` from a
+  float moves to the layout window beneath, so they don't (now tested).
+
+Self-announcing programs (smart-splits.nvim style: nvim sets an `IS_NVIM`
+user var that WezTerm reads) would replace process-name sniffing and fix
+the ssh and unconfigured-vim cases, but **herdr 0.9.1 doesn't pass OSC
+1337 `SetUserVar` through** to the outer terminal (checked by capturing the
+herdr client's raw output), and has no passthrough setting. Revisit if
+herdr adds one.
+
 Known limitations (not fixing now):
 - **ssh:** WezTerm sees `ssh` in front, not herdr, so a remote herdr gets
   neither ctrl+hjkl nor ctrl+a; WezTerm handles them locally. A fix would be
@@ -489,7 +510,13 @@ Known limitations (not fixing now):
 - **Nested herdr** isn't supported: the outer herdr takes ctrl+hjkl and
   ctrl+a first.
 - **Several herdr clients or WezTerm windows:** server focus is global, and
-  `list-clients` picks the most recently active WezTerm client.
+  `list-clients` picks the most recently active WezTerm client. The plugin
+  can't tell which client pressed the key (`HERDR_PLUGIN_CONTEXT_JSON` has
+  no client id), so with herdr open in both WezTerm and Ghostty an edge in
+  Ghostty can still move WezTerm focus.
+- **SDK strictness:** replies must carry every schema-required field, even
+  ones nav ignores (`agent_status`, `label`, …). A herdr release that drops
+  one breaks navigation with `ErrMissingField` until the SDK is updated.
 - **Race:** the foreground process can change between `process_info` and
   `send_keys`. herdr has no single call that does both.
 - **Moving from WezTerm into herdr** lands on herdr's last focused tab or
