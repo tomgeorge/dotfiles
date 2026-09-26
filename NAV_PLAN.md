@@ -323,6 +323,27 @@ Run stylua.
 
 Three levels. Each layer is covered by the cheapest test that exercises it.
 
+**Done.** `make test-all` in `herdr-plugins/` runs everything below
+(unit, Lua, e2e); the e2e suite takes ~5 s. What the harness learned:
+- **Keybindings run with the client's view of focus**, which lags the
+  server. A key pressed right after an API `tab focus`, or even right after
+  a key-driven switch, acts on the old tab/pane. The harness changes focus
+  only through herdr's own keys (`prefix+c`, `prefix+v`, `prefix+h/l`,
+  `prefix+<n>`) and waits until the client *draws* the change (active tab
+  label, focused pane border colour) before the next key. Humans never
+  race this; tests do.
+- `prefix+c` opens a name prompt; the tab exists once it's saved (Enter).
+  Escape cancels.
+- The client draws a moment after the server answers; keys sent earlier
+  are lost, so startup waits for the screen.
+- Pane shells are login shells whose profile resets PATH, so nvim finds
+  `herdr-nav` through the `~/.local/bin` fallback, as in real use.
+- Nix's `sh` (bash without readline) doesn't clear on ctrl+l, so case 10
+  checks that a literal ctrl+l reaches `cat -v` without firing `tg.nav`.
+- The first exec of a freshly built binary is slow on macOS; a warm-up
+  action runs before the latency checks. Warm key-to-focus: 5–40 ms.
+- Extra case 4b: nvim at both its and herdr's edge hands off to WezTerm.
+
 ### Spike results (already verified by hand, 2026-09)
 
 An isolated herdr can be driven by real keypresses and read back over its

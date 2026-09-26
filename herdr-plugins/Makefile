@@ -2,7 +2,7 @@
 # golangci-lint aren't on the global PATH.
 PLUGINS := $(patsubst %/herdr-plugin.toml,%,$(wildcard */herdr-plugin.toml))
 
-.PHONY: all build link test test-e2e test-all lint
+.PHONY: all build link test test-lua test-e2e test-all lint
 
 all: build
 
@@ -25,12 +25,18 @@ test:
 	cd go-herdrkit && go test -race ./...
 	go test -race ./...
 
+# The nvim and WezTerm halves of nav (nvim/lua/nav.lua, wezterm/nav.lua).
+test-lua:
+	nvim --headless -u NONE -l ../nvim/tests/nav_test.lua
+	nvim --headless -u NONE -l ../wezterm/nav_test.lua
+
 # Real herdr + tmux, isolated under a temp HOME; skips if either is missing.
+# HN_KEEP=1 leaves the environment running after the run, for debugging.
 test-e2e: build
 	go test -tags e2e -count=1 ./nav/...
 
-test-all: test test-e2e
+test-all: test test-lua test-e2e
 
 lint:
 	cd go-herdrkit && golangci-lint run ./...
-	golangci-lint run ./...
+	golangci-lint run --build-tags e2e ./...
