@@ -40,20 +40,31 @@ func TestActiveClientPane(t *testing.T) {
 	}
 }
 
-// recorder fakes wezterm: it logs each command and answers list-clients.
+// recorder fakes wezterm and ps: it logs each command and answers
+// list-clients, list (pane 7 is on ttys007) and ps (what runs on it).
 type recorder struct {
 	calls   []string
 	clients string
+	onTTY   string // ps -o comm= output for ttys007
 	err     error
 }
 
 func (r *recorder) run(_ context.Context, bin string, args ...string) ([]byte, error) {
 	r.calls = append(r.calls, bin+" "+strings.Join(args, " "))
-	if args[1] == "list-clients" {
+	switch {
+	case bin == "ps":
+		return []byte(r.onTTY), r.err
+	case args[1] == "list-clients":
 		return []byte(r.clients), r.err
+	case args[1] == "list":
+		return []byte(`[{"pane_id":3,"tty_name":"/dev/ttys003"},{"pane_id":7,"tty_name":"/dev/ttys007"}]`), r.err
 	}
 	return nil, r.err
 }
+
+var checkHerdr = []string{"wz cli list-clients --format json", "wz cli list --format json", "ps -t ttys007 -o comm="}
+
+const herdrOnTTY = "/bin/fish\n/etc/profiles/per-user/me/bin/herdr\n"
 
 func TestWezterm(t *testing.T) {
 	const clients = `[{"idle_time":{"secs":0,"nanos":1},"focused_pane_id":7}]`
@@ -64,9 +75,20 @@ func TestWezterm(t *testing.T) {
 		want []string
 	}{
 		"inside herdr asks for the active pane": {
-			wezterm{bin: "wz", pane: "99", insideHerdr: true}, recorder{clients: clients},
+			wezterm{bin: "wz", pane: "99", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
 			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
-			[]string{"wz cli list-clients --format json", "wz cli activate-pane-direction --pane-id 7 Left"},
+			append(checkHerdr, "wz cli activate-pane-direction --pane-id 7 Left"),
+		},
+		"herdr attached elsewhere (Ghostty, ssh) does nothing": {
+			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: "/bin/fish\n/usr/bin/nvim\n"},
+			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
+			checkHerdr,
+		},
+		"pane without a tty does nothing": {
+			wezterm{bin: "wz", insideHerdr: true},
+			recorder{clients: `[{"idle_time":{"secs":0,"nanos":1},"focused_pane_id":42}]`},
+			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, 1) },
+			[]string{"wz cli list-clients --format json", "wz cli list --format json"},
 		},
 		"outside herdr trusts WEZTERM_PANE": {
 			wezterm{bin: "wz", pane: "3"}, recorder{},
@@ -74,9 +96,9 @@ func TestWezterm(t *testing.T) {
 			[]string{"wz cli activate-pane-direction --pane-id 3 Down"},
 		},
 		"tab": {
-			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients},
+			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
 			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, -1) },
-			[]string{"wz cli list-clients --format json", "wz cli activate-tab --tab-relative -1 --pane-id 7"},
+			append(checkHerdr, "wz cli activate-tab --tab-relative -1 --pane-id 7"),
 		},
 		"no clients does nothing": {
 			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: `[]`},

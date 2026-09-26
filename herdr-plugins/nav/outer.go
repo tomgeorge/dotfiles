@@ -137,8 +137,61 @@ func (w *wezterm) targetPane(ctx context.Context) (string, bool, error) {
 	}
 	if !ok {
 		_, _ = fmt.Fprintln(w.log, "no wezterm clients; not handing off")
+		return "", false, nil
 	}
-	return pane, ok, err
+	// herdr attached from Ghostty or over ssh would otherwise move focus in
+	// whatever WezTerm window was used last.
+	hosts, err := w.paneRunsHerdr(ctx, pane)
+	if err != nil {
+		return "", false, err
+	}
+	if !hosts {
+		_, _ = fmt.Fprintf(w.log, "wezterm pane %s isn't running herdr; not handing off\n", pane)
+		return "", false, nil
+	}
+	return pane, true, nil
+}
+
+// paneRunsHerdr reports whether a herdr client runs on the WezTerm pane's
+// tty. It can't tell which herdr server that client is attached to.
+func (w *wezterm) paneRunsHerdr(ctx context.Context, pane string) (bool, error) {
+	out, err := w.run(ctx, w.bin, "cli", "list", "--format", "json")
+	if err != nil {
+		return false, fmt.Errorf("wezterm list: %w", err)
+	}
+	tty, err := paneTTY(out, pane)
+	if err != nil || tty == "" {
+		return false, err
+	}
+	// ps takes the tty without /dev/ (ttys000 on macOS, pts/3 on Linux).
+	procs, err := w.run(ctx, "ps", "-t", strings.TrimPrefix(tty, "/dev/"), "-o", "comm=")
+	if err != nil {
+		return false, fmt.Errorf("ps: %w", err)
+	}
+	for _, comm := range strings.Split(string(procs), "\n") {
+		if filepath.Base(strings.TrimSpace(comm)) == "herdr" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// paneTTY finds a pane's tty in `wezterm cli list --format json` output;
+// empty if the pane is gone or has none (a mux domain).
+func paneTTY(list []byte, pane string) (string, error) {
+	var panes []struct {
+		PaneID  uint64 `json:"pane_id"`
+		TTYName string `json:"tty_name"`
+	}
+	if err := json.Unmarshal(list, &panes); err != nil {
+		return "", fmt.Errorf("wezterm list: %w", err)
+	}
+	for _, p := range panes {
+		if strconv.FormatUint(p.PaneID, 10) == pane {
+			return p.TTYName, nil
+		}
+	}
+	return "", nil
 }
 
 type weztermClient struct {
