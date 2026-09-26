@@ -43,7 +43,7 @@ The parent can also call the `subagent` tool when you request/approve delegation
 ```
 
 Only one job runs at a time per parent session. Additional requests fail rather
-than queue. Each job has a five-minute timeout. `/subagent-cancel` cancels either
+than queue. Each job has a 20-minute timeout. `/subagent-cancel` cancels either
 entry point; Pi's normal tool cancellation also aborts tool-launched jobs.
 Shutdown/reload cancels the child. SIGTERM escalates to SIGKILL after one second.
 

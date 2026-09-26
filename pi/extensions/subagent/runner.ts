@@ -54,7 +54,7 @@ export async function runSubagent(
   } = {},
 ): Promise<Result> {
   const args = buildArgs(job);
-  const timeoutMs = options.timeoutMs ?? 300_000;
+  const timeoutMs = options.timeoutMs ?? 1_200_000; // 20 minutes: deep reviews outrun 5
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("timeoutMs must be positive");
   if (options.signal?.aborted) return { status: "cancelled", text: "", error: "Subagent cancelled" };
 
