@@ -41,6 +41,23 @@ case(top, "k", top, { "up" }, "top edge hands off")
 case(bottom, "j", bottom, { "down" }, "bottom edge hands off")
 case(left, "j", left, { "down" }, "full-height window hands off down")
 
+-- A floating window never hands off: wincmd leaves it for the layout
+-- window underneath (nvim 0.12), which counts as a move.
+local float = vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), true, {
+  relative = "editor",
+  row = 1,
+  col = 1,
+  width = 10,
+  height = 3,
+})
+for _, dir in ipairs({ "h", "j", "k", "l" }) do
+  handoffs = {}
+  vim.api.nvim_set_current_win(float)
+  nav.go(dir)
+  eq(handoffs, {}, "float " .. dir .. ": handoff")
+end
+vim.api.nvim_win_close(float, true)
+
 -- A lone window always hands off.
 vim.cmd("only")
 case(vim.api.nvim_get_current_win(), "l", vim.api.nvim_get_current_win(), { "right" }, "single window")

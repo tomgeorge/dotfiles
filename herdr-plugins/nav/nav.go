@@ -107,11 +107,9 @@ func (n navigator) tabMove(ctx context.Context, delta int) error {
 	if err != nil {
 		return err
 	}
-	next, ok, err := nextTab(tabs, wss[i].ActiveTabID, delta)
-	if err != nil {
-		return err
-	}
-	if ok {
+	// Not ok also when the current tab can't be placed (the workspace is
+	// mid-change): moving on to the neighbouring workspace beats failing.
+	if next, ok := nextTab(tabs, wss[i].ActiveTabID, delta); ok {
 		_, err = n.api.FocusTab(ctx, next)
 		return err
 	}
@@ -138,19 +136,19 @@ func (n navigator) tabMove(ctx context.Context, delta int) error {
 
 // nextTab returns the tab delta places from current in number order, or
 // ok=false when that runs off either end. current falls back to the focused
-// tab when empty or not in the list.
-func nextTab(tabs []herdr.TabInfo, current herdr.TabID, delta int) (herdr.TabID, bool, error) {
+// tab when empty or not in the list; with neither, ok is false.
+func nextTab(tabs []herdr.TabInfo, current herdr.TabID, delta int) (herdr.TabID, bool) {
 	tabs = slices.SortedFunc(slices.Values(tabs), func(a, b herdr.TabInfo) int { return cmp.Compare(a.Number, b.Number) })
 	i := slices.IndexFunc(tabs, func(t herdr.TabInfo) bool { return t.TabID == current })
 	if i < 0 {
 		i = slices.IndexFunc(tabs, func(t herdr.TabInfo) bool { return t.Focused })
 	}
 	if i < 0 {
-		return "", false, fmt.Errorf("tab %q not found and no tab is focused", current)
+		return "", false
 	}
 	j := i + delta
 	if j < 0 || j >= len(tabs) {
-		return "", false, nil
+		return "", false
 	}
-	return tabs[j].TabID, true, nil
+	return tabs[j].TabID, true
 }

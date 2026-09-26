@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -136,23 +137,40 @@ func TestRunActionForwardsToNvim(t *testing.T) {
 	}
 }
 
-// Runs against one server take turns, and give up waiting at the deadline.
+// Runs against one server take turns; a run that can't get the lock in
+// lockWait is dropped rather than run late.
 func TestLockNav(t *testing.T) {
 	socket := filepath.Join(t.TempDir(), "s")
-	unlock := lockNav(context.Background(), socket, io.Discard)
+	unlock, err := lockNav(context.Background(), socket, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
 	start := time.Now()
-	lockNav(ctx, socket, io.Discard)() // held: waits out ctx, then runs unlocked
-	if waited := time.Since(start); waited < 40*time.Millisecond {
-		t.Errorf("didn't wait for the held lock (%v)", waited)
+	if _, err := lockNav(context.Background(), socket, io.Discard); !errors.Is(err, errBusy) {
+		t.Errorf("held lock: err = %v, want errBusy", err)
+	}
+	if waited := time.Since(start); waited < lockWait-10*time.Millisecond || waited > lockWait+200*time.Millisecond {
+		t.Errorf("waited %v, want about %v", waited, lockWait)
 	}
 
 	unlock()
 	start = time.Now()
-	lockNav(context.Background(), socket, io.Discard)()
+	unlock2, err := lockNav(context.Background(), socket, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock2()
 	if waited := time.Since(start); waited > 20*time.Millisecond {
 		t.Errorf("released lock still blocked (%v)", waited)
 	}
+}
+
+// No lock file (unwritable dir): run anyway rather than lose every key.
+func TestLockNavUnusable(t *testing.T) {
+	unlock, err := lockNav(context.Background(), "/nonexistent/dir/s", io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
 }

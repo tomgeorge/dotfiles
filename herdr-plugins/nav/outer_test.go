@@ -54,15 +54,15 @@ func (r *recorder) run(_ context.Context, bin string, args ...string) ([]byte, e
 	switch {
 	case bin == "ps":
 		return []byte(r.onTTY), r.err
-	case args[1] == "list-clients":
+	case args[2] == "list-clients":
 		return []byte(r.clients), r.err
-	case args[1] == "list":
+	case args[2] == "list":
 		return []byte(`[{"pane_id":3,"tty_name":"/dev/ttys003"},{"pane_id":7,"tty_name":"/dev/ttys007"}]`), r.err
 	}
 	return nil, r.err
 }
 
-var checkHerdr = []string{"wz cli list-clients --format json", "wz cli list --format json", "ps -t ttys007 -o comm="}
+var checkHerdr = []string{"wz cli --no-auto-start list-clients --format json", "wz cli --no-auto-start list --format json", "ps -t ttys007 -o comm="}
 
 const herdrOnTTY = "/bin/fish\n/etc/profiles/per-user/me/bin/herdr\n"
 
@@ -77,7 +77,7 @@ func TestWezterm(t *testing.T) {
 		"inside herdr asks for the active pane": {
 			wezterm{bin: "wz", pane: "99", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
 			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Left) },
-			append(checkHerdr, "wz cli activate-pane-direction --pane-id 7 Left"),
+			append(checkHerdr, "wz cli --no-auto-start activate-pane-direction --pane-id 7 Left"),
 		},
 		"herdr attached elsewhere (Ghostty, ssh) does nothing": {
 			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: "/bin/fish\n/usr/bin/nvim\n"},
@@ -88,22 +88,22 @@ func TestWezterm(t *testing.T) {
 			wezterm{bin: "wz", insideHerdr: true},
 			recorder{clients: `[{"idle_time":{"secs":0,"nanos":1},"focused_pane_id":42}]`},
 			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, 1) },
-			[]string{"wz cli list-clients --format json", "wz cli list --format json"},
+			[]string{"wz cli --no-auto-start list-clients --format json", "wz cli --no-auto-start list --format json"},
 		},
 		"outside herdr trusts WEZTERM_PANE": {
 			wezterm{bin: "wz", pane: "3"}, recorder{},
 			func(ctx context.Context, w *wezterm) error { return w.PaneDirection(ctx, herdr.Down) },
-			[]string{"wz cli activate-pane-direction --pane-id 3 Down"},
+			[]string{"wz cli --no-auto-start activate-pane-direction --pane-id 3 Down"},
 		},
 		"tab": {
 			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: clients, onTTY: herdrOnTTY},
 			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, -1) },
-			append(checkHerdr, "wz cli activate-tab --tab-relative -1 --pane-id 7"),
+			append(checkHerdr, "wz cli --no-auto-start activate-tab --tab-relative -1 --pane-id 7"),
 		},
 		"no clients does nothing": {
 			wezterm{bin: "wz", insideHerdr: true}, recorder{clients: `[]`},
 			func(ctx context.Context, w *wezterm) error { return w.Tab(ctx, 1) },
-			[]string{"wz cli list-clients --format json"},
+			[]string{"wz cli --no-auto-start list-clients --format json"},
 		},
 		"no wezterm does nothing": {
 			wezterm{insideHerdr: true}, recorder{},
@@ -152,5 +152,20 @@ func TestLogOuter(t *testing.T) {
 	}
 	if got, want := string(b), "pane left\ntab +1\ntab -1\n"; got != want {
 		t.Errorf("log = %q, want %q", got, want)
+	}
+}
+
+// Inside herdr the inherited WEZTERM_UNIX_SOCKET (stale after a WezTerm
+// restart) must not reach wezterm; outside herdr it's the right one.
+func TestWeztermDropsStaleSocket(t *testing.T) {
+	t.Setenv("WEZTERM_UNIX_SOCKET", "/stale/gui-sock-1")
+	for inside, want := range map[bool]bool{true: false, false: true} {
+		out, err := newWezterm(inside, io.Discard).run(context.Background(), "/usr/bin/env")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(out), "WEZTERM_UNIX_SOCKET="); got != want {
+			t.Errorf("insideHerdr=%v: socket passed = %v, want %v", inside, got, want)
+		}
 	}
 }

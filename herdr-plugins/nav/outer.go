@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -49,6 +50,8 @@ func (o *logOuter) append(line string) error {
 }
 
 // wezterm drives WezTerm through `wezterm cli`.
+// Every `wezterm cli` call passes --no-auto-start: when it can't reach the
+// GUI it otherwise spends seconds starting a stray wezterm-mux-server.
 type wezterm struct {
 	bin string // empty when wezterm isn't installed
 	// pane is $WEZTERM_PANE, trusted only outside herdr: herdr panes inherit
@@ -61,13 +64,23 @@ type wezterm struct {
 }
 
 func newWezterm(insideHerdr bool, log io.Writer) *wezterm {
+	env := os.Environ()
+	if insideHerdr {
+		// Inherited from wherever the herdr server started, like
+		// WEZTERM_PANE, and named after that GUI's pid: after a WezTerm
+		// restart it points at nothing. Without it wezterm finds the
+		// running GUI itself.
+		env = slices.DeleteFunc(env, func(kv string) bool { return strings.HasPrefix(kv, "WEZTERM_UNIX_SOCKET=") })
+	}
 	return &wezterm{
 		bin:         findWezterm(),
 		pane:        os.Getenv("WEZTERM_PANE"),
 		insideHerdr: insideHerdr,
 		log:         log,
 		run: func(ctx context.Context, bin string, args ...string) ([]byte, error) {
-			out, err := exec.CommandContext(ctx, bin, args...).Output()
+			cmd := exec.CommandContext(ctx, bin, args...)
+			cmd.Env = env
+			out, err := cmd.Output()
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
 				err = fmt.Errorf("%w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
@@ -99,7 +112,7 @@ func (w *wezterm) PaneDirection(ctx context.Context, dir herdr.Direction) error 
 	if !ok || err != nil {
 		return err
 	}
-	_, err = w.run(ctx, w.bin, "cli", "activate-pane-direction", "--pane-id", pane, weztermDirs[dir])
+	_, err = w.run(ctx, w.bin, "cli", "--no-auto-start", "activate-pane-direction", "--pane-id", pane, weztermDirs[dir])
 	return err
 }
 
@@ -108,7 +121,7 @@ func (w *wezterm) Tab(ctx context.Context, delta int) error {
 	if !ok || err != nil {
 		return err
 	}
-	_, err = w.run(ctx, w.bin, "cli", "activate-tab", "--tab-relative", strconv.Itoa(delta), "--pane-id", pane)
+	_, err = w.run(ctx, w.bin, "cli", "--no-auto-start", "activate-tab", "--tab-relative", strconv.Itoa(delta), "--pane-id", pane)
 	return err
 }
 
@@ -127,7 +140,7 @@ func (w *wezterm) targetPane(ctx context.Context) (string, bool, error) {
 		}
 		return w.pane, true, nil
 	}
-	out, err := w.run(ctx, w.bin, "cli", "list-clients", "--format", "json")
+	out, err := w.run(ctx, w.bin, "cli", "--no-auto-start", "list-clients", "--format", "json")
 	if err != nil {
 		return "", false, fmt.Errorf("wezterm list-clients: %w", err)
 	}
@@ -155,7 +168,7 @@ func (w *wezterm) targetPane(ctx context.Context) (string, bool, error) {
 // paneRunsHerdr reports whether a herdr client runs on the WezTerm pane's
 // tty. It can't tell which herdr server that client is attached to.
 func (w *wezterm) paneRunsHerdr(ctx context.Context, pane string) (bool, error) {
-	out, err := w.run(ctx, w.bin, "cli", "list", "--format", "json")
+	out, err := w.run(ctx, w.bin, "cli", "--no-auto-start", "list", "--format", "json")
 	if err != nil {
 		return false, fmt.Errorf("wezterm list: %w", err)
 	}

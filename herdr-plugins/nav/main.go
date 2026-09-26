@@ -47,7 +47,10 @@ func run(args []string, log io.Writer) error {
 		if socket == "" {
 			return herdr.ErrNoSocket
 		}
-		unlock := lockNav(ctx, socket, log)
+		unlock, err := lockNav(ctx, socket, log)
+		if err != nil {
+			return err
+		}
 		defer unlock()
 		// Server focus, not HERDR_PANE_ID/HERDR_TAB_ID (see navigator).
 		n := navigator{api: herdr.New(socket), outer: outer, log: log}
@@ -75,7 +78,10 @@ func run(args []string, log io.Writer) error {
 		// Plain nvim in WezTerm: nothing between them.
 		return outer.PaneDirection(ctx, dir)
 	}
-	unlock := lockNav(ctx, socket, log)
+	unlock, err := lockNav(ctx, socket, log)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	// nvim's own pane is the right origin here, and HERDR_PANE_ID in nvim's
 	// environment names it exactly.

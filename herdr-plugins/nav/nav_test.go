@@ -199,17 +199,14 @@ func TestNextTab(t *testing.T) {
 		"empty uses focus":   {tabs(2, "t1", "t2"), "", -1, "t1", true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, ok, err := nextTab(tt.tabs, tt.current, tt.delta)
-			if err != nil {
-				t.Fatal(err)
-			}
+			got, ok := nextTab(tt.tabs, tt.current, tt.delta)
 			if got != tt.want || ok != tt.wantOK {
 				t.Errorf("nextTab = %q, %v; want %q, %v", got, ok, tt.want, tt.wantOK)
 			}
 		})
 	}
-	if _, _, err := nextTab(tabs(0, "t1"), "gone", 1); err == nil {
-		t.Error("no current and no focused tab: want error")
+	if _, ok := nextTab(tabs(0, "t1"), "gone", 1); ok {
+		t.Error("no current and no focused tab: want ok=false")
 	}
 }
 
@@ -236,6 +233,21 @@ func session(focusWs, focusTab int, tabs ...int) *fakeAPI {
 	return api
 }
 
+// unplaceable is a session whose focused workspace names an active tab that
+// tab.list doesn't have, as mid-change.
+func unplaceable() *fakeAPI {
+	api := session(1, 1, 2, 2)
+	for i := range api.workspaces {
+		if api.workspaces[i].WorkspaceID == "w1" {
+			api.workspaces[i].ActiveTabID = "w1:gone"
+		}
+	}
+	for i := range api.tabs["w1"] {
+		api.tabs["w1"][i].Focused = false
+	}
+	return api
+}
+
 func TestTabMove(t *testing.T) {
 	for name, tt := range map[string]struct {
 		api       *fakeAPI
@@ -243,14 +255,15 @@ func TestTabMove(t *testing.T) {
 		wantFocus string // "" = no focus_tab call
 		wantOuter []string
 	}{
-		"next within workspace":          {session(1, 2, 3, 2), 1, "w1:t3", nil},
-		"prev within workspace":          {session(1, 2, 3, 2), -1, "w1:t1", nil},
-		"past last tab to next ws":       {session(1, 3, 3, 2), 1, "w2:t1", nil},
-		"before first tab to prev ws":    {session(2, 1, 3, 2), -1, "w1:t3", nil},
-		"past last ws hands off":         {session(2, 2, 3, 2), 1, "", []string{"tab +1"}},
-		"before first ws hands off":      {session(1, 1, 3, 2), -1, "", []string{"tab -1"}},
-		"single tab, single ws":          {session(1, 1, 1), 1, "", []string{"tab +1"}},
-		"skips a workspace with no tabs": {session(1, 1, 1, 0, 2), 1, "w3:t1", nil},
+		"next within workspace":            {session(1, 2, 3, 2), 1, "w1:t3", nil},
+		"prev within workspace":            {session(1, 2, 3, 2), -1, "w1:t1", nil},
+		"past last tab to next ws":         {session(1, 3, 3, 2), 1, "w2:t1", nil},
+		"before first tab to prev ws":      {session(2, 1, 3, 2), -1, "w1:t3", nil},
+		"past last ws hands off":           {session(2, 2, 3, 2), 1, "", []string{"tab +1"}},
+		"before first ws hands off":        {session(1, 1, 3, 2), -1, "", []string{"tab -1"}},
+		"single tab, single ws":            {session(1, 1, 1), 1, "", []string{"tab +1"}},
+		"skips a workspace with no tabs":   {session(1, 1, 1, 0, 2), 1, "w3:t1", nil},
+		"unplaceable current tab moves on": {unplaceable(), 1, "w2:t1", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			outer := &fakeOuter{}
