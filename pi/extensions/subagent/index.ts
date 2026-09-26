@@ -2,15 +2,15 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { truncateHead, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { READ_TOOLS, runSubagent, validateJob, type Job } from "./runner.ts";
+import { READ_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
 
 export default function (pi: ExtensionAPI) {
   let active: { controller: AbortController; done: Promise<unknown> } | undefined;
   let shuttingDown = false;
 
-  async function run(job: Job, ctx: ExtensionContext, signal?: AbortSignal) {
+  async function run(job: Job, ctx: ExtensionContext, signal?: AbortSignal, onUpdate?: AgentToolUpdateCallback) {
     if (shuttingDown) throw new Error("Session is shutting down");
     if (active) throw new Error("A subagent is already running. Wait or use /subagent-cancel.");
     validateJob(job);
@@ -22,9 +22,22 @@ export default function (pi: ExtensionAPI) {
     const abort = () => controller.abort();
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
-    const done = runSubagent(job, { signal: controller.signal });
+    const started = Date.now();
+    let progress: Progress = { toolCalls: 0, activity: "starting" };
+    const report = () => {
+      const secs = Math.round((Date.now() - started) / 1000);
+      const line = `Subagent ${job.provider}/${job.model} · ${secs}s · ${progress.toolCalls} tool calls · ${progress.activity}`;
+      if (ctx.hasUI) ctx.ui.setStatus("subagent", line);
+      onUpdate?.({ content: [{ type: "text", text: line }], details: undefined });
+    };
+    const done = runSubagent(job, {
+      signal: controller.signal,
+      onProgress: (p) => { progress = p; report(); },
+    });
     active = { controller, done };
-    if (ctx.hasUI) ctx.ui.setStatus("subagent", `Subagent: ${job.provider}/${job.model}`);
+    report();
+    // Tick so elapsed time moves during long model calls with no tool activity.
+    const ticker = setInterval(report, 1000);
     try {
       const result = await done;
       if (result.status !== "ok") throw new Error(`${result.status}: ${result.error}`);
@@ -41,6 +54,7 @@ export default function (pi: ExtensionAPI) {
         details: { status: result.status, provider: job.provider, model: job.model, cwd: job.cwd },
       };
     } finally {
+      clearInterval(ticker);
       signal?.removeEventListener("abort", abort);
       active = undefined;
       if (ctx.hasUI) ctx.ui.setStatus("subagent", undefined);
@@ -59,14 +73,20 @@ export default function (pi: ExtensionAPI) {
       cwd: Type.String({ minLength: 1, description: "Absolute working directory" }),
       tools: Type.Array(StringEnum([...READ_TOOLS]), { minItems: 1, uniqueItems: true }),
     }),
-    async execute(_id, job, signal, _onUpdate, ctx) {
-      return run(job, ctx, signal);
+    async execute(_id, job, signal, onUpdate, ctx) {
+      return run(job, ctx, signal, onUpdate);
     },
   });
 
   pi.registerCommand("subagent", {
     description: "Read-only job: /subagent provider/model task (no arguments opens a picker)",
     async handler(args, ctx) {
+      const fail = (error: unknown) => {
+        if (shuttingDown) return;
+        const text = error instanceof Error ? error.message : String(error);
+        if (ctx.hasUI) ctx.ui.notify(text, "error");
+        else throw error;
+      };
       try {
         if (active) throw new Error("A subagent is already running. Wait or use /subagent-cancel.");
         let modelName: string | undefined;
@@ -90,17 +110,20 @@ export default function (pi: ExtensionAPI) {
           provider: modelName.slice(0, slash), model: modelName.slice(slash + 1),
           task, cwd: ctx.cwd, tools: [...READ_TOOLS],
         };
-        const result = await run(job, ctx);
-        if (!shuttingDown) pi.sendMessage({
-          customType: "subagent-result", display: true,
-          content: `Subagent ${modelName}\nTask: ${task}\n\n${result.content[0].text}`,
-          details: result.details,
-        }, { deliverAs: "followUp" });
+        const pending = run(job, ctx);
+        const deliver = (result: Awaited<typeof pending>) => {
+          if (!shuttingDown) pi.sendMessage({
+            customType: "subagent-result", display: true,
+            content: `Subagent ${modelName}\nTask: ${task}\n\n${result.content[0].text}`,
+            details: result.details,
+          }, { deliverAs: "followUp" });
+        };
+        // Pi awaits command handlers and blocks input meanwhile, so interactive jobs
+        // run in the background. Print mode must wait or the process exits first.
+        if (!ctx.hasUI) return deliver(await pending);
+        pending.then(deliver, fail);
       } catch (error) {
-        if (shuttingDown) return;
-        const text = error instanceof Error ? error.message : String(error);
-        if (ctx.hasUI) ctx.ui.notify(text, "error");
-        else throw error;
+        fail(error);
       }
     },
   });

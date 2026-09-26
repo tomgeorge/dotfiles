@@ -104,3 +104,18 @@ test("timeout escalates if child ignores SIGTERM", async () => {
   assert.equal(result.status, "error");
   assert.match(result.error!, /timed out/);
 });
+
+test("reports child tool calls as progress", async () => {
+  const seen: unknown[] = [];
+  const result = await run(
+    emit({ type: "tool_execution_start", toolCallId: "1", toolName: "grep", args: { pattern: "foo" } }) +
+    emit({ type: "tool_execution_start", toolCallId: "2", toolName: "read", args: { path: "a.ts" } }) +
+    emit(message("Final")),
+    { onProgress: (p: unknown) => seen.push(p) },
+  );
+  assert.equal(result.status, "ok");
+  assert.deepEqual(seen, [
+    { toolCalls: 1, activity: "grep foo" },
+    { toolCalls: 2, activity: "read a.ts" },
+  ]);
+});

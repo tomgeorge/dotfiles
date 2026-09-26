@@ -27,8 +27,13 @@ No additional dependencies.
 With no arguments, select an authenticated model and enter a task. With arguments,
 use an exact `provider/model` ID; model IDs may themselves contain slashes. The
 command uses the current working directory and all four reading tools. It does
-not change the parent model. Results appear in chat and become parent context;
+not change the parent model. In interactive mode the job runs in the background, so
+you can keep chatting. Results appear in chat and become parent context;
 when idle, returning a result does not trigger an additional parent model call.
+
+While a job runs, the status bar shows elapsed time, the child's tool-call count,
+and its latest tool call. Tool-launched jobs also stream this line into the tool row.
+The parent agent's turn still waits for a tool-launched job, as for any tool call.
 
 The parent can also call the `subagent` tool when you request/approve delegation:
 

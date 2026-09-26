@@ -19,6 +19,19 @@ export interface Result {
   error: string | null;
 }
 
+export interface Progress {
+  toolCalls: number;
+  /** Latest child tool call, e.g. `grep "foo"`. */
+  activity: string;
+}
+
+function describeToolCall(name: string, args: unknown): string {
+  const a = (args ?? {}) as Record<string, unknown>;
+  const detail = a.path ?? a.pattern ?? a.query ?? "";
+  const text = `${name} ${typeof detail === "string" ? detail : JSON.stringify(detail)}`.trim();
+  return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
+
 export function validateJob(job: Job): void {
   for (const key of ["task", "provider", "model", "cwd"] as const) {
     if (!job[key]?.trim()) throw new Error(`${key} must not be empty`);
@@ -48,6 +61,7 @@ export async function runSubagent(
   options: {
     signal?: AbortSignal;
     timeoutMs?: number;
+    onProgress?: (progress: Progress) => void;
     // Injection point for tests; production uses pi from PATH.
     command?: string;
     prefixArgs?: string[];
@@ -69,6 +83,7 @@ export async function runSubagent(
     let modelError = "";
     let failure: string | null = null;
     let cancelled = false;
+    const progress: Progress = { toolCalls: 0, activity: "starting" };
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     const stop = (reason: string, abort = false) => {
@@ -86,8 +101,15 @@ export async function runSubagent(
 
     const processLine = (line: string) => {
       if (!line.trim() || failure) return;
+      let reportProgress = false;
       try {
         const event = JSON.parse(line);
+        if (event?.type === "tool_execution_start") {
+          progress.toolCalls++;
+          progress.activity = describeToolCall(event.toolName, event.args);
+          reportProgress = true;
+          return;
+        }
         const message = event?.message;
         if (event?.type !== "message_end" || message?.role !== "assistant") return;
         // Refuse a child which resolved the requested model differently.
@@ -102,6 +124,9 @@ export async function runSubagent(
         modelError = message.errorMessage ?? "";
       } catch {
         stop("Invalid JSON event from subagent");
+      } finally {
+        // Outside the parse guard so a UI callback bug isn't reported as bad JSON.
+        if (reportProgress) options.onProgress?.({ ...progress });
       }
     };
 
