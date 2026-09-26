@@ -128,10 +128,12 @@ function M.apply_to_config(config)
     end
   end)
 
-  -- Leader+n: jump to next notifying pane
-  table.insert(config.keys, {
+  -- Leader+n: jump to next notifying pane. With nav.lua the leader is a key
+  -- table (ctrl+a goes to herdr when it's in front), so bind it there.
+  local leader_table = config.key_tables and config.key_tables.leader
+  table.insert(leader_table or config.keys, {
     key = "n",
-    mods = "LEADER",
+    mods = not leader_table and "LEADER" or nil,
     action = wezterm.action_callback(function(window, pane)
       local notifications = wezterm.GLOBAL.claude_notifications or {}
       for pane_id in pairs(notifications) do

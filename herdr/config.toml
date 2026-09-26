@@ -18,3 +18,56 @@ delivery = "herdr"
 [experimental]
 # Terminal output can contain secrets; do not persist screen history.
 pane_history = false
+
+[keys]
+prefix = "ctrl+a"
+copy_mode = "prefix+y" # frees prefix+[ for tg.nav.tab-prev
+split_horizontal = ["prefix+minus", "prefix+'"]
+split_vertical = ["prefix+v", "prefix+shift+5"]
+zoom = ["prefix+z", "prefix+o"]
+# focus_pane_* keep their prefix+h/j/k/l defaults: a fallback when tg.nav
+# isn't linked (`make link` in herdr-plugins/).
+
+# tg.nav: ctrl+hjkl and prefix+]/[ move through nvim, herdr and WezTerm.
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "tg.nav.left"
+description = "navigate left"
+
+[[keys.command]]
+key = "ctrl+j"
+type = "plugin_action"
+command = "tg.nav.down"
+description = "navigate down"
+
+[[keys.command]]
+key = "ctrl+k"
+type = "plugin_action"
+command = "tg.nav.up"
+description = "navigate up"
+
+[[keys.command]]
+key = "ctrl+l"
+type = "plugin_action"
+command = "tg.nav.right"
+description = "navigate right"
+
+[[keys.command]]
+key = "prefix+]"
+type = "plugin_action"
+command = "tg.nav.tab-next"
+description = "next tab"
+
+[[keys.command]]
+key = "prefix+["
+type = "plugin_action"
+command = "tg.nav.tab-prev"
+description = "previous tab"
+
+# ctrl+l is taken by tg.nav; this sends a literal one to clear the screen.
+[[keys.command]]
+key = "prefix+ctrl+l"
+type = "shell"
+command = '"$HERDR_BIN_PATH" pane send-keys "$HERDR_ACTIVE_PANE_ID" ctrl+l'
+description = "clear screen"

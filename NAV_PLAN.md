@@ -239,6 +239,22 @@ tabMove(delta):
 
 ## Phase 3: Config wiring
 
+**Done.** Differences from below, found by a spike against a real herdr:
+- `focus_pane_*` defaults are `prefix+h/j/k/l`, not `ctrl+hjkl`, so they
+  don't clash. They stay as a fallback instead of being blanked.
+- `tab.focus` replies `tab_info`, not `ok`; `FocusTab` now returns the tab.
+- `herdr plugin link` under `HOME=$T` writes only `$T`'s `plugins.json`, and
+  plugin actions inherit the server's environment (so `HERDR_NAV_OUTER_LOG`
+  works) with `HERDR_PANE_ID`/`HERDR_TAB_ID` set to the focused pane/tab.
+- `prefix+c` opens a tab-name prompt that swallows following keys; the e2e
+  harness creates tabs over the API instead.
+- WezTerm: `notifications.lua`'s `LEADER n` moves into the leader key table.
+  `nav.lua` lives next to `wezterm.lua`; test with
+  `nvim --headless -u NONE -l wezterm/nav_test.lua`.
+- nvim: `nav.lua` finds `herdr-nav` on PATH, else `~/.local/bin/herdr-nav`
+  (not on PATH here), so PATH needs no change. Test at
+  `nvim/tests/nav_test.lua`.
+
 ### `herdr/config.toml`
 
 ```toml

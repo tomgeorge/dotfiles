@@ -1,11 +1,32 @@
 local M = {}
 
+-- At nvim's edge these hand off to herdr/WezTerm (lua/nav.lua).
 M.window = {
   n = {
-    ["<C-l>"] = { "<C-w>l", "Window right" },
-    ["<C-h>"] = { "<C-w>h", "Window left" },
-    ["<C-j>"] = { "<C-w>j", "Window up" },
-    ["<C-k>"] = { "<C-w>k", "Window down" },
+    ["<C-l>"] = {
+      function()
+        require("nav").go("l")
+      end,
+      "Window right",
+    },
+    ["<C-h>"] = {
+      function()
+        require("nav").go("h")
+      end,
+      "Window left",
+    },
+    ["<C-j>"] = {
+      function()
+        require("nav").go("j")
+      end,
+      "Window down",
+    },
+    ["<C-k>"] = {
+      function()
+        require("nav").go("k")
+      end,
+      "Window up",
+    },
   },
 }
 

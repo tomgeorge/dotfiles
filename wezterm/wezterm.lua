@@ -1,6 +1,7 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
 local notifications = require("notifications")
+local nav = require("nav")
 
 local config = {
 	color_scheme = "Catppuccin Frappe",
@@ -18,28 +19,31 @@ local config = {
 	text_background_opacity = 0.9,
 	tab_bar_at_bottom = true,
 	use_fancy_tab_bar = false,
-	leader = { key = "a", mods = "CTRL" },
-	keys = {
-		-- Send ctrl+a when you press it twice
-		{ key = "a", mods = "LEADER|CTRL", action = act.SendKey({ key = "a", mods = "CTRL" }) },
-
-		-- Window navigation
-		{ key = "'", mods = "LEADER", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
-		{ key = "%", mods = "LEADER|SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
-		{ key = "h", mods = "LEADER", action = act.ActivatePaneDirection("Left") },
-		{ key = "j", mods = "LEADER", action = act.ActivatePaneDirection("Down") },
-		{ key = "k", mods = "LEADER", action = act.ActivatePaneDirection("Up") },
-		{ key = "l", mods = "LEADER", action = act.ActivatePaneDirection("Right") },
-		{ key = "x", mods = "LEADER", action = act.CloseCurrentPane({ confirm = true }) },
-		{ key = "o", mods = "LEADER", action = act.TogglePaneZoomState },
-		{ key = "c", mods = "LEADER", action = act.SpawnTab("CurrentPaneDomain") },
-		{ key = "]", mods = "LEADER", action = act.ActivateTabRelative(1) },
-		{ key = "[", mods = "LEADER", action = act.ActivateTabRelative(-1) },
-		{ key = "r", mods = "LEADER", action = act.ReloadConfiguration },
-		{ key = "y", mods = "LEADER", action = act.QuickSelect },
-	},
 }
 
+-- ctrl+a is the leader unless herdr is in front (see nav.lua); these run
+-- from a one-shot key table after it.
+local leader_keys = {
+	-- Send ctrl+a when you press it twice
+	{ key = "a", mods = "CTRL", action = act.SendKey({ key = "a", mods = "CTRL" }) },
+
+	-- Window navigation
+	{ key = "'", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+	{ key = "%", mods = "SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+	{ key = "h", action = act.ActivatePaneDirection("Left") },
+	{ key = "j", action = act.ActivatePaneDirection("Down") },
+	{ key = "k", action = act.ActivatePaneDirection("Up") },
+	{ key = "l", action = act.ActivatePaneDirection("Right") },
+	{ key = "x", action = act.CloseCurrentPane({ confirm = true }) },
+	{ key = "o", action = act.TogglePaneZoomState },
+	{ key = "c", action = act.SpawnTab("CurrentPaneDomain") },
+	{ key = "]", action = act.ActivateTabRelative(1) },
+	{ key = "[", action = act.ActivateTabRelative(-1) },
+	{ key = "r", action = act.ReloadConfiguration },
+	{ key = "y", action = act.QuickSelect },
+}
+
+nav.apply_to_config(config, leader_keys)
 notifications.apply_to_config(config)
 
 wezterm.on("window-config-reloaded", function(window, pane)
