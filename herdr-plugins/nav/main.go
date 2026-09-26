@@ -40,11 +40,17 @@ func run(args []string, log io.Writer) error {
 		outer = &logOuter{path: p}
 	}
 
-	if action := os.Getenv("HERDR_PLUGIN_ACTION_ID"); action != "" {
+	// Arguments win over HERDR_PLUGIN_ACTION_ID: nvim started from a plugin
+	// action can inherit it, and treating nvim's edge call as a herdr key
+	// would forward ctrl+h straight back to nvim, looping forever.
+	if action := os.Getenv("HERDR_PLUGIN_ACTION_ID"); action != "" && len(args) == 0 {
 		if socket == "" {
 			return herdr.ErrNoSocket
 		}
-		n := newNavigator(socket, outer, log)
+		unlock := lockNav(ctx, socket, log)
+		defer unlock()
+		// Server focus, not HERDR_PANE_ID/HERDR_TAB_ID (see navigator).
+		n := navigator{api: herdr.New(socket), outer: outer, log: log}
 		switch action {
 		case "tab-next":
 			return n.tabMove(ctx, 1)
@@ -69,16 +75,15 @@ func run(args []string, log io.Writer) error {
 		// Plain nvim in WezTerm: nothing between them.
 		return outer.PaneDirection(ctx, dir)
 	}
-	return newNavigator(socket, outer, log).paneMove(ctx, dir, false)
-}
-
-func newNavigator(socket string, outer Outer, log io.Writer) navigator {
-	return navigator{
-		api:       herdr.New(socket),
-		outer:     outer,
-		pane:      herdr.PaneID(os.Getenv("HERDR_PANE_ID")),
-		tab:       herdr.TabID(os.Getenv("HERDR_TAB_ID")),
-		workspace: herdr.WorkspaceID(os.Getenv("HERDR_WORKSPACE_ID")),
-		log:       log,
+	unlock := lockNav(ctx, socket, log)
+	defer unlock()
+	// nvim's own pane is the right origin here, and HERDR_PANE_ID in nvim's
+	// environment names it exactly.
+	n := navigator{
+		api:   herdr.New(socket),
+		outer: outer,
+		pane:  herdr.PaneID(os.Getenv("HERDR_PANE_ID")),
+		log:   log,
 	}
+	return n.paneMove(ctx, dir, false)
 }

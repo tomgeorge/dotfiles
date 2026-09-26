@@ -21,6 +21,11 @@ type herdrAPI interface {
 
 // navigator moves focus from one pane/tab, handing off to the outer
 // terminal (WezTerm) past herdr's edge.
+//
+// Empty pane/tab/workspace mean "whatever the server has focused now".
+// Keybinding actions use that rather than the ids herdr passes them: those
+// are the client's view, which lags, so a fast second ctrl+h would start
+// from where the first began.
 type navigator struct {
 	api       herdrAPI
 	outer     Outer
@@ -69,7 +74,9 @@ func (n navigator) paneMove(ctx context.Context, dir herdr.Direction, forward bo
 			// Moving focus is the better failure than swallowing the key.
 			_, _ = fmt.Fprintf(n.log, "process info: %v; moving focus\n", err)
 		} else if decide(dir, info) == forwardKey {
-			return n.api.SendKeys(ctx, n.pane, chords[dir])
+			// info.PaneID, not n.pane: with n.pane empty the server picked
+			// the pane, and send_keys needs it named.
+			return n.api.SendKeys(ctx, info.PaneID, chords[dir])
 		}
 	}
 	r, err := n.api.FocusDirection(ctx, n.pane, dir)

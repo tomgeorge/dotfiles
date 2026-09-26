@@ -24,7 +24,13 @@ type fakeAPI struct {
 
 func (f *fakeAPI) ProcessInfo(_ context.Context, pane herdr.PaneID) (herdr.ProcessInfo, error) {
 	f.calls = append(f.calls, "process_info "+string(pane))
-	return f.info, f.infoErr
+	// Like the server: an empty pane means the focused one, named in the reply.
+	info := f.info
+	info.PaneID = pane
+	if pane == "" {
+		info.PaneID = "focused"
+	}
+	return info, f.infoErr
 }
 
 func (f *fakeAPI) SendKeys(_ context.Context, pane herdr.PaneID, keys ...string) error {
@@ -131,6 +137,19 @@ func TestPaneMove(t *testing.T) {
 				t.Errorf("outer calls = %q, want %q", outer.calls, tt.wantOuter)
 			}
 		})
+	}
+}
+
+// Keybinding actions pass no pane: the server's focus is the origin, and
+// the key goes to the pane it named.
+func TestPaneMoveFromServerFocus(t *testing.T) {
+	api, outer := &fakeAPI{info: running("nvim")}, &fakeOuter{}
+	n := navigator{api: api, outer: outer, log: io.Discard}
+	if err := n.paneMove(context.Background(), herdr.Left, true); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"process_info ", "send_keys focused ctrl+h"}; !reflect.DeepEqual(api.calls, want) {
+		t.Errorf("calls = %q, want %q", api.calls, want)
 	}
 }
 
