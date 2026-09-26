@@ -23,7 +23,7 @@ pane_history = false
 prefix = "ctrl+a"
 copy_mode = "prefix+y" # frees prefix+[ for tg.nav.tab-prev
 split_horizontal = ["prefix+minus", "prefix+'"]
-split_vertical = ["prefix+v", "prefix+shift+5"]
+split_vertical = ["prefix+v", "prefix+%"] # not shift+5: herdr matches the character
 zoom = ["prefix+z", "prefix+o"]
 # focus_pane_* keep their prefix+h/j/k/l defaults: a fallback when tg.nav
 # isn't linked (`make link` in herdr-plugins/).

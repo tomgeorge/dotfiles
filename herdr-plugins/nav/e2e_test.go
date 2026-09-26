@@ -172,4 +172,24 @@ func TestE2E(t *testing.T) {
 		h.poll("^L to reach cat", waitFor, func() bool { return strings.Contains(h.screen(p1), "^L") })
 		wantOuter(t) // tg.nav's ctrl+l (right) didn't fire
 	})
+
+	t.Run("11 prefix+% and prefix+' split", func(t *testing.T) {
+		h := h.at(t)
+		tab, _ := h.newTab()
+		count := func() int {
+			var r struct{ Panes []paneInfo }
+			h.herdrJSON(&r, "pane", "list")
+			n := 0
+			for _, p := range r.Panes {
+				if p.TabID == tab {
+					n++
+				}
+			}
+			return n
+		}
+		h.keys("C-a", "%")
+		h.poll("split from prefix+%", waitFor, func() bool { return count() == 2 })
+		h.keys("C-a", "'")
+		h.poll("split from prefix+'", waitFor, func() bool { return count() == 3 })
+	})
 }
