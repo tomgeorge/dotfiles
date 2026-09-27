@@ -21,7 +21,8 @@ No additional dependencies.
 ```text
 /subagent
 /subagent anthropic/claude-sonnet-4-6 Review src/auth.ts for security problems
-/subagent-cancel
+/subagent-cancel      # cancel all running jobs
+/subagent-cancel 2    # cancel job #2
 ```
 
 With no arguments, select an authenticated model and enter a task. With arguments,
@@ -31,7 +32,7 @@ not change the parent model. In interactive mode the job runs in the background,
 you can keep chatting. Results appear in chat and become parent context;
 when idle, returning a result does not trigger an additional parent model call.
 
-While a job runs, the status bar shows elapsed time, the child's tool-call count,
+Each job gets a number (`#1`, `#2`, ...). While it runs, its status-bar line shows elapsed time, the child's tool-call count,
 and its latest tool call. Tool-launched jobs also stream this line into the tool row.
 The parent agent's turn still waits for a tool-launched job, as for any tool call.
 
@@ -47,10 +48,19 @@ The parent can also call the `subagent` tool when you request/approve delegation
 }
 ```
 
-Only one job runs at a time per parent session. Additional requests fail rather
-than queue. Each job has a 20-minute timeout. `/subagent-cancel` cancels either
+Up to 5 jobs run at once per parent session, from either entry point. The agent can
+issue several `subagent` calls in one turn and they run in parallel. Requests over
+the limit fail rather than queue. Change the limit with the `--subagent-max-concurrent`
+flag or the `PI_SUBAGENT_MAX_CONCURRENT` environment variable (the flag wins):
+
+```sh
+pi --subagent-max-concurrent 3
+PI_SUBAGENT_MAX_CONCURRENT=8 pi
+```
+
+Each job has a 20-minute timeout. `/subagent-cancel` cancels jobs from either
 entry point; Pi's normal tool cancellation also aborts tool-launched jobs.
-Shutdown/reload cancels the child. SIGTERM escalates to SIGKILL after one second.
+Shutdown/reload cancels all children. SIGTERM escalates to SIGKILL after one second.
 
 ## Boundaries
 
