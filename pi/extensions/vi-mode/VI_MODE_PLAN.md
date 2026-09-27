@@ -1,8 +1,9 @@
 # Plan: vi mode for the Pi prompt editor
 
-**Status:** Crawl is implemented. Decisions on the open questions: build our
-own; two Esc presses to abort from INSERT is fine; cursor shapes later.
-Differences from this plan:
+**Status:** Crawl, Walk and Run are implemented. "Later, if wanted" is
+not, except `ip`/`ap`. Decisions on the open questions: build our own; two
+Esc presses to abort from INSERT is fine; cursor shapes later. Differences
+from this plan:
 
 - `renderBottomBorder` *is* a protected method in Pi 0.87.1, so the mode
   label overrides it instead of patching `render()` output.
@@ -14,6 +15,13 @@ Differences from this plan:
   emoji or combining sequence as one character.
 - Pi asks the terminal for kitty keyboard flags 7, so NORMAL decodes CSI-u
   printable keys with `decodeKittyPrintable`.
+- Command execution lives in a pure `engine.ts`, which returns actions for
+  `editor.ts` to apply. That lets the tests drive whole commands (`d3w`,
+  `ci(`) without Pi.
+- Redo snapshots include the paste map, so a redone paste marker still
+  expands. Redo is dropped if the text changed since the last undo.
+- `"_` works as a black hole; other register names act as unnamed.
+- `ip`/`ap` came along with the other text objects.
 
 ## Goal
 

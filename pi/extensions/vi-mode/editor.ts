@@ -1,12 +1,12 @@
-// ViEditor: modes and key routing. Motions and edits are pure (motions.ts,
-// operators.ts) and reach the editor state through the bridge.
+// ViEditor: modes, key routing, undo and redo. NORMAL-mode commands run in
+// engine.ts, which is pure; this file applies what it returns through the
+// bridge.
 
 import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { decodeKittyPrintable, matchesKey, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
-import { Bridge, missingInternals } from "./bridge.ts";
-import { lastCol, nextCol, prevCol, snapCol, type Pos } from "./chars.ts";
-import * as m from "./motions.ts";
-import * as op from "./operators.ts";
+import { Bridge, missingInternals, type Snapshot } from "./bridge.ts";
+import { prevCol } from "./chars.ts";
+import { clampNormal, Engine, type Action } from "./engine.ts";
 
 type Mode = "insert" | "normal";
 
@@ -18,8 +18,7 @@ const PASTE_END = "\x1b[201~";
 function printable(data: string): string | undefined {
   const kitty = decodeKittyPrintable(data);
   if (kitty !== undefined) return kitty;
-  const chars = [...data];
-  if (chars.length !== 1) return undefined;
+  if ([...data].length !== 1) return undefined;
   const code = data.codePointAt(0)!;
   return code >= 32 && code !== 127 ? data : undefined;
 }
@@ -29,10 +28,14 @@ export class ViEditor extends CustomEditor {
   // then behaves exactly like the default one.
   readonly missing: string[];
   private bridge: Bridge;
+  private engine = new Engine();
   private mode: Mode = "insert";
-  private pending = "";
-  // Sticky column for j/k; Infinity after $. Reset by horizontal moves.
-  private want: number | null = null;
+  // Undo depth when INSERT began; Esc squashes everything since into one step.
+  private insertDepth = 0;
+  // Redo, which the base editor lacks. Valid only while the text is what the
+  // last undo or redo left, so typing in between invalidates it.
+  private redoStack: Snapshot[] = [];
+  private redoText: string | null = null;
   // Bracketed paste can arrive over several reads; none of it is a command.
   private pasting = false;
 
@@ -59,152 +62,92 @@ export class ViEditor extends CustomEditor {
     return true;
   }
 
+  private enterInsert(): void {
+    this.mode = "insert";
+    this.insertDepth = this.bridge.undoDepth();
+    this.engine.forgetColumn();
+  }
+
   private insertKey(data: string): void {
     if (matchesKey(data, "escape") && !this.isShowingAutocomplete()) {
       this.mode = "normal";
+      this.bridge.squashUndoTo(this.insertDepth);
       const { line, col } = this.bridge.cursor();
-      this.move({ line, col: prevCol(this.bridge.lines()[line], col) });
+      this.bridge.setCursor({ line, col: prevCol(this.bridge.lines()[line], col) });
       return;
     }
     super.handleInput(data);
+    // Submitting clears the undo stack; the next session starts from there.
+    if (matchesKey(data, "enter") && this.getText() === "") this.insertDepth = this.bridge.undoDepth();
   }
 
   private normalKey(data: string): void {
     if (matchesKey(data, "escape")) {
-      if (this.pending) this.pending = "";
-      else super.handleInput(data); // abort, as in the default editor
+      // Esc cancels a half-typed command; otherwise it's Pi's (abort).
+      if (!this.engine.cancel()) super.handleInput(data);
       return;
     }
     if (matchesKey(data, "enter")) {
-      this.pending = "";
+      this.engine.cancel();
       super.handleInput(data);
       // Submitted: the next prompt starts out typing.
-      if (this.getText() === "") this.mode = "insert";
+      if (this.getText() === "") this.enterInsert();
       else this.clamp();
       return;
     }
-    if (matchesKey(data, "backspace")) {
-      this.command("h");
-      return;
-    }
-    const key = printable(data);
+    const key = matchesKey(data, "ctrl+r") ? "<C-r>" : matchesKey(data, "backspace") ? "h" : printable(data);
     if (key === undefined) {
       // ctrl chords, arrows, and so on keep their Pi meaning.
-      this.pending = "";
-      this.want = null;
+      this.engine.cancel();
+      this.engine.forgetColumn();
       super.handleInput(data);
       this.clamp();
       return;
     }
-    this.command(key);
+    this.apply(this.engine.key(key, this.bridge.lines(), this.bridge.cursor()));
   }
 
-  private command(key: string): void {
-    const lines = this.bridge.lines();
-    const pos = this.bridge.cursor();
-
-    if (this.pending) {
-      const pending = this.pending;
-      this.pending = "";
-      if (pending === "d" && key === "d") this.edit(op.deleteLines(lines, pos));
-      if (pending === "c" && key === "c") this.edit(op.changeLine(lines, pos), "insert");
-      return;
-    }
-
-    // j/k keep the sticky column; $ sets it to the line end.
-    if (key === "j" || key === "k") {
-      this.want ??= pos.col;
-      this.bridge.setCursor(m.vertical(lines, pos, key === "j" ? 1 : -1, this.want).to);
-      return;
-    }
-    if (key === "$") {
-      this.bridge.setCursor(m.lineEnd(lines, pos).to);
-      this.want = Infinity;
-      return;
-    }
-    const motion = this.motion(key, lines, pos);
-    if (motion) {
-      this.move(motion.to);
-      return;
-    }
-    this.want = null;
-
-    switch (key) {
-      case "i":
-        return this.insertAt(pos);
-      case "a":
-        return this.insertAt({ line: pos.line, col: nextCol(lines[pos.line], pos.col) });
-      case "I":
-        return this.insertAt(m.firstNonBlankMotion(lines, pos).to);
-      case "A":
-        return this.insertAt({ line: pos.line, col: lines[pos.line].length });
-      case "o":
-      case "O":
-        return this.edit(op.openLine(lines, pos, key === "o"), "insert");
-      case "x":
-        return this.edit(op.deleteChars(lines, pos));
-      case "D":
-        return this.edit(op.deleteToEnd(lines, pos));
-      case "C":
-        return this.edit(op.deleteToEnd(lines, pos, true), "insert");
-      case "d":
-      case "c":
-        this.pending = key;
+  private apply(action: Action): void {
+    switch (action.type) {
+      case "move":
+        this.bridge.setCursor(action.cursor);
         return;
-      case "u":
-        this.bridge.undo();
+      case "edit":
+        this.redoStack = [];
+        if (action.insert) this.enterInsert();
+        this.bridge.applyEdit(action.lines, action.cursor);
+        return;
+      case "insert":
+        this.enterInsert();
+        this.bridge.setCursor(action.cursor);
+        return;
+      case "undo":
+        for (let i = 0; i < action.count && this.bridge.undoDepth() > 0; i++) {
+          this.redoStack.push(this.bridge.snapshot());
+          this.bridge.undo();
+        }
+        this.redoText = this.getText();
+        this.clamp();
+        return;
+      case "redo":
+        if (this.getText() !== this.redoText) this.redoStack = [];
+        for (let i = 0; i < action.count && this.redoStack.length > 0; i++) this.bridge.restore(this.redoStack.pop()!);
+        this.redoText = this.getText();
         this.clamp();
         return;
     }
-    // Unmapped keys do nothing: NORMAL mode never inserts text.
   }
 
-  private motion(key: string, lines: string[], pos: Pos): m.Motion | null {
-    switch (key) {
-      case "h": return m.left(lines, pos);
-      case "l": return m.right(lines, pos);
-      case "0": return m.lineStart(lines, pos);
-      case "^": return m.firstNonBlankMotion(lines, pos);
-      case "w": return m.wordForward(lines, pos);
-      case "W": return m.wordForward(lines, pos, 1, true);
-      case "b": return m.wordBackward(lines, pos);
-      case "B": return m.wordBackward(lines, pos, 1, true);
-      case "e": return m.wordEnd(lines, pos);
-      case "E": return m.wordEnd(lines, pos, 1, true);
-    }
-    return null;
-  }
-
-  private move(pos: Pos): void {
-    this.want = null;
-    this.bridge.setCursor(pos);
-  }
-
-  private insertAt(pos: Pos): void {
-    this.bridge.setCursor(pos);
-    this.mode = "insert";
-  }
-
-  // A null edit (nothing to delete) adds no undo step, but C on an empty
-  // line still enters INSERT.
-  private edit(e: op.Edit | null, mode: Mode = this.mode): void {
-    if (e) this.bridge.applyEdit(e.lines, e.cursor);
-    this.mode = mode;
-    this.clamp();
-  }
-
-  // NORMAL's cursor sits on a character, never past the last one.
   private clamp(): void {
     if (this.mode !== "normal") return;
-    const { line, col } = this.bridge.cursor();
-    const text = this.bridge.lines()[line] ?? "";
-    const clamped = Math.min(snapCol(text, col), lastCol(text));
-    if (clamped !== col) this.bridge.setCursor({ line, col: clamped });
+    const pos = this.bridge.cursor();
+    const clamped = clampNormal(this.bridge.lines(), pos);
+    if (clamped.line !== pos.line || clamped.col !== pos.col) this.bridge.setCursor(clamped);
   }
 
   protected renderBottomBorder(width: number, hiddenLineCount: number): string {
     if (this.missing.length > 0) return super.renderBottomBorder(width, hiddenLineCount);
-    const label = ` ${this.pending || (this.mode === "normal" ? "NORMAL" : "INSERT")} `;
+    const label = ` ${this.engine.pending || (this.mode === "normal" ? "NORMAL" : "INSERT")} `;
     const labelWidth = visibleWidth(label);
     if (width < labelWidth + 4) return super.renderBottomBorder(width, hiddenLineCount);
     return super.renderBottomBorder(width - labelWidth - 1, hiddenLineCount) + this.borderColor(label + "─");

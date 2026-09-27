@@ -4,13 +4,14 @@ import { charClass, BLANK, PUNCT, WORD } from "./chars.ts";
 import { firstNonBlankMotion, left, lineEnd, right, vertical, wordBackward, wordEnd, wordForward, type Motion } from "./motions.ts";
 import { parse, show } from "./testutil.ts";
 
-type MotionFn = (lines: string[], pos: { line: number; col: number }) => Motion;
+type MotionFn = (lines: string[], pos: { line: number; col: number }) => Motion | null;
 
 function check(name: string, fn: MotionFn, cases: [string, string][]) {
   test(name, () => {
     for (const [from, to] of cases) {
       const { lines, pos } = parse(from);
-      assert.equal(show(lines, fn(lines, pos).to), to, `from ${JSON.stringify(from)}`);
+      // null: the motion fails, and the cursor stays.
+      assert.equal(show(lines, fn(lines, pos)?.to ?? pos), to, `from ${JSON.stringify(from)}`);
     }
   });
 }
@@ -47,11 +48,11 @@ check("h and l step over whole graphemes", (l, p) => right(l, p), [
 
 test("j and k keep the wanted column across short lines", () => {
   const { lines, pos } = parse("abc|def\nx\nabcdefg");
-  const down = vertical(lines, pos, 1, pos.col);
+  const down = vertical(lines, pos, 1, pos.col)!;
   assert.equal(show(lines, down.to), "abcdef\n|x\nabcdefg");
-  assert.equal(show(lines, vertical(lines, down.to, 1, pos.col).to), "abcdef\nx\nabc|defg");
-  assert.equal(show(lines, vertical(lines, pos, -1, pos.col).to), "abc|def\nx\nabcdefg");
-  assert.equal(show(lines, vertical(lines, down.to, 1, Infinity).to), "abcdef\nx\nabcdef|g");
+  assert.equal(show(lines, vertical(lines, down.to, 1, pos.col)!.to), "abcdef\nx\nabc|defg");
+  assert.equal(vertical(lines, pos, -1, pos.col), null); // already on the first line
+  assert.equal(show(lines, vertical(lines, down.to, 1, Infinity)!.to), "abcdef\nx\nabcdef|g");
 });
 
 check("^ goes to the first non-blank", firstNonBlankMotion, [

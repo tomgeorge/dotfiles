@@ -4,6 +4,12 @@
 
 export type Pos = { line: number; col: number };
 
+// Text an operator acts on. Charwise: end is exclusive. Linewise: every line
+// from start.line to end.line; the columns don't matter.
+export type Range = { start: Pos; end: Pos; linewise: boolean };
+
+export const before = (a: Pos, b: Pos) => a.line < b.line || (a.line === b.line && a.col < b.col);
+
 // Vim's classes for `w`: blank, punctuation (other non-blank), word.
 export const BLANK = 0;
 export const PUNCT = 1;

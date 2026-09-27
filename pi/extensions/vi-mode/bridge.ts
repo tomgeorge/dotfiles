@@ -9,6 +9,8 @@ type Internals = {
   state: { lines: string[]; cursorLine: number; cursorCol: number };
   undoStack: { stack: unknown[] };
   lastAction: unknown;
+  pastes: Map<number, string>;
+  pasteCounter: number;
   setCursorCol(col: number): void;
   pushUndoSnapshot(): void;
   undo(): void;
@@ -25,6 +27,8 @@ export function missingInternals(editor: object): string[] {
   if (!s || !Array.isArray(s.lines) || typeof s.cursorLine !== "number" || typeof s.cursorCol !== "number") missing.push("state");
   if (!Array.isArray(e.undoStack?.stack)) missing.push("undoStack.stack");
   if (!("lastAction" in e)) missing.push("lastAction");
+  if (!(e.pastes instanceof Map)) missing.push("pastes");
+  if (typeof e.pasteCounter !== "number") missing.push("pasteCounter");
   for (const fn of ["setCursorCol", "pushUndoSnapshot", "undo", "exitHistoryBrowsing"] as const) {
     if (typeof e[fn] !== "function") missing.push(fn);
   }
@@ -66,4 +70,39 @@ export class Bridge {
   undo(): void {
     this.e.undo();
   }
+
+  undoDepth(): number {
+    return this.e.undoStack.stack.length;
+  }
+
+  // Drop snapshots after the first depth + 1, so everything since depth
+  // undoes as one step (an insert session).
+  squashUndoTo(depth: number): void {
+    const stack = this.e.undoStack.stack;
+    if (stack.length > depth + 1) stack.length = depth + 1;
+  }
+
+  // For redo, which the base editor doesn't have. Includes pastes, so a
+  // redone paste marker still expands.
+  snapshot(): Snapshot {
+    return {
+      lines: [...this.e.state.lines],
+      cursor: this.cursor(),
+      pastes: new Map(this.e.pastes),
+      pasteCounter: this.e.pasteCounter,
+    };
+  }
+
+  // Restore a snapshot as a new undo step.
+  restore(s: Snapshot): void {
+    this.e.exitHistoryBrowsing();
+    this.e.pushUndoSnapshot();
+    this.e.pastes = new Map(s.pastes);
+    this.e.pasteCounter = s.pasteCounter;
+    this.e.state.lines = [...s.lines];
+    this.setCursor(s.cursor);
+    this.e.onChange?.(this.e.getText());
+  }
 }
+
+export type Snapshot = { lines: string[]; cursor: Pos; pastes: Map<number, string>; pasteCounter: number };
