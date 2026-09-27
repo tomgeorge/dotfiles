@@ -29,6 +29,7 @@ copy_mode = "prefix+y" # frees prefix+[ for tg.nav.tab-prev
 split_horizontal = ["prefix+minus", "prefix+'"]
 split_vertical = ["prefix+v", "prefix+%"] # not shift+5: herdr matches the character
 zoom = ["prefix+z", "prefix+o"]
+rename_pane = "prefix+shift+e" # its default, prefix+shift+p, is tg.find's
 # focus_pane_* keep their prefix+h/j/k/l defaults: a fallback when tg.nav
 # isn't linked (`make link` in herdr-plugins/).
 
@@ -68,6 +69,14 @@ key = "prefix+["
 type = "plugin_action"
 command = "tg.nav.tab-prev"
 description = "previous tab"
+
+# tg.find: one picker over workspaces, live agents, worktrees and, behind a
+# leading `/`, zoxide dirs. The popup's size is in the plugin's manifest.
+[[keys.command]]
+key = "prefix+shift+p"
+type = "shell"
+command = '"$HERDR_BIN_PATH" plugin pane open --plugin tg.find --entrypoint picker'
+description = "find a workspace, agent, worktree or dir"
 
 # ctrl+l is taken by tg.nav; this sends a literal one to clear the screen.
 [[keys.command]]
