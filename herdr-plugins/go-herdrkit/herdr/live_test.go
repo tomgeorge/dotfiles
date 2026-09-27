@@ -102,3 +102,53 @@ func TestLiveListWorkspaces(t *testing.T) {
 	}
 	t.Logf("%+v", wss)
 }
+
+// Read-only: decodes the whole session, which checks every required field
+// against a real server. Logs counts, not content.
+func TestLiveSnapshot(t *testing.T) {
+	c := liveClient(t)
+	s, err := c.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("herdr %s: %d workspaces, %d tabs, %d panes, %d agents, repos %d",
+		s.Version, len(s.Workspaces), len(s.Tabs), len(s.Panes), len(s.Agents), len(s.RepositoryRoots()))
+}
+
+// Read-only: lists the worktrees of every repository with an open workspace.
+func TestLiveListWorktrees(t *testing.T) {
+	c := liveClient(t)
+	s, err := c.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range s.RepositoryRoots() {
+		list, err := c.ListWorktrees(context.Background(), root)
+		if err != nil {
+			t.Errorf("%s: %v", root, err)
+			continue
+		}
+		t.Logf("%s: %d worktrees", list.Source.Repository.Name, len(list.Worktrees))
+	}
+}
+
+// Focuses the workspace that already has focus, which changes nothing, to
+// check the reply shape against a real server: a fake built from the same
+// assumption can't catch a wrong result tag.
+func TestLiveFocusFocusedWorkspace(t *testing.T) {
+	c := liveClient(t)
+	s, err := c.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.FocusedWorkspaceID == "" {
+		t.Skip("no focused workspace")
+	}
+	ws, err := c.FocusWorkspace(context.Background(), s.FocusedWorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.WorkspaceID != s.FocusedWorkspaceID || !ws.Focused {
+		t.Errorf("focused %+v, want %s", ws, s.FocusedWorkspaceID)
+	}
+}

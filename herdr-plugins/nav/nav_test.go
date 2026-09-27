@@ -333,3 +333,84 @@ func TestTabMoveNoFocusedWorkspace(t *testing.T) {
 		t.Error("want error")
 	}
 }
+
+// ws makes a workspace numbered n; repo and linked put it in a worktree
+// group ("" = not a Herdr worktree).
+func ws(id string, n uint, repo string, linked bool) herdr.WorkspaceInfo {
+	w := herdr.WorkspaceInfo{WorkspaceID: herdr.WorkspaceID(id), Number: n}
+	if repo != "" {
+		w.Worktree = &herdr.WorkspaceWorktree{Repository: herdr.Repository{Key: repo}, IsLinkedWorktree: linked}
+	}
+	return w
+}
+
+func TestSidebarOrder(t *testing.T) {
+	for name, tt := range map[string]struct {
+		in   []herdr.WorkspaceInfo
+		want []herdr.WorkspaceID
+	}{
+		"plain workspaces go by number": {
+			[]herdr.WorkspaceInfo{ws("b", 2, "", false), ws("a", 1, "", false)},
+			[]herdr.WorkspaceID{"a", "b"},
+		},
+		// The case that broke nav: a worktree made after another workspace
+		// is numbered last but drawn under its parent.
+		"a later worktree sits under its parent": {
+			[]herdr.WorkspaceInfo{ws("dots", 1, "r", false), ws("other", 2, "", false), ws("feat", 3, "r", true)},
+			[]herdr.WorkspaceID{"dots", "feat", "other"},
+		},
+		"the group sits where its first member is, parent first": {
+			[]herdr.WorkspaceInfo{ws("feat", 1, "r", true), ws("other", 2, "", false), ws("dots", 3, "r", false)},
+			[]herdr.WorkspaceID{"dots", "feat", "other"},
+		},
+		"children keep number order": {
+			[]herdr.WorkspaceInfo{ws("dots", 1, "r", false), ws("b", 4, "r", true), ws("x", 2, "", false), ws("a", 3, "r", true)},
+			[]herdr.WorkspaceID{"dots", "a", "b", "x"},
+		},
+		"a lone worktree isn't a group": {
+			[]herdr.WorkspaceInfo{ws("feat", 1, "r", true), ws("other", 2, "", false), ws("dots", 3, "s", false)},
+			[]herdr.WorkspaceID{"feat", "other", "dots"},
+		},
+		"linked worktrees without their main checkout aren't a group": {
+			[]herdr.WorkspaceInfo{ws("a", 1, "r", true), ws("x", 2, "", false), ws("b", 3, "r", true)},
+			[]herdr.WorkspaceID{"a", "x", "b"},
+		},
+		"two repos": {
+			[]herdr.WorkspaceInfo{ws("r1", 1, "r", false), ws("s1", 2, "s", false), ws("r2", 3, "r", true), ws("s2", 4, "s", true)},
+			[]herdr.WorkspaceID{"r1", "r2", "s1", "s2"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var got []herdr.WorkspaceID
+			for _, w := range sidebarOrder(tt.in) {
+				got = append(got, w.WorkspaceID)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("order = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// Past the last tab of a repo's workspace, nav goes into its worktree, as
+// the sidebar and Herdr's own next-workspace key do, not to the workspace
+// numbered next.
+func TestTabMoveFollowsTheSidebarIntoAWorktree(t *testing.T) {
+	dots, other, feat := ws("w1", 1, "r", false), ws("w2", 2, "", false), ws("w3", 3, "r", true)
+	dots.Focused, dots.ActiveTabID = true, "w1:t1"
+	api := &fakeAPI{
+		workspaces: []herdr.WorkspaceInfo{dots, other, feat},
+		tabs: map[herdr.WorkspaceID][]herdr.TabInfo{
+			"w1": {{TabID: "w1:t1", WorkspaceID: "w1", Number: 1, Focused: true}},
+			"w2": {{TabID: "w2:t1", WorkspaceID: "w2", Number: 1}},
+			"w3": {{TabID: "w3:t1", WorkspaceID: "w3", Number: 1}},
+		},
+	}
+	n := navigator{api: api, outer: &fakeOuter{}, moves: &fakeMoves{}, log: io.Discard}
+	if err := n.tabMove(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	if last := api.calls[len(api.calls)-1]; last != "focus_tab w3:t1" {
+		t.Errorf("last call = %q, want focus_tab w3:t1 (calls %q)", last, api.calls)
+	}
+}

@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -284,5 +285,55 @@ func TestE2E(t *testing.T) {
 		step("[", ws2First, 1)
 		step("[", ws1Last, ws1Number)
 		wantOuter(t)
+	})
+
+	// A worktree is numbered when it's made, but the sidebar draws it under
+	// its repo's workspace, and prefix+]/[ must follow the sidebar.
+	t.Run("14 prefix+]/[ visit a worktree under its repo, not by number", func(t *testing.T) {
+		h := h.at(t)
+		repo := filepath.Join(h.home, "src", "repo")
+		for _, args := range [][]string{
+			{"init", "-q", "-b", "main", repo},
+			{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "init"},
+		} {
+			if out, err := command(h.env, "git", args...); err != nil {
+				t.Fatalf("git %v: %v: %s", args, err, out)
+			}
+		}
+
+		type opened struct {
+			Workspace struct {
+				WorkspaceID string `json:"workspace_id"`
+			}
+			Tab struct {
+				TabID string `json:"tab_id"`
+			}
+		}
+		var repoWS, plain, wt opened
+		h.herdrJSON(&repoWS, "workspace", "create", "--cwd", repo)
+		h.herdrJSON(&plain, "workspace", "create", "--cwd", h.home)
+		h.herdrJSON(&wt, "worktree", "create", "--workspace", repoWS.Workspace.WorkspaceID, "--branch", "feat", "--no-focus")
+		t.Cleanup(func() {
+			if os.Getenv("HN_KEEP") == "" {
+				_, _ = h.tryHerdr("workspace", "close", plain.Workspace.WorkspaceID)
+				_, _ = h.tryHerdr("workspace", "close", repoWS.Workspace.WorkspaceID, "--group")
+			}
+		})
+
+		h.herdr("tab", "focus", repoWS.Tab.TabID)
+		h.poll("repo tab", waitFor, func() bool { return h.focusedTab() == repoWS.Tab.TabID })
+		// Every workspace here has one tab of one pane. Waiting for the client
+		// to draw it keeps the next key from racing the switch.
+		h.waitClient(1, 0)
+		step := func(key, wantTab string) {
+			t.Helper()
+			h.keys("C-a", key)
+			h.poll("tab "+wantTab, waitFor, func() bool { return h.focusedTab() == wantTab })
+			h.waitClient(1, 0)
+		}
+		step("]", wt.Tab.TabID)
+		step("]", plain.Tab.TabID)
+		step("[", wt.Tab.TabID)
+		step("[", repoWS.Tab.TabID)
 	})
 }

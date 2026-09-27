@@ -1,6 +1,6 @@
 module github.com/tomgeorge/dotfiles/herdr-plugins
 
-go 1.23
+go 1.27
 
 require github.com/tomgeorge/go-herdrkit v0.0.0
 

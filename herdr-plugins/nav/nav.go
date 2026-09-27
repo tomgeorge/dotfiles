@@ -154,7 +154,7 @@ func (n navigator) tabMove(ctx context.Context, delta int) error {
 	if err != nil {
 		return err
 	}
-	wss = slices.SortedFunc(slices.Values(wss), func(a, b herdr.WorkspaceInfo) int { return cmp.Compare(a.Number, b.Number) })
+	wss = sidebarOrder(wss)
 	i := slices.IndexFunc(wss, func(w herdr.WorkspaceInfo) bool { return w.Focused })
 	if i < 0 {
 		return fmt.Errorf("no workspace is focused")
@@ -208,4 +208,57 @@ func nextTab(tabs []herdr.TabInfo, current herdr.TabID, delta int) (herdr.TabID,
 		return "", false
 	}
 	return tabs[j].TabID, true
+}
+
+// sidebarOrder sorts workspaces the way Herdr's sidebar lists them, which is
+// also the order Herdr's own next/previous-workspace keys walk. It's number
+// order, except that a worktree group is drawn as one block where its first
+// member falls: the parent (the repo's main checkout), then its linked
+// worktrees in number order. Worktrees are numbered when created, so without
+// this a worktree made after other workspaces would be visited last, not
+// under its parent.
+//
+// A run of workspaces with the same repository is a group only when it has
+// two or more members and one of them is a main checkout, as in Herdr 0.9.1's
+// workspace_entries (src/client/shell/sidebar.rs). Collapsed groups live in
+// the Herdr client, out of the API's reach, so every group counts as
+// expanded.
+func sidebarOrder(wss []herdr.WorkspaceInfo) []herdr.WorkspaceInfo {
+	wss = slices.SortedFunc(slices.Values(wss), func(a, b herdr.WorkspaceInfo) int { return cmp.Compare(a.Number, b.Number) })
+	members := map[string][]int{}
+	for i, w := range wss {
+		if w.Worktree != nil {
+			k := w.Worktree.Repository.Key
+			members[k] = append(members[k], i)
+		}
+	}
+	isMain := func(i int) bool { return !wss[i].Worktree.IsLinkedWorktree }
+	grouped := func(k string) bool {
+		return len(members[k]) >= 2 && slices.ContainsFunc(members[k], isMain)
+	}
+
+	out := make([]herdr.WorkspaceInfo, 0, len(wss))
+	emitted := map[string]bool{}
+	for i, w := range wss {
+		if w.Worktree == nil || !grouped(w.Worktree.Repository.Key) {
+			out = append(out, w)
+			continue
+		}
+		k := w.Worktree.Repository.Key
+		if emitted[k] {
+			continue
+		}
+		emitted[k] = true
+		parent := i
+		if j := slices.IndexFunc(members[k], isMain); j >= 0 {
+			parent = members[k][j]
+		}
+		out = append(out, wss[parent])
+		for _, m := range members[k] {
+			if m != parent {
+				out = append(out, wss[m])
+			}
+		}
+	}
+	return out
 }
