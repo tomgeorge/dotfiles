@@ -1,0 +1,6 @@
+go 1.27
+
+use (
+	./herdr-plugins
+	./herdr-plugins/go-herdrkit
+)

@@ -1,5 +1,5 @@
-# Run inside the dev shell (direnv loads it from .envrc): go and
-# golangci-lint aren't on the global PATH.
+# Run inside the dev shell (direnv loads it from the repo-root .envrc): go
+# and golangci-lint aren't on the global PATH.
 PLUGINS := $(patsubst %/herdr-plugin.toml,%,$(wildcard */herdr-plugin.toml))
 
 .PHONY: all build link test test-lua test-e2e test-all lint

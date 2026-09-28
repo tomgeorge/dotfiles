@@ -1,5 +1,5 @@
 {
-  description = "Herdr plugins and the go-herdrkit SDK";
+  description = "Dev shell for the dotfiles repo (herdr plugins, go-herdrkit SDK)";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
