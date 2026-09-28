@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -38,22 +40,31 @@ func open(ctx context.Context, c api, d Destination) error {
 // something opens it: a checkout as a worktree, else the workspace already
 // sitting in it, else a new workspace.
 func openDir(ctx context.Context, c api, path string) error {
-	dir, err := filepath.EvalSymlinks(path)
-	if err == nil {
-		dir, err = filepath.Abs(dir)
-	}
+	dir, err := resolve(path)
 	if err != nil {
 		return fmt.Errorf("resolving %s: %w", path, err)
 	}
+	if info, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("resolving %s: %w", path, err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", dir)
+	}
 
-	// .git is exactly the test for a checkout root: a file in a linked
-	// worktree, a directory in the main one, absent in a subdirectory, where
-	// worktree.open would pick the wrong root.
-	if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+	// .git is exactly the test for a checkout root: a directory in the main
+	// checkout, a file in a linked worktree, absent in a subdirectory (where
+	// OpenWorktree would pick the wrong root). Stat, so a .git symlink counts
+	// by what it points to, and a dangling one as no checkout.
+	_, err = os.Stat(filepath.Join(dir, ".git"))
+	switch {
+	case err == nil:
+		// The checkout serves as its own repo root: Herdr finds the
+		// repository from any checkout of it.
 		if _, err := c.OpenWorktree(ctx, dir, dir, true); err != nil {
 			return fmt.Errorf("opening a workspace for %s: %w", dir, err)
 		}
 		return nil
+	case !errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("checking whether %s is a git checkout: %w", dir, err)
 	}
 
 	snap, err := c.Snapshot(ctx)
@@ -61,7 +72,12 @@ func openDir(ctx context.Context, c api, path string) error {
 		return fmt.Errorf("reading the session: %w", err)
 	}
 	for _, p := range snap.Panes {
-		if p.Cwd == dir {
+		if p.Cwd == "" {
+			continue
+		}
+		// Resolved too, so a pane that got there through a symlink counts.
+		// A cwd that no longer resolves just isn't a match.
+		if cwd, err := resolve(p.Cwd); err == nil && cwd == dir {
 			if _, err := c.FocusWorkspace(ctx, p.WorkspaceID); err != nil {
 				return fmt.Errorf("focusing the workspace already in %s: %w", dir, err)
 			}
@@ -72,4 +88,13 @@ func openDir(ctx context.Context, c api, path string) error {
 		return fmt.Errorf("creating a workspace for %s: %w", dir, err)
 	}
 	return nil
+}
+
+// resolve is path's absolute, symlink-free form: one spelling per directory.
+func resolve(path string) (string, error) {
+	dir, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(dir)
 }

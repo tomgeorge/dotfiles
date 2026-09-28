@@ -3,23 +3,18 @@ package picker
 import (
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/junegunn/fzf/src/algo"
 	"github.com/junegunn/fzf/src/util"
 )
 
-// The query language is fzf's extended search, ported from fzf's
-// src/pattern.go (parseTerms, extendedMatch), MIT. That file lives in
-// package fzf, which drags in the whole TUI, so only the algorithms are
-// imported and the parser is repeated here.
-//
-//	foo      fuzzy          'foo     exact substring    'foo'  exact on word boundaries
-//	^foo     prefix         foo$     suffix             ^foo$  equal
-//	!foo     doesn't contain (exact)                    !'foo  doesn't fuzzy-match
-//	a | b    either term
-//
-// Space-separated terms must all match. Case is smart: a term with an upper
-// case letter is case-sensitive. Latin diacritics are normalised.
+// The query parser is ported from fzf's src/pattern.go (parseTerms,
+// extendedMatch), MIT; the package doc describes the syntax. That file
+// lives in package fzf, which drags in the whole TUI, so only the
+// algorithms are imported and the parser is repeated here. algo and util
+// are fzf's internals, with no compatibility promise: go.mod pins the
+// version, and a change there needs the tests re-run, not just a build.
 
 type termType int
 
@@ -44,6 +39,8 @@ type term struct {
 type pattern [][]term
 
 func parsePattern(query string) pattern {
+	// "\ " is an escaped literal space: park it as a tab while splitting on
+	// spaces, then put it back.
 	query = strings.ReplaceAll(query, `\ `, "\t")
 	var sets pattern
 	var set []term
@@ -52,6 +49,8 @@ func parsePattern(query string) pattern {
 		text := strings.ReplaceAll(token, "\t", " ")
 		lower := strings.ToLower(text)
 		caseSensitive := text != lower
+		// fzf's rule: fold diacritics only when the term has none, so "cafe"
+		// finds "café" but "café" finds only itself.
 		normalize := lower == string(algo.NormalizeRunes([]rune(lower)))
 		if !caseSensitive {
 			text = lower
@@ -127,15 +126,41 @@ type matcher struct {
 	slab    *util.Slab
 }
 
-// initScheme sets fzf's scoring scheme. algo keeps it in package globals and
-// has no default until Init runs, so every model calls this when it's built.
-// Safe here because a picker is the only matcher in its (short-lived)
-// process; don't use this package from concurrent goroutines.
-func initScheme(paths bool) {
-	if paths {
-		algo.Init("path") // '/' is a word boundary, so path segments rank higher
-	} else {
+// scheme records which of fzf's scoring schemes is set up. algo keeps its
+// scheme in package globals and scores nothing sensibly until Init runs.
+var scheme struct {
+	sync.Mutex
+	ready, paths bool
+}
+
+// ensureScheme sets up fzf's default scheme, unless ScorePaths already set
+// up the path one.
+func ensureScheme() {
+	scheme.Lock()
+	defer scheme.Unlock()
+	if !scheme.ready {
 		algo.Init("default")
+		scheme.ready = true
+	}
+}
+
+// ScorePaths switches fzf's scoring to its path scheme, for every picker in
+// the process: fzf keeps its scheme in package globals. Under it '/' is the
+// only delimiter and the start of the text counts as one, and a match after
+// a space no longer outranks one after a '/'. So a query ranks entries where
+// it starts a path segment first.
+//
+// Call it before building or using any picker. It rewrites the globals that
+// matching reads, so calling it while another goroutine matches is a race;
+// calling it again is harmless.
+func ScorePaths() {
+	scheme.Lock()
+	defer scheme.Unlock()
+	// One way only: "path" sets everything it changes, but "default" doesn't
+	// restore the delimiters "path" replaced.
+	if !scheme.paths {
+		algo.Init("path")
+		scheme.ready, scheme.paths = true, true
 	}
 }
 
@@ -155,11 +180,11 @@ func (m *matcher) match(text *util.Chars, withPos bool) (score int, positions []
 			res, pos := algos[t.typ](t.caseSensitive, t.normalize, true, text, t.text, withPos, m.slab)
 			found := res.Start >= 0
 			if t.inv {
-				if found {
-					continue
-				}
-				matched = true
-				break
+				// A satisfied negation carries the set, but like fzf keep
+				// looking: a positive alternative still adds score and
+				// highlight.
+				matched = matched || !found
+				continue
 			}
 			if !found {
 				continue

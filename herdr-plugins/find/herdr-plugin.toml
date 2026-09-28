@@ -21,7 +21,7 @@ placement = "popup"
 command = ["./bin/herdr-find"]
 # Cells, not a percentage: Herdr clamps a request larger than the terminal,
 # so this is min(100, terminal), capped on a big display and full width on a
-# laptop. The agent group spends agentFixedCells (51) on columns before the
-# task gets anything; a test keeps a task readable at this width.
+# laptop. An agent's task gets what the agent group's fixed columns leave;
+# a test keeps a task readable at this width.
 width = 100
 height = 24

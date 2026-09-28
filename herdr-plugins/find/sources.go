@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -22,8 +23,8 @@ type api interface {
 	CreateWorkspace(ctx context.Context, cwd, label string, focus bool) (herdr.WorkspaceCreated, error)
 }
 
-// Sources is everything the index is built from, in one value, so building
-// destinations is a pure function over a fixture.
+// Sources is everything the destinations are built from, in one value, so
+// building them is a pure function over a fixture.
 type Sources struct {
 	Snapshot herdr.Snapshot
 	// Worktrees has one listing per repository Herdr holds a workspace in. A
@@ -33,10 +34,11 @@ type Sources struct {
 	Dirs []string
 }
 
-// collect reads every source. Losing one repository's worktrees or zoxide
-// costs just those rows, but says so on log: otherwise a socket failure
-// reads as "this repo has no worktrees" forever.
-func collect(ctx context.Context, c api, zoxide string, log io.Writer) (Sources, error) {
+// collect reads every source. Only the snapshot is essential: losing one
+// repository's worktrees, or zoxide, costs just those rows. It logs a
+// warning, though, or a socket failure would read as "this repo has no
+// worktrees" forever.
+func collect(ctx context.Context, c api, zoxide string, log *slog.Logger) (Sources, error) {
 	snap, err := c.Snapshot(ctx)
 	if err != nil {
 		return Sources{}, fmt.Errorf("reading the session: %w", err)
@@ -45,13 +47,13 @@ func collect(ctx context.Context, c api, zoxide string, log io.Writer) (Sources,
 	for _, root := range snap.RepositoryRoots() {
 		list, err := c.ListWorktrees(ctx, root)
 		if err != nil {
-			_, _ = fmt.Fprintf(log, "find: leaving out the worktrees of %s: %v\n", root, err)
+			log.Warn("leaving out a repository's worktrees", "repo", root, "err", err)
 			continue
 		}
 		s.Worktrees = append(s.Worktrees, list)
 	}
 	if s.Dirs, err = zoxideDirs(ctx, zoxide); err != nil {
-		_, _ = fmt.Fprintf(log, "find: leaving out zoxide directories: %v\n", err)
+		log.Warn("leaving out zoxide directories", "err", err)
 	}
 	return s, nil
 }
@@ -85,33 +87,39 @@ type repoBranch struct{ repo, branch string }
 
 // Destinations turns the sources into rows, in source order within each
 // kind. home shortens paths for display.
+//
+// Herdr and zoxide can spell one directory differently, so checkouts are
+// joined to their branches, and places deduplicated, by pathKey. Each
+// destination keeps its path as its source spelled it.
 func (s Sources) Destinations(home string) []Destination {
 	// A workspace knows its checkout but not its branch; the branch comes
-	// from the worktree listing, joined on the checkout path.
+	// from the worktree listing, joined on the checkout path, and reads the
+	// same as the worktree row would.
 	branches := map[string]string{}
 	for _, list := range s.Worktrees {
 		for _, wt := range list.Worktrees {
-			if wt.Branch != "" {
-				branches[wt.Path] = wt.Branch
+			if wt.Branch != "" || wt.IsDetached {
+				branches[pathKey(wt.Path)] = wt.BranchLabel()
 			}
 		}
 	}
 
 	var out []Destination
+	// offered is every path a row already goes to, so no place is offered
+	// twice under two kinds.
+	offered := map[string]bool{}
 	byWorkspace := map[herdr.WorkspaceID]repoBranch{}
 	for _, ws := range s.Snapshot.Workspaces {
 		var repo, checkout string
 		if ws.Worktree != nil {
 			repo, checkout = ws.Worktree.Repository.Name, ws.Worktree.CheckoutPath
 		}
-		branch, ok := branches[checkout]
+		branch, ok := branches[pathKey(checkout)]
 		if !ok || checkout == "" {
 			branch = ws.Label
 		}
-		path := checkout
-		if path == "" {
-			path = s.Snapshot.EffectiveWorkspaceDir(ws.WorkspaceID)
-		}
+		path := s.Snapshot.EffectiveWorkspaceDir(ws.WorkspaceID) // the checkout, else a pane's cwd
+		offered[pathKey(path)] = true
 		byWorkspace[ws.WorkspaceID] = repoBranch{repo, branch}
 		out = append(out, Destination{
 			Kind:        KindWorkspace,
@@ -140,13 +148,14 @@ func (s Sources) Destinations(home string) []Destination {
 		})
 	}
 
-	// Openable leaves out worktrees already open as a workspace, so one
-	// checkout isn't offered twice under two kinds.
+	// Openable leaves out bare and prunable entries, and checkouts already
+	// open as a workspace.
 	for _, list := range s.Worktrees {
 		for _, wt := range list.Worktrees {
-			if !wt.Openable() {
+			if !wt.Openable() || offered[pathKey(wt.Path)] {
 				continue
 			}
+			offered[pathKey(wt.Path)] = true
 			out = append(out, Destination{
 				Kind:        KindWorktree,
 				Path:        wt.Path,
@@ -158,34 +167,25 @@ func (s Sources) Destinations(home string) []Destination {
 		}
 	}
 
-	// A directory already reachable above is dropped, so one place never
-	// appears twice under two names.
-	seen := s.reachable()
 	for _, dir := range s.Dirs {
-		if seen[dir] {
+		if offered[pathKey(dir)] {
 			continue
 		}
+		offered[pathKey(dir)] = true
 		out = append(out, Destination{Kind: KindDirectory, Path: dir, DisplayPath: tilde(dir, home)})
 	}
 	return out
 }
 
-func (s Sources) reachable() map[string]bool {
-	seen := map[string]bool{}
-	for _, ws := range s.Snapshot.Workspaces {
-		if ws.Worktree != nil {
-			seen[ws.Worktree.CheckoutPath] = true
-		}
-		if dir := s.Snapshot.EffectiveWorkspaceDir(ws.WorkspaceID); dir != "" {
-			seen[dir] = true
-		}
+// pathKey is how paths are compared: cleaned, so "/src/dots/" and
+// "/src/dots" are one place. It doesn't touch the filesystem, so a path and
+// a symlink to it stay two places; open resolves those. Empty stays empty,
+// not ".".
+func pathKey(path string) string {
+	if path == "" {
+		return ""
 	}
-	for _, list := range s.Worktrees {
-		for _, wt := range list.Worktrees {
-			seen[wt.Path] = true
-		}
-	}
-	return seen
+	return filepath.Clean(path)
 }
 
 // tilde shortens a path under home to ~/…, leaving a sibling that merely

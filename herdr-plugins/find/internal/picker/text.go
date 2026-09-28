@@ -9,9 +9,10 @@ import (
 )
 
 // Every width here is a display width in cells, never bytes or runes, and
-// every cut lands on a grapheme boundary. Agent rows carry terminal titles,
-// which contain wide glyphs, combining marks and emoji sequences; measuring
-// per rune would shift every column to the right of one of them.
+// every cut lands on a grapheme boundary. Rows often carry outside text,
+// such as terminal titles, which contain wide glyphs, combining marks and
+// emoji sequences; measuring per rune would shift every column to the
+// right of one of them.
 
 // width is the cells text occupies when printed.
 func width(text string) int { return ansi.StringWidth(text) }
@@ -32,21 +33,22 @@ func clusters(text string) []string {
 // ellipsis marks text that truncate cut short.
 const ellipsis = "…"
 
-// truncate clips text to max cells, ending in an ellipsis when anything was
-// dropped. A cluster straddling the limit is dropped whole, so the result is
-// never wider than max and what's kept is always a cluster-prefix of text.
-func truncate(text string, max int) string {
-	if width(text) <= max {
+// truncate clips text to limit cells, ending in an ellipsis when anything
+// was dropped. A cluster straddling the limit is dropped whole, so the
+// result is never wider than limit and what's kept is always a
+// cluster-prefix of text.
+func truncate(text string, limit int) string {
+	if width(text) <= limit {
 		return text
 	}
-	if max <= 0 {
+	if limit <= 0 {
 		return ""
 	}
 	var b strings.Builder
 	used := 0
 	for _, c := range clusters(text) {
 		w := width(c)
-		if used+w > max-1 {
+		if used+w > limit-1 {
 			break
 		}
 		used += w
@@ -75,9 +77,9 @@ func singleLine(text string) string {
 	}, text)
 }
 
-// pasteable is pasted text reduced to one query line: whitespace controls
-// become spaces and other controls are dropped, so a paste can't reach the
-// terminal.
+// pasteable is typed or pasted text reduced to one query line: whitespace
+// controls become spaces and other controls are dropped, so nothing typed
+// can reach the terminal.
 func pasteable(text string) string {
 	return strings.Map(func(r rune) rune {
 		switch {

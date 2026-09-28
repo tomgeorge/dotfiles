@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/tomgeorge/go-herdrkit/herdr"
 )
 
 func TestEmptyConfigIsTheDefault(t *testing.T) {
@@ -32,14 +30,14 @@ func TestInvalidConfigIsTheDefault(t *testing.T) {
 func TestEveryAliasResolves(t *testing.T) {
 	for alias, canonical := range aliases {
 		got, ok := Named(alias)
-		if !ok || got != palettes[canonical] {
+		if !ok || got != builtins[canonical] {
 			t.Errorf("Named(%q) = %v, want %s", alias, ok, canonical)
 		}
 	}
-	if len(palettes) != 18 {
-		t.Errorf("%d palettes, Herdr 0.9.1 has 18", len(palettes))
+	if len(builtins) != 18 {
+		t.Errorf("%d builtins, Herdr 0.9.1 has 18", len(builtins))
 	}
-	for name := range palettes {
+	for name := range builtins {
 		if aliases[name] != name {
 			t.Errorf("palette %q has no alias to itself", name)
 		}
@@ -48,7 +46,7 @@ func TestEveryAliasResolves(t *testing.T) {
 
 func TestNamesAreNormalised(t *testing.T) {
 	for _, name := range []string{"Tokyo Night", "tokyo_night", "TOKYONIGHT"} {
-		if got, ok := Named(name); !ok || got != palettes["tokyo-night"] {
+		if got, ok := Named(name); !ok || got != builtins["tokyo-night"] {
 			t.Errorf("Named(%q) didn't resolve to tokyo-night", name)
 		}
 	}
@@ -56,7 +54,7 @@ func TestNamesAreNormalised(t *testing.T) {
 
 func TestNamedTheme(t *testing.T) {
 	got := Parse("[theme]\nname = \"dracula\"\n")
-	if got != palettes["dracula"] {
+	if got != builtins["dracula"] {
 		t.Errorf("got %+v, want dracula", got)
 	}
 }
@@ -72,17 +70,29 @@ func TestCustomColoursOverrideTheBase(t *testing.T) {
 [theme]
 name = "nord"
 [theme.custom]
-panel_bg = "#101010"
+accent = "#000001"
+panel_bg = "#000002"
+selection_bg = "#000003"
+overlay0 = "rgb(0, 0, 4)"
 text = "white"
-overlay0 = "rgb(1, 2, 3)"
 mauve = "#abc"
+green = "#000005"
+yellow = "#000006"
+red = "#000007"
+blue = "#000008"
 teal = "reset"
 `)
-	want := palettes["nord"]
-	want.Background = rgb(0x10, 0x10, 0x10)
-	want.Strong = lipgloss.BrightWhite
-	want.Muted = rgb(1, 2, 3)
+	want := builtins["nord"]
+	want.Accent = rgb(0, 0, 1)
+	want.Background = rgb(0, 0, 2)
+	want.Selection = rgb(0, 0, 3)
+	want.Muted = rgb(0, 0, 4)
+	want.Text = lipgloss.BrightWhite
 	want.Matched = rgb(0xaa, 0xbb, 0xcc)
+	want.Green = rgb(0, 0, 5)
+	want.Yellow = rgb(0, 0, 6)
+	want.Red = rgb(0, 0, 7)
+	want.Blue = rgb(0, 0, 8)
 	want.Teal = reset
 	if got != want {
 		t.Errorf("got  %+v\nwant %+v", got, want)
@@ -131,36 +141,13 @@ func TestParseColor(t *testing.T) {
 	}
 }
 
-func TestStatusGlyphsFollowHerdr(t *testing.T) {
-	d := Default()
-	s := Parse("[ui]\nstatus_indicators = \"symbols\"\n")
-	for _, tt := range []struct {
-		status      herdr.AgentStatus
-		dot, symbol string
-		colour      color.Color
-	}{
-		{herdr.AgentBlocked, "●", "×", d.Red},
-		{herdr.AgentWorking, "●", "◐", d.Yellow},
-		{herdr.AgentDone, "●", "✓", d.Teal},
-		{herdr.AgentIdle, "○", "○", d.Green},
-		{herdr.AgentUnknown, "·", "·", d.Muted},
-	} {
-		if g, c := d.Status(tt.status); g != tt.dot || c != tt.colour {
-			t.Errorf("dots %s = %q %v, want %q %v", tt.status, g, c, tt.dot, tt.colour)
-		}
-		if g, _ := s.Status(tt.status); g != tt.symbol {
-			t.Errorf("symbols %s = %q, want %q", tt.status, g, tt.symbol)
-		}
-	}
-}
-
 func TestLoadReadsHerdrConfigPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte("[theme]\nname = \"vesper\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HERDR_CONFIG_PATH", path)
-	if got := Load(); got != palettes["vesper"] {
+	if got := Load(); got != builtins["vesper"] {
 		t.Errorf("Load() = %+v, want vesper", got)
 	}
 	t.Setenv("HERDR_CONFIG_PATH", filepath.Join(t.TempDir(), "missing.toml"))

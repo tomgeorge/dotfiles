@@ -6,40 +6,44 @@ import tea "charm.land/bubbletea/v2"
 type Op int
 
 const (
-	Insert Op = iota + 1
-	DeleteBack
-	DeleteWord
-	ClearQuery
-	CaretHome
-	CaretEnd
-	CaretLeft
-	CaretRight
-	Next
-	Previous
-	AcceptOp
-	AbortOp
+	Insert     Op = iota + 1 // insert Text at the caret
+	DeleteBack               // delete the character before the caret
+	DeleteWord               // delete back to the start of the previous word
+	ClearQuery               // delete the whole query
+	CaretHome                // move the caret to the start of the query
+	CaretEnd                 // move the caret to the end of the query
+	CaretLeft                // move the caret one character left
+	CaretRight               // move the caret one character right
+	Next                     // move the cursor N entries down
+	Previous                 // move the cursor N entries up
+	Accept                   // choose the entry under the cursor
+	Abort                    // leave without choosing
 )
 
 // Command is an Op with its argument: Text for Insert, N for Next and
-// Previous.
+// Previous. An N of 0 moves one entry, so Command{Op: Next} does what it
+// says; a negative N moves nowhere.
 type Command struct {
 	Op   Op
 	Text string
 	N    int
 }
 
-// command maps a key to fzf's binding for it. page is how far a page key
+// commandFor maps a key to fzf's binding for it. page is how far a page key
 // moves: whatever is on screen.
 //
-// A popup receives every key, Escape included, so no Herdr binding can
-// intercept anything. A key this declines is simply dead.
-func command(k tea.Key, page int) (Command, bool) {
-	ctrl := k.Mod.Contains(tea.ModCtrl)
-	alt := k.Mod.Contains(tea.ModAlt)
-	if ctrl {
+// The picker has the whole keyboard while it runs, Escape included; a key
+// this declines does nothing.
+func commandFor(k tea.Key, page int) (Command, bool) {
+	// Alt chords, ctrl+alt included, belong to the terminal and the window
+	// manager; typing them as text would insert a letter nobody asked for.
+	if k.Mod.Contains(tea.ModAlt) {
+		return Command{}, false
+	}
+	if k.Mod.Contains(tea.ModCtrl) {
 		switch k.Code {
 		case 'c', 'g', 'q':
-			return Command{Op: AbortOp}, true
+			return Command{Op: Abort}, true
 		case 'j', 'n':
 			return Command{Op: Next, N: 1}, true
 		case 'k', 'p':
@@ -59,11 +63,6 @@ func command(k tea.Key, page int) (Command, bool) {
 		case 'f':
 			return Command{Op: CaretRight}, true
 		}
-		return Command{}, false
-	}
-	// Alt chords belong to the terminal and the window manager; typing them
-	// as text would insert a letter nobody asked for.
-	if alt {
 		return Command{}, false
 	}
 	switch k.Code {
@@ -86,12 +85,12 @@ func command(k tea.Key, page int) (Command, bool) {
 	case tea.KeyPgUp:
 		return Command{Op: Previous, N: max(page, 1)}, true
 	case tea.KeyEnter:
-		return Command{Op: AcceptOp}, true
+		return Command{Op: Accept}, true
 	case tea.KeyEscape:
-		return Command{Op: AbortOp}, true
+		return Command{Op: Abort}, true
 	}
 	if k.Text != "" {
-		return Command{Op: Insert, Text: pasteable(k.Text)}, true
+		return Command{Op: Insert, Text: k.Text}, true
 	}
 	return Command{}, false
 }

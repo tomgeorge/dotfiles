@@ -4,6 +4,10 @@ Goal: one popup, one keypress, to jump to any workspace, live agent, git
 worktree or zoxide directory. This is a Go port of Josh's `find` plugin, and
 of the reusable picker inside herdrkit that it's built on.
 
+> This is the plan the code was built from, kept for its reasoning. The code
+> has since moved on: the API sketches and file names below are out of date,
+> and the package docs in `herdr-plugins/find` are the reference.
+
 Prior art (MIT, github.com/joshrwolf/dots, read at HEAD):
 
 | Josh's file | Lines | What it is |
