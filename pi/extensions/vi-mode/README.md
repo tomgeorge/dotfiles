@@ -19,7 +19,7 @@ Run `/reload` in Pi afterward, or try it once with `pi -e ./pi/extensions/vi-mod
 ## Keys
 
 The editor starts in INSERT, which behaves like Pi's default editor. The mode,
-or the command typed so far (such as `2d3`), shows at the right of the
+or the command typed so far (such as `2d3`), shows at the left of the
 editor's bottom border.
 
 Commands take counts (`3w`, `2dd`, `d3w`; `2d3w` deletes six words).

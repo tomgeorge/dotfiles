@@ -150,6 +150,6 @@ export class ViEditor extends CustomEditor {
     const label = ` ${this.engine.pending || (this.mode === "normal" ? "NORMAL" : "INSERT")} `;
     const labelWidth = visibleWidth(label);
     if (width < labelWidth + 4) return super.renderBottomBorder(width, hiddenLineCount);
-    return super.renderBottomBorder(width - labelWidth - 1, hiddenLineCount) + this.borderColor(label + "─");
+    return this.borderColor("─" + label) + super.renderBottomBorder(width - labelWidth - 1, hiddenLineCount);
   }
 }
