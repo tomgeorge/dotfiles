@@ -1,7 +1,12 @@
 import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const READ_TOOLS = ["read", "grep", "find", "ls"] as const;
+// Extension tool from git-read.ts, loaded into the child only when requested.
+export const GIT_TOOL = "git";
+export const ALLOWED_TOOLS = [...READ_TOOLS, GIT_TOOL] as const;
+export const GIT_EXTENSION = fileURLToPath(new URL("./git-read.ts", import.meta.url));
 // Children run with --no-extensions; these are loaded explicitly anyway.
 // pi-anthropic-auth keeps Anthropic subscription auth on plan limits; without it,
 // Anthropic rejects requests with a 400 ("Third-party apps now draw from your extra usage").
@@ -27,8 +32,10 @@ export interface Progress {
 
 function describeToolCall(name: string, args: unknown): string {
   const a = (args ?? {}) as Record<string, unknown>;
-  const detail = a.path ?? a.pattern ?? a.query ?? "";
-  const text = `${name} ${typeof detail === "string" ? detail : JSON.stringify(detail)}`.trim();
+  const detail = a.path ?? a.pattern ?? a.query ?? a.args ?? "";
+  const shown = typeof detail === "string" ? detail
+    : Array.isArray(detail) ? detail.join(" ") : JSON.stringify(detail);
+  const text = `${name} ${shown}`.trim();
   return text.length > 80 ? `${text.slice(0, 77)}...` : text;
 }
 
@@ -37,16 +44,17 @@ export function validateJob(job: Job): void {
     if (!job[key]?.trim()) throw new Error(`${key} must not be empty`);
   }
   if (!isAbsolute(job.cwd)) throw new Error("cwd must be an absolute path");
-  if (!job.tools.length || job.tools.some((tool) => !READ_TOOLS.includes(tool as typeof READ_TOOLS[number]))) {
-    throw new Error(`tools must be a nonempty subset of: ${READ_TOOLS.join(", ")}`);
+  if (!job.tools.length || job.tools.some((tool) => !ALLOWED_TOOLS.includes(tool as typeof ALLOWED_TOOLS[number]))) {
+    throw new Error(`tools must be a nonempty subset of: ${ALLOWED_TOOLS.join(", ")}`);
   }
 }
 
 export function buildArgs(job: Job, extensions: readonly string[] = CHILD_EXTENSIONS): string[] {
   validateJob(job);
+  const all = job.tools.includes(GIT_TOOL) ? [...extensions, GIT_EXTENSION] : extensions;
   return [
     "-p", "--mode", "json", "--no-session", "--no-extensions",
-    ...extensions.flatMap((source) => ["-e", source]),
+    ...all.flatMap((source) => ["-e", source]),
     "--no-skills", "--no-prompt-templates", "--no-approve", "--offline",
     "--provider", job.provider, "--model", job.model,
     "--tools", job.tools.join(","),

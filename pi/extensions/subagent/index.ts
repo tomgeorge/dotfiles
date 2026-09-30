@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { READ_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
+import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
 const MAX_CONCURRENT_FLAG = "subagent-max-concurrent";
@@ -95,14 +95,14 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
-    description: "Run one read-only task in a fresh pi process. Explicit provider/model, absolute cwd, and tools; no parent conversation is copied. Only read, grep, find, ls are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
+    description: "Run one read-only task in a fresh pi process. Explicit provider/model, absolute cwd, and tools; no parent conversation is copied. Only read, grep, find, ls, and git (read-only subcommands: log, show, diff, blame, grep, merge-base, rev-parse, branch/tag listing, etc.) are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
     promptGuidelines: ["Use subagent only when the user requests or approves delegation. Include all necessary task context and use the user's chosen provider/model."],
     parameters: Type.Object({
       task: Type.String({ minLength: 1 }),
       provider: Type.String({ minLength: 1 }),
       model: Type.String({ minLength: 1, description: "Exact model ID, not an alias or pattern" }),
       cwd: Type.String({ minLength: 1, description: "Absolute working directory" }),
-      tools: Type.Array(StringEnum([...READ_TOOLS]), { minItems: 1, uniqueItems: true }),
+      tools: Type.Array(StringEnum([...ALLOWED_TOOLS]), { minItems: 1, uniqueItems: true }),
     }),
     // Independent child processes share no mutable state beyond the job map.
     executionMode: "parallel",
@@ -142,7 +142,7 @@ export default function (pi: ExtensionAPI) {
         if (slash < 1) throw new Error("Use an exact provider/model ID");
         const job: Job = {
           provider: modelName.slice(0, slash), model: modelName.slice(slash + 1),
-          task, cwd: ctx.cwd, tools: [...READ_TOOLS],
+          task, cwd: ctx.cwd, tools: [...ALLOWED_TOOLS],
         };
         const pending = run(job, ctx);
         const deliver = (result: Awaited<typeof pending>) => {

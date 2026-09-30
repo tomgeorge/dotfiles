@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildArgs, CHILD_EXTENSIONS, runSubagent, type Job } from "./runner.ts";
+import { buildArgs, CHILD_EXTENSIONS, GIT_EXTENSION, runSubagent, type Job } from "./runner.ts";
 
 const job: Job = {
   task: "--evil @file $(echo nope)", provider: "test", model: "exact/model",
@@ -35,6 +35,14 @@ test("loads only the listed child extensions", () => {
   const custom = buildArgs(job, ["./a.ts", "npm:b"]);
   assert.deepEqual(custom.filter((arg, i) => custom[i - 1] === "-e"), ["./a.ts", "npm:b"]);
   assert.ok(!buildArgs(job, []).includes("-e"));
+});
+
+test("loads the git extension only when git is requested", () => {
+  assert.ok(!buildArgs(job).includes(GIT_EXTENSION));
+  const args = buildArgs({ ...job, tools: ["read", "git"] });
+  assert.equal(args[args.indexOf(GIT_EXTENSION) - 1], "-e");
+  assert.equal(args[args.indexOf("--tools") + 1], "read,git");
+  assert.match(GIT_EXTENSION, /git-read\.ts$/);
 });
 
 test("reject invalid jobs before spawning", async () => {
@@ -110,6 +118,7 @@ test("reports child tool calls as progress", async () => {
   const result = await run(
     emit({ type: "tool_execution_start", toolCallId: "1", toolName: "grep", args: { pattern: "foo" } }) +
     emit({ type: "tool_execution_start", toolCallId: "2", toolName: "read", args: { path: "a.ts" } }) +
+    emit({ type: "tool_execution_start", toolCallId: "3", toolName: "git", args: { args: ["log", "-1"] } }) +
     emit(message("Final")),
     { onProgress: (p: unknown) => seen.push(p) },
   );
@@ -117,5 +126,6 @@ test("reports child tool calls as progress", async () => {
   assert.deepEqual(seen, [
     { toolCalls: 1, activity: "grep foo" },
     { toolCalls: 2, activity: "read a.ts" },
+    { toolCalls: 3, activity: "git log -1" },
   ]);
 });

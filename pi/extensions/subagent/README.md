@@ -27,7 +27,7 @@ No additional dependencies.
 
 With no arguments, select an authenticated model and enter a task. With arguments,
 use an exact `provider/model` ID; model IDs may themselves contain slashes. The
-command uses the current working directory and all four reading tools. It does
+command uses the current working directory and all reading tools, including `git`. It does
 not change the parent model. In interactive mode the job runs in the background, so
 you can keep chatting. Results appear in chat and become parent context;
 when idle, returning a result does not trigger an additional parent model call.
@@ -44,9 +44,27 @@ The parent can also call the `subagent` tool when you request/approve delegation
   "provider": "anthropic",
   "model": "claude-sonnet-4-6",
   "cwd": "/absolute/path/to/project",
-  "tools": ["read", "grep", "find", "ls"]
+  "tools": ["read", "grep", "find", "ls", "git"]
 }
 ```
+
+`git` is optional. When requested, the child loads `git-read.ts` with `-e`, which
+registers a `git` tool taking the arguments after `git` as an array. `git-policy.ts`
+decides what may run:
+
+- Only read subcommands: blame, cat-file, describe, diff, for-each-ref, grep, log,
+  ls-files, ls-tree, merge-base, name-rev, rev-list, rev-parse, shortlog, show,
+  show-ref, status, `reflog` (show/exists), and `branch`/`tag` with listing options
+  only (`--list` is forced, so positionals are patterns, never new refs).
+- Rejected options: `--output*`, `--ext-diff`, `--textconv`, `--filters`,
+  `--open-files-in-pager`/`-O`, `--exec`, `--upload-pack`, `--receive-pack`.
+- Always applied: `--no-pager`, `core.fsmonitor=false`, `protocol.allow=never`,
+  `GIT_OPTIONAL_LOCKS=0`, `GIT_NO_LAZY_FETCH=1`, and `--no-ext-diff`/`--no-textconv`
+  where the subcommand supports them.
+
+Configured clean/smudge filters (e.g. Git LFS) can still run when `diff` or `status`
+compares the working tree; that is the same trust boundary as the configuration
+itself. Output is capped like other results; runaway commands stop at 32 MiB.
 
 Up to 5 jobs run at once per parent session, from either entry point. The agent can
 issue several `subagent` calls in one turn and they run in parallel. Requests over
@@ -75,8 +93,8 @@ Shutdown/reload cancels all children. SIGTERM escalates to SIGKILL after one sec
 - Startup network updates are disabled with `--offline`; model requests still run.
 - Unavailable model IDs fail, never intentionally fall back. Extension-only
   providers are unsupported unless their extension is added to `CHILD_EXTENSIONS`.
-- Only `read`, `grep`, `find`, and `ls` are exposed. No bash, editing, worktree
-  creation, commits, or recursion. This is **not an OS security sandbox**: reading
+- Only `read`, `grep`, `find`, `ls`, and read-only `git` are exposed. No bash,
+  editing, worktree creation, commits, fetches, or recursion. This is **not an OS security sandbox**: reading
   can reach outside `cwd`, and Pi configuration itself can execute credential helpers.
 - The runner returns `ok`, `error`, or `cancelled`. The Pi tool adapter throws on
   failure so Pi marks it as a failed tool call; commands display an error.
@@ -88,7 +106,7 @@ Shutdown/reload cancels all children. SIGTERM escalates to SIGKILL after one sec
 ## Checks
 
 ```sh
-node --test pi/extensions/subagent/runner.test.ts
+node --test pi/extensions/subagent/runner.test.ts pi/extensions/subagent/git-policy.test.ts
 bash -n link.sh
 ```
 
