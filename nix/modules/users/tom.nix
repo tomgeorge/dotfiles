@@ -36,7 +36,10 @@ in
           programs.bash.shellAliases.docker = "podman";
         }
       ];
-      homeManager.tom-work.imports = [ hm.default ];
+      homeManager.tom-work.imports = [
+        hm.default
+        hm.devWork
+      ];
     }
   ];
 }

@@ -113,5 +113,14 @@
           yq-go
         ];
       };
+
+    homeManager.devWork =
+      { pkgs, ... }:
+      {
+        home.packages = [
+          # incident.io CLI; not in nixpkgs.
+          (pkgs.callPackage ../../pkgs/inc.nix { })
+        ];
+      };
   };
 }
