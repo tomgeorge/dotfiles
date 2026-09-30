@@ -1,0 +1,32 @@
+{
+  "service": "http://127.0.0.1:8765",
+  "backends": ["arch-router", "laya-typed-decisions"],
+  "primary": "arch-router",
+  "timeoutMs": 3000,
+  "routes": {
+    "implement": {
+      "description": "Write new code, add a feature, or propose a patch from a description or spec",
+      "models": ["openai-codex/gpt-6.1-sol", "anthropic/claude-opus-5-5", "anthropic/claude-sonnet-5-5"]
+    },
+    "debug": {
+      "description": "Find the cause of a failure, error message, crash, or unexpected behaviour",
+      "models": ["openai-codex/gpt-6.1-sol", "anthropic/claude-fable-5-1"]
+    },
+    "review": {
+      "description": "Critique existing code or a diff for bugs, security problems, and correctness",
+      "models": ["anthropic/claude-opus-5-5", "openai-codex/gpt-6.1-sol"]
+    },
+    "architecture": {
+      "description": "Design a system, compare approaches, plan a change, or weigh tradeoffs",
+      "models": ["anthropic/claude-fable-5-1", "openai-codex/gpt-6-astra"]
+    },
+    "explore": {
+      "description": "Locate code, explain how something works, or summarize files",
+      "models": ["openai-codex/gpt-6-luna", "anthropic/claude-sonnet-5-5"]
+    },
+    "test": {
+      "description": "Design or write tests, or find gaps in test coverage",
+      "models": ["anthropic/claude-sonnet-5-5", "openai-codex/gpt-6.1-sol"]
+    }
+  }
+}

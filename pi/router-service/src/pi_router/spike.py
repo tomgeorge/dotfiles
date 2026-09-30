@@ -18,6 +18,8 @@ from pathlib import Path
 from .backends import ArchRouterBackend, LayaBackend
 
 EVAL_DIR = Path(__file__).resolve().parents[2] / "eval"
+# The same routes pi sends, so the evaluation measures what's deployed.
+ROUTES_FILE = Path(__file__).resolve().parents[3] / "subagent-routes.json"
 BACKENDS = {
     "laya-english": lambda: LayaBackend("english"),
     "laya-typed-decisions": lambda: LayaBackend("typed-decisions"),
@@ -80,11 +82,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--backends", default=",".join(BACKENDS), help="comma-separated: " + ", ".join(BACKENDS))
     parser.add_argument("--tasks", type=Path, default=EVAL_DIR / "tasks.jsonl")
-    parser.add_argument("--routes", type=Path, default=EVAL_DIR / "routes.json")
+    parser.add_argument("--routes", type=Path, default=ROUTES_FILE, help="pi's subagent-routes.json")
     parser.add_argument("--out", type=Path, help="write per-task rankings as JSONL")
     args = parser.parse_args()
 
-    routes = json.loads(args.routes.read_text())
+    routes = {name: r["description"] for name, r in json.loads(args.routes.read_text())["routes"].items()}
     tasks = [json.loads(line) for line in args.tasks.read_text().splitlines() if line.strip()]
     names = [b.strip() for b in args.backends.split(",") if b.strip()]
     unknown = set(names) - set(BACKENDS)

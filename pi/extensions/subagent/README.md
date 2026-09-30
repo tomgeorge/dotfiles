@@ -106,7 +106,7 @@ Shutdown/reload cancels all children. SIGTERM escalates to SIGKILL after one sec
 ## Checks
 
 ```sh
-node --test pi/extensions/subagent/runner.test.ts pi/extensions/subagent/git-policy.test.ts
+node --test pi/extensions/subagent/*.test.ts
 bash -n link.sh
 ```
 

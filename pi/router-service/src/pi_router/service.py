@@ -176,7 +176,11 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = Settings.from_env()
-    app = create_app(load_backends(settings))
+    backends = load_backends(settings)
+    # The first call on MPS compiles kernels (~2x slower); pay that before the first real request.
+    for b in backends.values():
+        b.rank("warm up", {"debug": "Find the cause of a failure"})
+    app = create_app(backends)
     uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
 
 

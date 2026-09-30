@@ -12,28 +12,17 @@
         ...
       }:
       let
-        # Runs from the checkout, not the store: torch with MPS and laya aren't practical to
-        # package through nixpkgs, so uv installs them from pi/router-service/uv.lock.
-        project = "${config.home.homeDirectory}/git/dotfiles/pi/router-service";
+        # Same derivation as the root flake's `pi-router` package. The system flake is
+        # evaluated from the git repo, so paths outside nix/ resolve.
+        piRouter = pkgs.callPackage ../../../pi/router-service/nix/package.nix { };
         logFile = "${config.home.homeDirectory}/Library/Logs/pi-router.log";
       in
       lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
-        home.packages = [ pkgs.uv ];
-
         launchd.agents.pi-router = {
           enable = true;
           config = {
-            ProgramArguments = [
-              "${pkgs.uv}/bin/uv"
-              "run"
-              "--frozen"
-              "--project"
-              project
-              "pi-router-serve"
-            ];
-            WorkingDirectory = project;
+            ProgramArguments = [ (lib.getExe piRouter) ];
             EnvironmentVariables = {
-              PATH = "${pkgs.uv}/bin:/usr/bin:/bin:/usr/sbin:/sbin";
               PI_ROUTER_HOST = "127.0.0.1";
               PI_ROUTER_PORT = "8765";
               PI_ROUTER_DEVICE = "mps";

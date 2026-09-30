@@ -2,7 +2,7 @@
 name = "pi-router"
 version = "0.1.0"
 description = "Local System 1 model router for pi subagents (Laya and Arch-Router)"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 dependencies = [
   "laya==0.3.22",
   "torch>=2.4",
@@ -11,13 +11,9 @@ dependencies = [
   "uvicorn>=0.27",
 ]
 
-[dependency-groups]
-dev = ["pytest>=8", "httpx2"]
-
 [project.scripts]
 pi-router-serve = "pi_router.service:main"
 pi-router-warm = "pi_router.service:warm"
-pi-router-spike = "pi_router.spike:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -28,3 +24,4 @@ packages = ["src/pi_router"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]

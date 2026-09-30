@@ -1,19 +1,27 @@
-# uv comes from the pi-router home-manager module; outside it, run
-# `nix shell nixpkgs#uv -c make <target>`.
-.PHONY: test lint warm serve spike
+# Python and every dependency come from the root flake's `router` dev shell. Targets enter it
+# automatically unless it's already active (direnv in this directory, or `nix develop`).
+ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+RUN := $(if $(PI_ROUTER_DEVSHELL),,nix develop $(ROOT)\#router -c)
+PY := $(RUN) env PYTHONPATH=src python
+
+.PHONY: test lint warm serve spike build
 
 test:
-	uv run --frozen pytest -q
+	$(PY) -m pytest -q
 
 lint:
-	uv run --frozen --with ruff ruff check src tests
+	$(RUN) ruff check src tests
 
-# Download and load the pinned models once; the service itself runs offline.
+# Download and load the pinned models once; the launchd service itself runs offline.
 warm:
-	uv run --frozen pi-router-warm
+	$(PY) -m pi_router warm
 
 serve:
-	uv run --frozen pi-router-serve
+	$(PY) -m pi_router serve
 
 spike:
-	uv run --frozen pi-router-spike
+	$(PY) -m pi_router spike
+
+# The same package the launchd agent runs, including its test suite.
+build:
+	nix build $(ROOT)\#pi-router --no-link --print-out-paths

@@ -15,10 +15,15 @@ evaluation results are in [`ROUTER_PLAN.md`](../../ROUTER_PLAN.md).
 
 ## Run
 
+Nix manages every dependency. `nix/package.nix` builds the service from
+nixpkgs (torch, transformers, fastapi, uvicorn) plus Laya, packaged from its
+PyPI wheel in `nix/laya.nix`. The root flake exposes it as `.#pi-router` and
+provides a `router` dev shell. The build runs the test suite.
+
 On macOS, the `piRouter` home-manager module (`nix/modules/features/pi-router.nix`)
-installs `uv` and a launchd agent that runs the service at login on
-`127.0.0.1:8765`. The agent runs offline, so download the pinned models once
-first (about 4.5 GB into `~/.cache/huggingface`):
+runs the same package as a launchd agent at login on `127.0.0.1:8765`. The
+agent runs offline, so download the pinned models once first (about 4.5 GB
+into `~/.cache/huggingface`):
 
 ```sh
 make router-warm        # from the repo root
@@ -26,11 +31,9 @@ sudo darwin-rebuild switch --flake ~/git/dotfiles/nix
 curl -s localhost:8765/health
 ```
 
-Logs: `~/Library/Logs/pi-router.log`. Restart after changing code or the lockfile:
-
-```sh
-launchctl kickstart -k gui/$(id -u)/org.nix-community.home.pi-router
-```
+Logs: `~/Library/Logs/pi-router.log`. Code changes reach the agent through
+`darwin-rebuild switch`, like any other package. New files must be tracked
+by git (`git add`) before a flake can see them.
 
 Model revisions are pinned in `src/pi_router/service.py`; both the agent and
 `make router-warm` use them. To upgrade, change them, run `make router-warm`,
@@ -73,9 +76,15 @@ curl -s localhost:8765/v1/route -H 'content-type: application/json' -d '{
 make router-test        # service tests with fake backends; no models needed
 make router-lint
 make router-spike       # evaluate every backend on eval/tasks.jsonl (loads real models)
+make router-build       # nix build .#pi-router, which also runs the tests
 ```
 
-Outside the home-manager setup, prefix with `nix shell nixpkgs#uv -c`.
-`eval/tasks.jsonl` holds labelled tasks and `eval/routes.json` the route
-descriptions used for evaluation. Keep the tasks free of private details:
-this repository is public.
+The targets enter the `router` dev shell themselves. To work inside it,
+run `direnv allow` in `pi/router-service` (its `.envrc` loads `#router`) or
+`nix develop .#router`. It's a separate shell from `default` so the torch
+closure only loads here. From a checkout, `python -m pi_router serve|warm|spike`
+runs any entry point with `PYTHONPATH=src`.
+
+`eval/tasks.jsonl` holds labelled tasks. The spike reads route descriptions
+from pi's `pi/subagent-routes.json`, so it measures the routes pi sends. Keep
+the tasks free of private details: this repository is public.

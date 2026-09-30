@@ -100,15 +100,15 @@ A backend that fails returns `{"error": "..."}` and doesn't fail the others.
 
 ### Packaging and service (Nix)
 
-- Code: `pi/router-service/`, a `uv` project (`pyproject.toml` +
-  `uv.lock`) with `laya`, `transformers`, `torch`, `fastapi`, `uvicorn`.
-  `laya` isn't in nixpkgs, and torch with MPS support is painful to build
-  through Nix on darwin. A locked uv environment is the pragmatic choice.
-- Nix: new `nix/modules/features/pi-router.nix` home-manager module:
-  - adds `uv` to `home.packages`.
-  - darwin: `launchd.agents.pi-router` with `RunAtLoad`, `KeepAlive`, logs
-    in `~/Library/Logs/pi-router.log`.
-  - command: `uv run --frozen --project <dotfiles>/pi/router-service pi-router-serve`.
+- Code: `pi/router-service/`. Nix manages every dependency.
+  `nix/package.nix` builds it from nixpkgs (torch 2.13 with MPS,
+  transformers, fastapi, uvicorn) plus Laya, packaged from its PyPI wheel
+  (`nix/laya.nix`). The root flake exposes `.#pi-router` and a `router` dev
+  shell, the same way it provides go-herdrkit's toolchain.
+- Nix: `nix/modules/features/pi-router.nix` home-manager module:
+  - darwin: `launchd.agents.pi-router` runs the store-built
+    `pi-router-serve` with `RunAtLoad`, `KeepAlive`, and logs in
+    `~/Library/Logs/pi-router.log`.
   - env: `PI_ROUTER_HOST=127.0.0.1`, `PI_ROUTER_PORT=8765`,
     `PI_ROUTER_DEVICE=mps`, `HF_HUB_OFFLINE=1`.
 - Model revisions are pinned in `pi_router/service.py`, so the service and
@@ -210,7 +210,7 @@ Two sources of labels:
 
 1. **Offline set**: `pi/router-service/eval/tasks.jsonl`, 40–60 hand-labelled
    engineering tasks (seeded from past `subagent` calls in
-   `~/.pi/agent/sessions/*.jsonl`). `uv run pi-router-eval` reports, per
+   `~/.pi/agent/sessions/*.jsonl`). `make router-eval` reports, per
    backend: top-1/top-3 accuracy, confusion matrix, calibration (does p≈0.8
    mean right ~80% of the time?), p50/p95 latency, and truncation rate.
 2. **Online log**: each confirmation in the picker is a label.
@@ -226,10 +226,10 @@ Two sources of labels:
    offline set. Checks: that Arch-Router's per-route scoring matches its
    greedy output, Laya's truncation, latency on MPS. Stop if neither backend
    beats ~70% top-1 on six routes.
-1. **Service + Nix.** *Done; see `pi/router-service/README.md`.* `pi/router-service` with `/v1/route` and `/health`,
+1. **Service + Nix.** *Done; see `pi/router-service/README.md`. Moved from uv to Nix-managed dependencies.* `pi/router-service` with `/v1/route` and `/health`,
    pytest against small fake backends, the home-manager module, and the
    `make router-warm` target.
-2. **`router.ts` + config + tests.** Node tests against a local fake HTTP
+2. **`router.ts` + config + tests.** *Done: `pi/extensions/subagent/router.ts`, `pi/subagent-routes.json` (linked by `link.sh`).* Node tests against a local fake HTTP
    server (same style as `runner.test.ts`): ranking, availability filtering,
    duplicate models, timeout → unavailable, unsure → fallback.
 3. **Pi integration.** Optional model on the tool, reordered `/subagent`,
@@ -248,11 +248,11 @@ Two sources of labels:
 
 ## Phase 0 results
 
-Run with `cd pi/router-service && uv run pi-router-spike` (uv via
-`nix shell nixpkgs#uv` until the Nix module lands). 59 labelled tasks in
+Run with `make router-spike`. First run under uv (Python 3.12, torch 2.14);
+repeated under Nix (Python 3.14, torch 2.13) with identical accuracy. 59 labelled tasks in
 `eval/tasks.jsonl`: 8 real past subagent tasks (all reviews), 48 hand-written
 (~8 per route), 4 non-engineering tasks, 3 long tasks where the goal comes
-after ~450 tokens of context. Routes are in `eval/routes.json`, first draft
+after ~450 tokens of context. Routes (now in `pi/subagent-routes.json`) were a first draft
 without tuning. M-series Mac, MPS.
 
 | Backend | Top-1 | Top-3 | p50 latency | Notes |
