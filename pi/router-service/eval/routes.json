@@ -1,0 +1,8 @@
+{
+  "implement": "Write new code, add a feature, or propose a patch from a description or spec",
+  "debug": "Find the cause of a failure, error message, crash, or unexpected behaviour",
+  "review": "Critique existing code or a diff for bugs, security problems, and correctness",
+  "architecture": "Design a system, compare approaches, plan a change, or weigh tradeoffs",
+  "explore": "Locate code, explain how something works, or summarize files",
+  "test": "Design or write tests, or find gaps in test coverage"
+}

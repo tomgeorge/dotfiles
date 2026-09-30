@@ -29,6 +29,7 @@ in
       homeManager.tom.imports = [
         hm.default
         hm.gpgTools
+        hm.piRouter
         # docker -> podman only on personal machines; work uses orbstack
         {
           programs.fish.shellAliases.docker = "podman";
@@ -39,6 +40,7 @@ in
       homeManager.tom-work.imports = [
         hm.default
         hm.devWork
+        hm.piRouter
       ];
     }
   ];

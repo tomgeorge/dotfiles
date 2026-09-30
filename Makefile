@@ -7,3 +7,7 @@ all build link test test-lua test-e2e test-all lint:
 
 build-%:
 	$(MAKE) -C herdr-plugins $@
+
+# pi/router-service targets: make router-test, router-warm, router-lint, ...
+router-%:
+	$(MAKE) -C pi/router-service $*
