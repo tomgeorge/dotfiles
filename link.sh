@@ -39,6 +39,8 @@ link pi/AGENTS.md ~/.pi/agent/AGENTS.md
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
 link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
 link pi/extensions/slack-mcp ~/.pi/agent/extensions/slack-mcp
+# pi-only: Claude Code has Slack directly, so it shouldn't see a skill that calls itself.
+link pi/skills/slack ~/.pi/agent/skills/slack
 
 if [[ ! -x ~/.local/bin/herdr-nav ]]; then
   echo "note: herdr-nav isn't installed; run \`make link\` in herdr-plugins/ (nvim can't hand off to herdr or WezTerm without it)" >&2
