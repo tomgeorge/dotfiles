@@ -31,6 +31,7 @@ class LayaBackend:
     """Laya `choice` question; the distribution over options is the ranking."""
 
     INSTRUCTIONS = "Which kind of software engineering work does this task ask for?"
+    DIFFICULTY_INSTRUCTIONS = "How much reasoning effort does this software engineering task need?"
 
     REPO = "convaiinnovations/laya"
 
@@ -61,6 +62,25 @@ class LayaBackend:
             extra={"truncated": bool(usage.get("truncated")),
                    "state_tokens_dropped": usage.get("state_tokens_dropped", 0)},
         )
+
+    def rate(self, task: str, levels: dict[str, str], mode: str = "choice") -> Ranking:
+        """Rank ordered difficulty `levels` (easiest first). `mode` is Laya's question type:
+        `choice` treats levels as unordered options; `score` uses its ordinal head."""
+        if mode not in ("choice", "score"):
+            raise ValueError(f"mode must be choice or score, got {mode!r}")
+        names = list(levels)
+        if mode == "choice":
+            q = {"type": "choice", "instructions": self.DIFFICULTY_INSTRUCTIONS, "criteria": dict(levels)}
+        else:
+            q = {"type": "score", "instructions": self.DIFFICULTY_INSTRUCTIONS,
+                 "criteria": [f"{n}: {d}" for n, d in levels.items()]}
+        start = time.perf_counter()
+        answer = self.router.predict(task, {"d": q}, model=self.checkpoint)["answers"]["d"]
+        latency = (time.perf_counter() - start) * 1000
+        probs = answer["probabilities"]
+        # `score` keys its distribution by level index ("0", "1", ...).
+        pairs = [(n, probs[n] if mode == "choice" else probs[str(i)]) for i, n in enumerate(names)]
+        return Ranking(ranked=sorted(pairs, key=lambda kv: kv[1], reverse=True), latency_ms=latency)
 
 
 # Upstream's prompt, verbatim: the model card says it works best with this exact format.
@@ -129,12 +149,21 @@ class ArchRouterBackend:
         # transformers 5 returns a BatchEncoding here; 4.x returned a list.
         return list(ids["input_ids"] if hasattr(ids, "keys") else ids)
 
-    @torch.no_grad()
     def rank(self, task: str, routes: dict[str, str], greedy: bool = False) -> Ranking:
         """`greedy` also generates the model's own answer; it roughly doubles latency."""
+        return self._score(task, routes, with_other=True, greedy=greedy)
+
+    def rate(self, task: str, levels: dict[str, str], mode: str = "choice") -> Ranking:
+        """Rank difficulty `levels` by presenting them as routes. Arch-Router wasn't trained for
+        this; it's an experiment measured by the spike."""
+        del mode  # only one way to ask
+        return self._score(task, levels, with_other=False)
+
+    @torch.no_grad()
+    def _score(self, task: str, routes: dict[str, str], with_other: bool, greedy: bool = False) -> Ranking:
         start = time.perf_counter()
         prompt = self._prompt_ids(task, routes)
-        names = list(routes) + [OTHER]
+        names = list(routes) + ([OTHER] if with_other else [])
         # `other` is not listed in <routes>: upstream's prompt names it as the fallback instead.
         conts = [self.tok.encode(s.format(n), add_special_tokens=False) for n in names for s in self.SPELLINGS]
 

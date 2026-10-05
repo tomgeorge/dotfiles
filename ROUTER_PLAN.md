@@ -282,6 +282,28 @@ they are short and clean. Real tasks are longer and start with role
 instructions ("You are an adversarial reviewer…"). Expect lower accuracy in
 real use; the online log (phase 3) is the real test. Go decision: proceed.
 
+## Difficulty → thinking level (experiment)
+
+Goal: rate each task easy/moderate/hard and map it to Pi's `--thinking`
+(`low`/`medium`/`high`, in `pi/subagent-routes.json` under `difficulty`).
+Pi clamps unsupported levels per model, so any level is safe to pass.
+
+`make router-spike` with `--difficulty`, same 59 tasks, difficulty labelled by
+hand (19 easy, 29 moderate, 11 hard; my labels, subjective). Baseline: always
+"moderate" is right 49% of the time.
+
+| Variant | Exact | Hard found | Easy found | Its "hard" calls really hard | p50 |
+|---|---|---|---|---|---|
+| arch-router (levels as routes) | 39% | 8/11 | 8/19 | 8/26 | 236 ms |
+| laya-typed-decisions, choice | 44% | 3/11 | 1/19 | 3/11 | 68 ms |
+| laya-typed-decisions, score | 47% | 3/11 | 0/19 | 3/8 | 64 ms |
+| laya-english, choice | 47% | 3/11 | 5/19 | 3/12 | 59 ms |
+
+Result: **no variant beats the baseline**, and confidence doesn't track
+accuracy (Arch-Router is right 48% of the time at p ≥ 0.8). Laya collapses to
+"moderate"; Arch-Router finds most hard tasks but calls a third of all tasks
+hard. Zero-shot difficulty isn't usable as-is; not wired into Pi.
+
 ## Open questions
 
 - Unsure rules per backend: set them once the online log has ~50 entries.
