@@ -65,6 +65,12 @@
           pinentry.package = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
         };
 
+        # Upstream gnupg can't receive launchd-passed sockets, so the HM launchd
+        # agent dies with "file descriptor 3 must be valid in --supervised mode"
+        # and KeepAlive restarts it every 10s forever. gpg autostarts its own
+        # agent on ~/.gnupg/S.gpg-agent anyway, so drop the broken service.
+        launchd.agents.gpg-agent.enable = lib.mkForce false;
+
         programs.mise = {
           enable = true;
           enableFishIntegration = true;
@@ -115,8 +121,24 @@
       };
 
     homeManager.devWork =
-      { pkgs, ... }:
+      { config, pkgs, ... }:
+      let
+        gnupgHome = config.programs.gpg.homedir;
+      in
       {
+        # Temporary: diagnose what resets the YubiKey (and drops the cached
+        # PIN) when agents sign commits. Remove once found.
+        programs.gpg.scdaemonSettings = {
+          log-file = "${gnupgHome}/scdaemon.log";
+          debug-level = "basic";
+        };
+        services.gpg-agent = {
+          verbose = true;
+          extraConfig = ''
+            log-file ${gnupgHome}/gpg-agent.log
+          '';
+        };
+
         home.packages = [
           # incident.io CLI; not in nixpkgs.
           (pkgs.callPackage ../../pkgs/inc.nix { })
