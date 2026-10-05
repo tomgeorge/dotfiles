@@ -1,7 +1,8 @@
 # One-shot subagent
 
 One explicit job → fresh Pi process → result. No agent personas, shared conversation,
-workflow engine, recursive delegation, or automatic model selection.
+workflow engine, or recursive delegation. A local router can *suggest* models; you
+always confirm one.
 
 ## Install
 
@@ -20,14 +21,17 @@ No additional dependencies.
 
 ```text
 /subagent
+/subagent Review src/auth.ts for security problems
 /subagent anthropic/claude-sonnet-4-6 Review src/auth.ts for security problems
 /subagent-cancel      # cancel all running jobs
 /subagent-cancel 2    # cancel job #2
 ```
 
-With no arguments, select an authenticated model and enter a task. With arguments,
-use an exact `provider/model` ID; model IDs may themselves contain slashes. The
-command uses the current working directory and all reading tools, including `git`. It does
+With no arguments, enter a task, then choose a model (see [Model suggestions](#model-suggestions)).
+With only a task, choose a model for it. If the first word is an exact available
+`provider/model` ID, that model runs the rest; model IDs may themselves contain slashes.
+A first word like `anthropic/claude-typo` (a known provider, unknown model) is an error,
+not part of the task. The command uses the current working directory and all reading tools, including `git`. It does
 not change the parent model. In interactive mode the job runs in the background, so
 you can keep chatting. Results appear in chat and become parent context;
 when idle, returning a result does not trigger an additional parent model call.
@@ -36,7 +40,9 @@ Each job gets a number (`#1`, `#2`, ...). While it runs, its status-bar line sho
 and its latest tool call. Tool-launched jobs also stream this line into the tool row.
 The parent agent's turn still waits for a tool-launched job, as for any tool call.
 
-The parent can also call the `subagent` tool when you request/approve delegation:
+The parent can also call the `subagent` tool when you request/approve delegation.
+If you named a model, it passes it; otherwise it omits `provider` and `model`, and
+you pick from suggestions before the job starts (an error without an interactive UI):
 
 ```json
 {
@@ -47,6 +53,33 @@ The parent can also call the `subagent` tool when you request/approve delegation
   "tools": ["read", "grep", "find", "ls", "git"]
 }
 ```
+
+### Model suggestions
+
+When no model is given, `router.ts` sends the task to the local router service
+(`pi/router-service`, on `127.0.0.1:8765`), which ranks it against the routes in
+`~/.pi/agent/subagent-routes.json` (linked from `pi/subagent-routes.json`). The picker
+lists each route's models, best route first, with every router backend's score:
+
+```text
+Subagent model — arch-router: review 1.00 · laya-typed-decisions: review 0.60
+  anthropic/claude-opus-5-5   review   arch-router 1.00 · laya-typed-decisions 0.60
+  openai-codex/gpt-6.1-sol    review   arch-router 1.00 · laya-typed-decisions 0.60
+  …
+  All models…
+```
+
+- The title shows each backend's top pick, `(disagree)` when they differ, and `unsure`
+  when the task looks off-topic or fails a configured `unsure` rule.
+- If the router isn't running, times out (`timeoutMs`, default 3 s), or fails, the full
+  model list opens with the reason. A missing config file turns routing off; a broken
+  one warns and does the same.
+- Configured models not available in this Pi are left out and named in the title.
+- One picker opens at a time; parallel tool calls wait their turn.
+- Every routed attempt, including cancellations, is appended to
+  `~/.pi/agent/router/decisions.jsonl` (mode 0600; it contains task text): the
+  rankings, what you picked, and whether it was the top suggestion. These are the
+  labels for comparing the backends.
 
 `git` is optional. When requested, the child loads `git-read.ts` with `-e`, which
 registers a `git` tool taking the arguments after `git` as an array. `git-policy.ts`

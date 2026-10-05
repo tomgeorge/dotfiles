@@ -232,7 +232,7 @@ Two sources of labels:
 2. **`router.ts` + config + tests.** *Done: `pi/extensions/subagent/router.ts`, `pi/subagent-routes.json` (linked by `link.sh`).* Node tests against a local fake HTTP
    server (same style as `runner.test.ts`): ranking, availability filtering,
    duplicate models, timeout → unavailable, unsure → fallback.
-3. **Pi integration.** Optional model on the tool, reordered `/subagent`,
+3. **Pi integration.** *Done: `picker.ts` + `index.ts`; see the subagent README.* Optional model on the tool, reordered `/subagent`,
    compare-mode picker, decision log, README update.
 4. **Eval report.** `pi-router-eval` for the offline set and the log.
 5. **Later: auto-select.** Config such as

@@ -265,6 +265,8 @@ export function formatChoice(choice: Choice, backends: string[]): string {
 
 export interface Decision {
   time: string;
+  /** Which entry point asked: the `/subagent` command or the `subagent` tool. */
+  via?: "command" | "tool";
   task: string;
   outcome: RouteOutcome;
   rankedBy?: string;
