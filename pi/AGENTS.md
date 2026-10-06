@@ -40,3 +40,6 @@ Use `ketch` for external research — web pages, OSS code, library docs.
 - `ketch code "query" --lang go` for real OSS code with repo/line context
 - `ketch docs "query" --library /org/repo` for version-aware library docs
 - All commands support `--json`. `ketch config` reports active backends.
+
+## Work
+For work-specific instructions, read `~/.pi/agent/WORK.md` if it exists. It is kept out of this repo.
