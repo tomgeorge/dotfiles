@@ -8,6 +8,7 @@
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
         hunk = pkgs.callPackage ../../pkgs/hunk.nix { };
+        wt = pkgs.callPackage ../../pkgs/wt.nix { };
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
         # ignores on macOS, so they write to the read-only sandbox $HOME and
         # fail. The binary itself is fine. Drop once nixpkgs fixes the package.
@@ -115,6 +116,7 @@
           stow
           tmux
           tree-sitter
+          wt
           yazi
           yq-go
         ];
