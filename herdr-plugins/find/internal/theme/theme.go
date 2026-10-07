@@ -235,7 +235,9 @@ func (c config) resolve() Theme {
 // named are the colour names Herdr accepts, as ANSI indices the way ratatui
 // numbers them: its "gray" is ANSI 7 and its "white" ANSI 15.
 var named = map[string]color.Color{
-	"black": lipgloss.Black, "red": lipgloss.Red, "green": lipgloss.Green,
+	"black":  lipgloss.Black,
+	"red":    lipgloss.Red,
+	"green":  lipgloss.Green,
 	"yellow": lipgloss.Yellow, "blue": lipgloss.Blue,
 	"magenta": lipgloss.Magenta, "purple": lipgloss.Magenta,
 	"cyan": lipgloss.Cyan, "gray": lipgloss.White, "grey": lipgloss.White,

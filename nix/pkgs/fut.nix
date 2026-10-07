@@ -1,0 +1,94 @@
+{
+  lib,
+  stdenv,
+  applyPatches,
+  callPackage,
+  cctools,
+  fetchFromGitHub,
+  runCommand,
+  rustPlatform,
+  xcbuild,
+  zig_0_16,
+}:
+
+let
+  # Must match GHOSTTY_COMMIT in vendor/libghostty-vt-sys/build.rs for this fut release.
+  ghostty = applyPatches {
+    name = "ghostty-source";
+    src = fetchFromGitHub {
+      owner = "ghostty-org";
+      repo = "ghostty";
+      rev = "ab0b9da9e88fcb4b0533a1854e84628f663930af";
+      hash = "sha256-LZuEFAt3/wfn6YWfk7NHnqLAtZ9g4mi6yTptx0mLKj0=";
+    };
+    # Absolute tool paths don't exist in the Darwin sandbox (mirrors nixpkgs' libghostty-vt).
+    postPatch = lib.optionalString stdenv.hostPlatform.isDarwin ''
+      substituteInPlace src/build/LibtoolStep.zig \
+        --replace-fail /bin/cp cp \
+        --replace-fail /usr/bin/ranlib ranlib
+    '';
+  };
+
+  # The build script would otherwise git-clone Ghostty and let Zig fetch its
+  # dependencies, neither of which works in the sandbox.
+  ghosttyZigDeps = callPackage "${ghostty}/build.zig.zon.nix" {
+    # Zig mis-resolves relative paths through symlinked package dirs, so copy
+    # instead of symlinking (https://codeberg.org/ziglang/zig/issues/32121).
+    linkFarm =
+      name: entries:
+      runCommand name { } ''
+        mkdir -p $out
+        ${lib.concatMapStringsSep "\n" (e: "cp -rL ${e.path} $out/${e.name}") entries}
+      '';
+  };
+in
+rustPlatform.buildRustPackage (finalAttrs: {
+  pname = "fut";
+  version = "0.32";
+
+  src = fetchFromGitHub {
+    owner = "mikker";
+    repo = "fut";
+    tag = finalAttrs.version;
+    hash = "sha256-m+aKo/dQYhRjtn6vHKSXI6QJ3znJ8uDr48MUKoU8Pe0=";
+  };
+
+  cargoHash = "sha256-RcqG9qUbrvVM9fUp3yL49LUvAoGZy9XIrqpw4/DK334=";
+
+  nativeBuildInputs = [
+    zig_0_16
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isDarwin [
+    cctools
+    # Provides xcrun, which Zig uses to locate the macOS SDK.
+    xcbuild
+  ];
+
+  # Zig is only called from libghostty-vt-sys's build script; keep its setup
+  # hook from replacing the cargo phases.
+  dontUseZigConfigure = true;
+  dontUseZigBuild = true;
+  dontUseZigCheck = true;
+  dontUseZigInstall = true;
+
+  env.GHOSTTY_ZIG_SYSTEM_DIR = ghosttyZigDeps;
+
+  preBuild = ''
+    # Zig writes build artifacts next to build.zig, so it needs a writable copy.
+    cp -r ${ghostty} "$TMPDIR/ghostty"
+    chmod -R u+w "$TMPDIR/ghostty"
+    export GHOSTTY_SOURCE_DIR="$TMPDIR/ghostty"
+    export ZIG_GLOBAL_CACHE_DIR="$TMPDIR/zig-cache"
+  '';
+
+  # The test suite drives real PTYs and daemons, which the sandbox doesn't allow.
+  doCheck = false;
+
+  meta = {
+    description = "Persistent, agent-aware terminal multiplexer";
+    homepage = "https://fut.sh";
+    # Upstream ships no license file.
+    license = lib.licenses.unfree;
+    mainProgram = "fut";
+  };
+})
