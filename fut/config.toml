@@ -1,6 +1,4 @@
 #:schema https://fut.sh/schemas/config.json
-# Fut has no shell setting: its daemon spawns $SHELL. The fish alias in
-# nix/modules/features/fish.nix points that at fish (macOS's login shell is zsh).
 
 # `fut project NAME` falls back to ~/git/NAME.
 projects_dir = "~/git"
@@ -10,6 +8,11 @@ extensions = [
   "~/.config/fut/extensions/wt",
   "~/.config/fut/extensions/ghostty-title",
 ]
+
+# Otherwise panes run $SHELL, which is zsh on macOS: nix-darwin doesn't change
+# the login shell (see TODO.md). terminal.shell comes from my fork's trunk.
+[terminal]
+shell = "/run/current-system/sw/bin/fish"
 
 # Pass a BEL to Ghostty when a terminal inside fut rings. Agent lifecycle
 # reports alone don't trigger it (fut 0.32), only real terminal bells.

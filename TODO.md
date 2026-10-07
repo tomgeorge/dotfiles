@@ -6,8 +6,8 @@
 nothing on macOS: nix-darwin only applies it to users listed in
 `users.knownUsers` with a `uid` set, and its docs say not to put the admin user
 there. So `dscl . -read ~ UserShell` is still `/bin/zsh`, and `$SHELL` is zsh
-even inside fish. For now, a `fut` alias in `fish.nix` sets `SHELL` so fut's
-daemon spawns fish.
+even inside fish. Fut sidesteps this with `terminal.shell` in
+`fut/config.toml`.
 
 Options:
 
@@ -19,8 +19,6 @@ Options:
    a user whose uid doesn't match. Costs: hardcoded uid per host, it resets
    `PrimaryGroupID` (default 20, `staff`) on every rebuild, and it may clash
    with MDM on the work Mac.
-
-Either way, drop the `fut` alias afterwards.
 
 References:
 

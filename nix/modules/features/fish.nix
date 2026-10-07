@@ -35,9 +35,6 @@
             diff = "nvim -d";
             cd = "z";
             hmh = "man home-configuration.nix";
-            # fut's daemon spawns $SHELL, which fish leaves as the login shell
-            # (zsh on macOS, where nix-darwin doesn't change it). See TODO.md.
-            fut = "SHELL=${pkgs.fish}/bin/fish command fut";
             ramdisk =
               if pkgs.stdenv.hostPlatform.isDarwin then
                 "diskutil erasevolume HFS+ 'RAMDisk' $(hdiutil attach -nomount ram://2048)"
