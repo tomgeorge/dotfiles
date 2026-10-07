@@ -46,16 +46,17 @@ let
 in
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "fut";
-  version = "0.32";
+  version = "0.34-unstable-2026-10-07";
 
+  # The `trunk` branch of my fork: upstream 0.34 plus my open PRs to mikker/fut.
   src = fetchFromGitHub {
-    owner = "mikker";
+    owner = "tomgeorge";
     repo = "fut";
-    tag = finalAttrs.version;
-    hash = "sha256-m+aKo/dQYhRjtn6vHKSXI6QJ3znJ8uDr48MUKoU8Pe0=";
+    rev = "eb4fbe12113e18455df168e8ed7ab657a5009684";
+    hash = "sha256-4d3PGfCGGZ5TRvMEPyT7AyuNzjBD9NsuMXoTmToVocQ=";
   };
 
-  cargoHash = "sha256-RcqG9qUbrvVM9fUp3yL49LUvAoGZy9XIrqpw4/DK334=";
+  cargoHash = "sha256-bGGTFllgvjITpDlOHgzUYw1e32dYrGsi9he8Ze7DsfY=";
 
   nativeBuildInputs = [
     zig_0_16
