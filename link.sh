@@ -39,6 +39,7 @@ link pi/AGENTS.md ~/.pi/agent/AGENTS.md
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
 link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
 link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
+link pi/extensions/mcp-confirm ~/.pi/agent/extensions/mcp-confirm
 link pi/extensions/slack-mcp ~/.pi/agent/extensions/slack-mcp
 # pi-only: Claude Code has Slack directly, so it shouldn't see a skill that calls itself.
 link pi/skills/slack ~/.pi/agent/skills/slack
