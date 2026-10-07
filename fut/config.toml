@@ -1,0 +1,102 @@
+#:schema https://fut.sh/schemas/config.json
+# Fut has no shell setting: its daemon spawns $SHELL. The fish alias in
+# nix/modules/features/fish.nix points that at fish (macOS's login shell is zsh).
+
+# `fut project NAME` falls back to ~/git/NAME.
+projects_dir = "~/git"
+
+# Bundled extensions, linked from the fut package by nix (dev.nix).
+extensions = [
+  "~/.config/fut/extensions/wt",
+  "~/.config/fut/extensions/ghostty-title",
+]
+
+# Pass a BEL to Ghostty when a terminal inside fut rings. Agent lifecycle
+# reports alone don't trigger it (fut 0.32), only real terminal bells.
+[alerts]
+signal_outer_terminal = true
+
+[ui]
+# Same prefix as herdr and WezTerm.
+prefix = "ctrl-a"
+
+[ui.bindings]
+# Mirror herdr's split keys; the defaults (| and _) keep working too.
+split_pane_down = "-"
+split_pane_right = "v"
+# The palette has these but they ship unbound.
+rename_tab = "r"
+rename_workspace = "W"
+"wt:new-worktree" = "N"
+
+[ui.icons]
+# Ghostty and WezTerm both bundle the Nerd Font symbols, so this works with
+# any font.
+preset = "nerd_font"
+
+# The default right sidebar shows only the focused session's agents; list
+# every session's so blocked/finished agents elsewhere stay visible.
+[ui.sidebar.right]
+components = [
+  { component = "agents", size = "fill", scope = "global" },
+]
+
+[ui.spinner]
+style = "dots"
+
+[ui.tab_bar]
+# position = "bottom"
+
+# Catppuccin Frappe, matching Ghostty and herdr. Each table replaces the
+# whole default style, so modifiers are restated.
+[ui.styles.muted]
+foreground = "#838ba7" # overlay1
+
+# Hierarchy fades from accent to text, as Catppuccin's own ports do. The
+# navigator's selected row reverses these (it ignores ui.styles.selected),
+# so they double as its highlight colors.
+[ui.styles.session]
+foreground = "#ca9ee6" # mauve
+add_modifiers = ["bold"]
+
+[ui.styles.workspace]
+foreground = "#8caaee" # blue
+
+[ui.styles.tab]
+foreground = "#babbf1" # lavender
+
+[ui.styles.pane]
+foreground = "#a5adce" # subtext0
+
+[ui.styles.current]
+foreground = "#ca9ee6" # mauve
+add_modifiers = ["reversed", "bold"]
+remove_modifiers = ["underlined"]
+
+[ui.styles.selected]
+background = "#414559" # surface0
+remove_modifiers = ["reversed"]
+
+[ui.styles.closing]
+foreground = "#737994" # overlay0
+add_modifiers = ["crossed_out"]
+
+[ui.styles.activity]
+foreground = "#99d1db" # sky
+
+[ui.styles.attention]
+foreground = "#ef9f76" # peach
+add_modifiers = ["bold"]
+
+[ui.styles.error]
+foreground = "#e78284" # red
+add_modifiers = ["bold"]
+
+[ui.styles.divider]
+foreground = "#51576d" # surface1
+
+[ui.styles.added]
+foreground = "#a6d189" # green
+
+[ui.styles.deleted]
+foreground = "#e78284" # red

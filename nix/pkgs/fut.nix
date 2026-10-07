@@ -5,8 +5,10 @@
   callPackage,
   cctools,
   fetchFromGitHub,
+  python3,
   runCommand,
   rustPlatform,
+  stdenvNoCC,
   xcbuild,
   zig_0_16,
 }:
@@ -83,6 +85,27 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   # The test suite drives real PTYs and daemons, which the sandbox doesn't allow.
   doCheck = false;
+
+  # The bundled extensions, kept out of the main derivation so changing them
+  # doesn't rebuild fut. Each is a directory to list under `extensions`.
+  passthru.extensions = stdenvNoCC.mkDerivation {
+    pname = "fut-extensions";
+    inherit (finalAttrs) version src;
+
+    # wt's adapters need python3; macOS only has the Xcode CLT stub.
+    buildInputs = [ python3 ];
+
+    dontConfigure = true;
+    dontBuild = true;
+
+    installPhase = ''
+      mkdir -p $out/share/fut
+      cp -r extensions $out/share/fut/extensions
+      rm -r $out/share/fut/extensions/*/test
+      substituteInPlace $out/share/fut/extensions/wt/bin/worktree-event \
+        --replace-fail 'if ! python3 -c' 'if ! ${lib.getExe python3} -c'
+    '';
+  };
 
   meta = {
     description = "Persistent, agent-aware terminal multiplexer";

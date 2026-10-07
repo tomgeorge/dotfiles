@@ -30,6 +30,7 @@ link wezterm ~/.config/wezterm
 link ghostty ~/.config/ghostty
 # Only the config file: ~/.config/herdr also holds sockets, logs and plugins.json.
 link herdr/config.toml ~/.config/herdr/config.toml
+link fut/config.toml ~/.config/fut/config.toml
 # herdr-nav (which nvim runs at its edge) and the herdr plugins are
 # installed by `make link` in herdr-plugins/, which builds them first.
 link claude/hooks ~/.claude/hooks

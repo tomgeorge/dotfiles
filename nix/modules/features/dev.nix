@@ -8,6 +8,7 @@
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
         hunk = pkgs.callPackage ../../pkgs/hunk.nix { };
+        fut = pkgs.callPackage ../../pkgs/fut.nix { };
         wt = pkgs.callPackage ../../pkgs/wt.nix { };
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
         # ignores on macOS, so they write to the read-only sandbox $HOME and
@@ -63,7 +64,8 @@
           enable = true;
           defaultCacheTtl = 600;
           maxCacheTtl = 7200;
-          pinentry.package = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
+          pinentry.package =
+            if pkgs.stdenv.hostPlatform.isDarwin then pkgs.pinentry_mac else pkgs.pinentry-curses;
         };
 
         # Upstream gnupg can't receive launchd-passed sockets, so the HM launchd
@@ -94,6 +96,7 @@
           curl
           fd
           flyctl
+          fut
           github-cli
           gnupg
           gnutls
@@ -107,9 +110,9 @@
           mkcert
           neovim
           nodejs
-          pi-coding-agent
           oras
           pass
+          pi-coding-agent
           ripgrep
           rlwrap
           slides
@@ -120,6 +123,9 @@
           yazi
           yq-go
         ];
+
+        # fut/config.toml (linked by link.sh) lists these by stable path.
+        xdg.configFile."fut/extensions".source = "${fut.extensions}/share/fut/extensions";
       };
 
     homeManager.devWork =

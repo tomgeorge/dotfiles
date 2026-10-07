@@ -16,6 +16,7 @@
     "~/.claude/skills"
   ],
   "packages": [
-    "npm:@gotgenes/pi-anthropic-auth"
+    "npm:@gotgenes/pi-anthropic-auth",
+    "git:github.com/mikker/fut"
   ]
 }
