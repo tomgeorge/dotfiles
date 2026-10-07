@@ -49,6 +49,22 @@ style = "dots"
 
 [ui.tab_bar]
 # position = "bottom"
+# Lanes replace the defaults wholesale, so these restate them. Added: the
+# session name on the left, and session.waiting beside client.waiting.
+# Styles must be semantic roles, so session.waiting borrows workspace's
+# blue to tell "this session" from peach "every session".
+left = [
+  { segments = [{ token = "session.name", prefix = " ", suffix = " ", max_width = 20 }], style = "session", priority = 210 },
+  { segments = [{ component = "tabs" }], priority = 100 },
+]
+right = [
+  { segments = [{ token = "workspace.name", prefix = " ", suffix = " ", max_width = 20 }], style = "muted", priority = 200 },
+  { segments = [{ token = "client.zoom", suffix = " " }], priority = 255 },
+  { segments = [{ token = "client.help" }], style = "muted", priority = 0 },
+  { segments = [{ token = "fut" }], style = "muted", priority = 0 },
+  { segments = [{ token = "session.waiting", prefix = " " }], style = "workspace", priority = 255 },
+  { segments = [{ token = "client.waiting", prefix = " ", suffix = " " }], style = "attention", priority = 255 },
+]
 
 # Catppuccin Frappe, matching Ghostty and herdr. Each table replaces the
 # whole default style, so modifiers are restated.
