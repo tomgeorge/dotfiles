@@ -46,14 +46,14 @@ let
 in
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "fut";
-  version = "0.34-unstable-2026-10-07";
+  version = "0.34-unstable-2026-10-08";
 
   # The `trunk` branch of my fork: upstream 0.34 plus my open PRs to mikker/fut.
   src = fetchFromGitHub {
     owner = "tomgeorge";
     repo = "fut";
-    rev = "eb4fbe12113e18455df168e8ed7ab657a5009684";
-    hash = "sha256-4d3PGfCGGZ5TRvMEPyT7AyuNzjBD9NsuMXoTmToVocQ=";
+    rev = "92af04e8148bdf27c5778812dbc3dd62b77b76a9";
+    hash = "sha256-S/RyubyvkzcjCUTplWWGcls8n7vBcr1ccVLm3DJyfpw=";
   };
 
   cargoHash = "sha256-bGGTFllgvjITpDlOHgzUYw1e32dYrGsi9he8Ze7DsfY=";
