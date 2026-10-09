@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "hey": {
+      "command": "/etc/profiles/per-user/tgeorge/bin/hey",
+      "args": [
+        "mcp",
+        "--read-only",
+        "--domains",
+        "threads,search,boxes"
+      ],
+      "env": {
+        "HEY_NONINTERACTIVE": "1"
+      }
+    },
+    "hey-triage": {
+      "command": "/etc/profiles/per-user/tgeorge/bin/hey",
+      "args": [
+        "mcp",
+        "--domains",
+        "contacts"
+      ],
+      "env": {
+        "HEY_NONINTERACTIVE": "1"
+      }
+    },
+    "todoist": {
+      "url": "https://ai.todoist.net/mcp"
+    },
+    "fantastical": {
+      "command": "/etc/profiles/per-user/tgeorge/bin/uvx",
+      "args": [
+        "fantastical-mcp"
+      ]
+    }
+  }
+}
