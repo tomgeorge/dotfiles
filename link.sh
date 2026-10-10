@@ -43,6 +43,7 @@ link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
 link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
 link pi/extensions/mcp-confirm ~/.pi/agent/extensions/mcp-confirm
 link pi/extensions/watch ~/.pi/agent/extensions/watch
+link pi/extensions/hey-organize ~/.pi/agent/extensions/hey-organize
 
 if [[ ! -x ~/.local/bin/herdr-nav ]]; then
   echo "note: herdr-nav isn't installed; run \`make link\` in herdr-plugins/ (nvim can't hand off to herdr or WezTerm without it)" >&2
