@@ -29,6 +29,14 @@
 - Commit messages: imperative mood, short subject line, body explains why.
 - Create worktrees under `~/git/worktrees/<repo>/<branch>` (replace `/` in the branch name with `-`), e.g. `git worktree add ~/git/worktrees/dotfiles/feat-go-herdrkit feat/go-herdrkit`.
 
+## Tickets
+When writing or editing tickets (Linear, GitHub issues), the tickets in a project should read as a crisp narrative of what we're trying to achieve.
+- Titles describe the outcome, not the implementation ("Control who receives request-status notifications", not "Add ORG_ALLOWLIST to the emitter").
+- Lead with the outcome: what changes for users or the team, and why it matters.
+- Add a short "Done when" list of observable results.
+- Include implementation details only when they give needed context (blocking PRs, ordering constraints, risks). Keep them brief.
+- Keep it short. No walls of text.
+
 ## Shell
 - Prefer non-interactive commands. Avoid commands that hang (pagers, editors, watchers).
 - Use `rg` and `fd` when available.

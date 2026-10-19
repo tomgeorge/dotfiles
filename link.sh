@@ -39,6 +39,8 @@ link sketchybar ~/.config/sketchybar
 # installed by `make link` in herdr-plugins/, which builds them first.
 link claude/hooks ~/.claude/hooks
 link claude/skills ~/.claude/skills
+# Only skills/: ~/.agents also holds .skill-lock.json from the skills installer.
+link agents/skills ~/.agents/skills
 link pi/settings.json ~/.pi/agent/settings.json
 link pi/AGENTS.md ~/.pi/agent/AGENTS.md
 link pi/mcp.json ~/.pi/agent/mcp.json

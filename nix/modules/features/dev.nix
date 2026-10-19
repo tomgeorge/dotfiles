@@ -154,7 +154,12 @@
         home.packages = [
           # incident.io CLI; not in nixpkgs.
           (pkgs.callPackage ../../pkgs/inc.nix { })
+          # nixpkgs' default go lags behind; some projects need 1.27.
+          pkgs.go_1_27
         ];
+
+        # `go install` targets land here.
+        home.sessionPath = [ "$HOME/go/bin" ];
       };
   };
 }
