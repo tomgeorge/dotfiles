@@ -20,8 +20,8 @@ let
     src = fetchFromGitHub {
       owner = "ghostty-org";
       repo = "ghostty";
-      rev = "ab0b9da9e88fcb4b0533a1854e84628f663930af";
-      hash = "sha256-LZuEFAt3/wfn6YWfk7NHnqLAtZ9g4mi6yTptx0mLKj0=";
+      rev = "b3dc3d794513c11633e7c3347935693957744e83";
+      hash = "sha256-1oItTID8wgc/CawP+E3ZpXv9C/T/gpvy3JL84M9ezaw=";
     };
     # Absolute tool paths don't exist in the Darwin sandbox (mirrors nixpkgs' libghostty-vt).
     postPatch = lib.optionalString stdenv.hostPlatform.isDarwin ''
@@ -46,17 +46,17 @@ let
 in
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "fut";
-  version = "0.34-unstable-2026-10-09";
+  version = "0.38-unstable-2026-10-20";
 
-  # The `trunk` branch of my fork: upstream 0.34 plus my open PRs to mikker/fut.
+  # The `trunk` branch of my fork: upstream 0.38 plus my open PRs to mikker/fut.
   src = fetchFromGitHub {
     owner = "tomgeorge";
     repo = "fut";
-    rev = "308634f8ace98daf25629ce1771003c80a716df9";
-    hash = "sha256-y4H0EIfkaSqxTbLFDvFtka2cCKQPht3b74ovtfyivfQ=";
+    rev = "cf941c65ad4e60b9bd2c02d0a82657f9cd3ec456";
+    hash = "sha256-AJ7BNy9ySX8SrRePJ35N7y0bbePs4qU2sdg7/iIPSDA=";
   };
 
-  cargoHash = "sha256-bGGTFllgvjITpDlOHgzUYw1e32dYrGsi9he8Ze7DsfY=";
+  cargoHash = "sha256-ytWlP6Q4CAR+b/qXRzq8aQMMByz+pU3cT53ShnnoI+0=";
 
   nativeBuildInputs = [
     zig_0_16
