@@ -31,6 +31,10 @@ link ghostty ~/.config/ghostty
 # Only the config file: ~/.config/herdr also holds sockets, logs and plugins.json.
 link herdr/config.toml ~/.config/herdr/config.toml
 link fut/config.toml ~/.config/fut/config.toml
+# Only the config file: dinky keeps nothing else there, but it writes a default
+# config when the path is missing, so link it before dinky's first run.
+link dinky/dinky.toml ~/.config/dinky/dinky.toml
+link sketchybar ~/.config/sketchybar
 # herdr-nav (which nvim runs at its edge) and the herdr plugins are
 # installed by `make link` in herdr-plugins/, which builds them first.
 link claude/hooks ~/.claude/hooks
