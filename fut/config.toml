@@ -9,6 +9,36 @@ extensions = [
   "~/.config/fut/extensions/ghostty-title",
 ]
 
+# Explicit entries are what Ctrl-a S suggests; the fallback above only
+# resolves exact names.
+[projects.dotfiles]
+path = "~/git/dotfiles"
+
+[projects.fut]
+path = "~/git/fut"
+
+[projects.supper-club]
+path = "~/git/supper-club"
+
+[projects.nrepl-lsp]
+path = "~/git/nrepl-lsp"
+
+[projects.biff]
+path = "~/git/biff"
+
+[projects.mcp-hey]
+path = "~/git/mcp-hey"
+
+[projects.homelab]
+path = "~/git/homelab"
+
+# Pops lazygit over the panes in the focused pane's directory.
+[trusted_commands.lazygit]
+title = "lazygit"
+binding = "g"
+program = "/etc/profiles/per-user/tgeorge/bin/lazygit"
+size = { width = 160, height = 45 }
+
 # Otherwise panes run $SHELL, which is zsh on macOS: nix-darwin doesn't change
 # the login shell (see TODO.md). terminal.shell comes from my fork's trunk.
 [terminal]
@@ -38,10 +68,12 @@ rename_workspace = "W"
 preset = "nerd_font"
 
 # The default right sidebar shows only the focused session's agents; list
-# every session's so blocked/finished agents elsewhere stay visible.
+# every session's so blocked/finished agents elsewhere stay visible. Global
+# rows get cramped on one line, so the row splits source from status and
+# location (which gains the session name once rows span sessions).
 [ui.sidebar.right]
 components = [
-  { component = "agents", size = "fill", scope = "global" },
+  { component = "agents", size = "fill", scope = "global", row = { left = [{ text = " " }], body = [{ token = "agent.source" }], right = [{ token = "agent.activity" }, { text = " " }], detail = [{ text = "  " }, { token = "agent.status" }, { token = "agent.location", style = "muted", prefix = " · " }] } },
 ]
 
 [ui.spinner]
@@ -64,6 +96,19 @@ right = [
   { segments = [{ token = "fut" }], style = "muted", priority = 0 },
   { segments = [{ token = "session.waiting", prefix = " " }], style = "workspace", priority = 255 },
   { segments = [{ token = "client.waiting", prefix = " ", suffix = " " }], style = "attention", priority = 255 },
+]
+
+# The default item plus tab.progress, which shows NN% only while a program
+# reports determinate progress.
+[ui.tab_bar.item]
+segments = [
+  { text = " " },
+  { token = "tab.index" },
+  { token = "tab.name", prefix = " " },
+  { token = "tab.closing", prefix = " " },
+  { token = "tab.activity", prefix = " " },
+  { token = "tab.progress", prefix = " ", style = "muted" },
+  { text = " " },
 ]
 
 # Catppuccin Frappe, matching Ghostty and herdr. Each table replaces the
