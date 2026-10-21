@@ -2,14 +2,49 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
+import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { JobStore, readGitInfo } from "./jobs.ts";
+import {
+  doing, duration, initialPopup, money, popupKey, popupLines, widgetLines,
+  type PopupKey, type PopupState, type Style,
+} from "./panel.ts";
 import { pickModel, type PickerUI } from "./picker.ts";
 import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
 const MAX_CONCURRENT_FLAG = "subagent-max-concurrent";
 const MAX_CONCURRENT_ENV = "PI_SUBAGENT_MAX_CONCURRENT";
+const PANEL_KEY = "ctrl+shift+s";
+const WIDGET_KEY = "subagents";
+const SPINNER_MS = 120;
+
+function makeStyle(theme: Theme): Style {
+  return {
+    fg: (tone, text) => theme.fg(tone, text),
+    bold: (text) => theme.bold(text),
+    selected: (text) => theme.bg("selectedBg", text),
+    width: visibleWidth,
+    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
+    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
+  };
+}
+
+// First match wins; letters mirror lazygit/vim.
+const POPUP_KEYS: [KeyId[], PopupKey][] = [
+  [["up", "k"], "up"],
+  [["down", "j"], "down"],
+  [["pageUp", "ctrl+u"], "pageUp"],
+  [["pageDown", "ctrl+d"], "pageDown"],
+  [["home", "g"], "top"],
+  [["end", "shift+g"], "bottom"],
+  [["enter", "tab", "l", "right"], "enter"],
+  [["escape", "h", "left"], "back"],
+  [["a"], "toggle"],
+  [["x"], "cancel"],
+  [["q", "ctrl+c", PANEL_KEY], "close"],
+];
 
 export default function (pi: ExtensionAPI) {
   const active = new Map<number, { controller: AbortController; done: Promise<unknown> }>();
@@ -17,6 +52,76 @@ export default function (pi: ExtensionAPI) {
   let shuttingDown = false;
   // One model picker at a time: parallel tool calls would otherwise stack dialogs.
   let pickerQueue: Promise<unknown> = Promise.resolve();
+  // Every job this session, finished ones included, for the widget and popup.
+  const store = new JobStore();
+  let frame = 0;
+  let spinner: ReturnType<typeof setInterval> | undefined;
+  let widgetTui: TUI | undefined;
+  let widgetCtx: ExtensionContext | undefined;
+  let popupOpen = false;
+
+  /** Show the below-editor widget while jobs run; animate its spinner. */
+  function syncWidget(ctx: ExtensionContext) {
+    if (!ctx.hasUI) return;
+    const running = store.running().length > 0;
+    if (running && !widgetCtx) {
+      widgetCtx = ctx;
+      ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
+        widgetTui = tui;
+        const component: Component = {
+          render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
+          invalidate() {},
+        };
+        return component;
+      }, { placement: "belowEditor" });
+      spinner = setInterval(() => { frame++; widgetTui?.requestRender(); }, SPINNER_MS);
+    } else if (!running && widgetCtx) {
+      clearInterval(spinner);
+      spinner = undefined;
+      widgetCtx.ui.setWidget(WIDGET_KEY, undefined);
+      widgetCtx = undefined;
+      widgetTui = undefined;
+    }
+  }
+
+  async function openPopup(ctx: ExtensionContext) {
+    if (!ctx.hasUI || popupOpen) return;
+    popupOpen = true;
+    try {
+      await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
+        const state: PopupState = initialPopup(store.list());
+        let page = 1;
+        const unsubscribe = store.subscribe(() => tui.requestRender());
+        // The widget's spinner stops when nothing runs; tick here too so elapsed
+        // time moves for jobs started while only the popup is up.
+        const ticker = setInterval(() => tui.requestRender(), SPINNER_MS);
+        return {
+          render(width) {
+            const height = Math.max(8, Math.floor(tui.terminal.rows * 0.8));
+            const out = popupLines(store.list(), state, Date.now(), width, height, makeStyle(theme), frame);
+            page = out.page;
+            return out.lines;
+          },
+          handleInput(data) {
+            const key = POPUP_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1]
+              ?? (data === "G" ? "bottom" : undefined);
+            if (!key) return;
+            const action = popupKey(state, store.list(), key, page);
+            if (action.type === "close") return done();
+            if (action.type === "cancel") active.get(action.id)?.controller.abort();
+            tui.requestRender();
+          },
+          invalidate() {},
+          dispose() {
+            unsubscribe();
+            clearInterval(ticker);
+          },
+        };
+      }, { overlay: true, overlayOptions: { anchor: "center", width: "90%", minWidth: 60, maxHeight: "80%" } });
+    } finally {
+      popupOpen = false;
+    }
+  }
 
   pi.registerFlag(MAX_CONCURRENT_FLAG, {
     description: `Maximum concurrent subagent jobs (default ${DEFAULT_MAX_CONCURRENT}; env ${MAX_CONCURRENT_ENV})`,
@@ -75,25 +180,32 @@ export default function (pi: ExtensionAPI) {
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     const id = nextId++;
-    const statusKey = `subagent-${id}`;
     const started = Date.now();
-    let progress: Progress = { toolCalls: 0, activity: "starting" };
+    const record = store.add({
+      id, provider: job.provider, model: job.model, task: job.task, cwd: job.cwd, tools: job.tools, started,
+      progress: { toolCalls: 0, activity: "starting", phase: "starting", usage: { input: 0, output: 0, cost: 0 } },
+    });
+    readGitInfo(job.cwd).then((git) => store.setGit(id, git));
+    // The tool row streams one line; the widget and popup read the store.
     const report = () => {
-      const secs = Math.round((Date.now() - started) / 1000);
-      const line = `Subagent #${id} ${job.provider}/${job.model} · ${secs}s · ${progress.toolCalls} tool calls · ${progress.activity}`;
-      if (ctx.hasUI) ctx.ui.setStatus(statusKey, line);
+      const { progress } = record;
+      const line = `Subagent #${id} ${job.model} · ${duration(Date.now() - started)} · ${progress.toolCalls} tool calls · ${money(progress.usage.cost)} · ${doing(record)}`;
       onUpdate?.({ content: [{ type: "text", text: line }], details: undefined });
     };
     const done = runSubagent(job, {
       signal: controller.signal,
-      onProgress: (p) => { progress = p; report(); },
+      onProgress: (p: Progress) => store.update(id, p),
     });
     active.set(id, { controller, done });
+    syncWidget(ctx);
     report();
     // Tick so elapsed time moves during long model calls with no tool activity.
     const ticker = setInterval(report, 1000);
+    let finished = false;
     try {
       const result = await done;
+      store.finish(id, result.status, { result: result.text || undefined, error: result.error ?? undefined });
+      finished = true;
       if (result.status !== "ok") throw new Error(`Subagent #${id} ${result.status}: ${result.error}`);
       const truncated = truncateHead(result.text);
       let text = truncated.content;
@@ -107,11 +219,14 @@ export default function (pi: ExtensionAPI) {
         content: [{ type: "text" as const, text }],
         details: { id, status: result.status, provider: job.provider, model: job.model, cwd: job.cwd },
       };
+    } catch (error) {
+      if (!finished) store.finish(id, "error", { error: error instanceof Error ? error.message : String(error) });
+      throw error;
     } finally {
       clearInterval(ticker);
       signal?.removeEventListener("abort", abort);
       active.delete(id);
-      if (ctx.hasUI) ctx.ui.setStatus(statusKey, undefined);
+      syncWidget(ctx);
     }
   }
 
@@ -223,8 +338,19 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("subagents", {
+    description: `Browse subagents: status, activity, spend, results (${PANEL_KEY})`,
+    handler: (_args, ctx) => openPopup(ctx),
+  });
+
+  pi.registerShortcut(PANEL_KEY, {
+    description: "Browse subagents",
+    handler: (ctx) => openPopup(ctx),
+  });
+
   pi.on("session_shutdown", async () => {
     shuttingDown = true;
+    clearInterval(spinner);
     const jobs = [...active.values()];
     for (const { controller } of jobs) controller.abort();
     await Promise.all(jobs.map(({ done }) => done));

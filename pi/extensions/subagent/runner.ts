@@ -24,11 +24,35 @@ export interface Result {
   error: string | null;
 }
 
+export interface Usage {
+  /** Prompt tokens including cache reads/writes, summed over turns. */
+  input: number;
+  output: number;
+  /** Provider-reported USD. */
+  cost: number;
+}
+
+export type Phase = "starting" | "thinking" | "writing" | "tool";
+
 export interface Progress {
   toolCalls: number;
   /** Latest child tool call, e.g. `grep "foo"`. */
   activity: string;
+  phase: Phase;
+  usage: Usage;
 }
+
+const ZERO_USAGE: Usage = { input: 0, output: 0, cost: 0 };
+
+function readUsage(raw: unknown): Usage {
+  const u = (raw ?? {}) as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const cost = (u.cost ?? {}) as Record<string, unknown>;
+  return { input: n(u.input) + n(u.cacheRead) + n(u.cacheWrite), output: n(u.output), cost: n(cost.total) };
+}
+
+const addUsage = (a: Usage, b: Usage): Usage =>
+  ({ input: a.input + b.input, output: a.output + b.output, cost: a.cost + b.cost });
 
 function describeToolCall(name: string, args: unknown): string {
   const a = (args ?? {}) as Record<string, unknown>;
@@ -91,7 +115,9 @@ export async function runSubagent(
     let modelError = "";
     let failure: string | null = null;
     let cancelled = false;
-    const progress: Progress = { toolCalls: 0, activity: "starting" };
+    const progress: Progress = { toolCalls: 0, activity: "starting", phase: "starting", usage: ZERO_USAGE };
+    // message_update usage is cumulative for the in-flight response only.
+    let finishedUsage = ZERO_USAGE;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     const stop = (reason: string, abort = false) => {
@@ -115,11 +141,23 @@ export async function runSubagent(
         if (event?.type === "tool_execution_start") {
           progress.toolCalls++;
           progress.activity = describeToolCall(event.toolName, event.args);
+          progress.phase = "tool";
+          reportProgress = true;
+          return;
+        }
+        if (event?.type === "message_update") {
+          const kind = event.assistantMessageEvent?.type;
+          if (kind === "thinking_start") progress.phase = "thinking";
+          else if (kind === "text_start") progress.phase = "writing";
+          if (event.usage) progress.usage = addUsage(finishedUsage, readUsage(event.usage));
           reportProgress = true;
           return;
         }
         const message = event?.message;
         if (event?.type !== "message_end" || message?.role !== "assistant") return;
+        finishedUsage = addUsage(finishedUsage, readUsage(message.usage));
+        progress.usage = finishedUsage;
+        reportProgress = true;
         // Refuse a child which resolved the requested model differently.
         if (message.provider !== job.provider || message.model !== job.model) {
           stop("Child used a different provider/model than requested");

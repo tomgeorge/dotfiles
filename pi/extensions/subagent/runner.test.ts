@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildArgs, CHILD_EXTENSIONS, GIT_EXTENSION, runSubagent, type Job } from "./runner.ts";
+import { buildArgs, CHILD_EXTENSIONS, GIT_EXTENSION, runSubagent, type Job, type Progress } from "./runner.ts";
 
 const job: Job = {
   task: "--evil @file $(echo nope)", provider: "test", model: "exact/model",
@@ -120,12 +120,30 @@ test("reports child tool calls as progress", async () => {
     emit({ type: "tool_execution_start", toolCallId: "2", toolName: "read", args: { path: "a.ts" } }) +
     emit({ type: "tool_execution_start", toolCallId: "3", toolName: "git", args: { args: ["log", "-1"] } }) +
     emit(message("Final")),
-    { onProgress: (p: unknown) => seen.push(p) },
+    { onProgress: (p: Progress) => seen.push({ toolCalls: p.toolCalls, activity: p.activity }) },
   );
   assert.equal(result.status, "ok");
-  assert.deepEqual(seen, [
+  assert.deepEqual(seen.slice(0, 3), [
     { toolCalls: 1, activity: "grep foo" },
     { toolCalls: 2, activity: "read a.ts" },
     { toolCalls: 3, activity: "git log -1" },
   ]);
+});
+
+test("reports phase and usage summed across turns", async () => {
+  const seen: Progress[] = [];
+  const usage = (input: number, output: number, total: number) =>
+    ({ input, output, cacheRead: 10, cacheWrite: 0, cost: { total } });
+  const result = await run(
+    emit({ type: "message_update", usage: usage(100, 5, 0.01), assistantMessageEvent: { type: "thinking_start" } }) +
+    emit(message("Working", "toolUse", { usage: usage(100, 20, 0.02) })) +
+    emit({ type: "message_update", usage: usage(200, 3, 0.005), assistantMessageEvent: { type: "text_start" } }) +
+    emit(message("Final", "stop", { usage: usage(200, 30, 0.04) })),
+    { onProgress: (p: Progress) => seen.push(p) },
+  );
+  assert.equal(result.status, "ok");
+  assert.deepEqual(seen.map((p) => p.phase), ["thinking", "thinking", "writing", "writing"]);
+  // In-flight usage counts on top of finished turns, then is replaced by the final.
+  assert.deepEqual(seen[2].usage, { input: 110 + 210, output: 23, cost: 0.025 });
+  assert.deepEqual(seen.at(-1)!.usage, { input: 320, output: 50, cost: 0.06 });
 });

@@ -25,6 +25,7 @@ No additional dependencies.
 /subagent anthropic/claude-sonnet-4-6 Review src/auth.ts for security problems
 /subagent-cancel      # cancel all running jobs
 /subagent-cancel 2    # cancel job #2
+/subagents            # browse jobs (also ctrl+shift+s)
 ```
 
 With no arguments, enter a task, then choose a model (see [Model suggestions](#model-suggestions)).
@@ -36,9 +37,41 @@ not change the parent model. In interactive mode the job runs in the background,
 you can keep chatting. Results appear in chat and become parent context;
 when idle, returning a result does not trigger an additional parent model call.
 
-Each job gets a number (`#1`, `#2`, ...). While it runs, its status-bar line shows elapsed time, the child's tool-call count,
-and its latest tool call. Tool-launched jobs also stream this line into the tool row.
-The parent agent's turn still waits for a tool-launched job, as for any tool call.
+Each job gets a number (`#1`, `#2`, ...). Tool-launched jobs stream a progress line
+(elapsed time, tool calls, spend, current activity) into the tool row. The parent
+agent's turn still waits for a tool-launched job, as for any tool call.
+
+### Panel
+
+While jobs run, a widget below the input box lists them, one row each (up to five,
+then `+N more`):
+
+```text
+─ Subagents · 3 running · $0.42 ──────────────────────────── ctrl+shift+s ─
+ ⠋  #1  claude-sonnet-4-6    12s    4 tools   $0.03  read runner.ts
+ ⠙  #2  gpt-6.1-sol          19s    3 tools   $0.11  grep setStatus
+ ⠹  #3  claude-opus-5-5    1m04s   12 tools   $0.28  thinking…
+```
+
+`ctrl+shift+s` or `/subagents` opens a two-pane popup: jobs on the left, details for
+the selected one on the right (cwd, git branch and whether it is a linked worktree,
+tools, spend and tokens, task, and a timestamped tool-call log or the result).
+Finished jobs stay listed for the session.
+
+| Key | List | Details |
+| --- | --- | --- |
+| `j`/`k`, arrows, `ctrl+d`/`ctrl+u`, `g`/`G` | Select job | Scroll |
+| `enter`, `tab` | Focus details | Back to list |
+| `a` | Switch activity/result | Same |
+| `x` | Cancel selected job | Same |
+| `esc` | Close | Back to list |
+| `q`, `ctrl+shift+s` | Close | Close |
+
+Spend is the provider-reported cost from the child's usage events, summed over its
+turns. `ctrl+shift+s` needs a terminal that reports modifier keys (kitty keyboard
+protocol: Ghostty, kitty, WezTerm); elsewhere use `/subagents`. Rendering
+(`panel.ts`) and job state (`jobs.ts`) are separate from Pi so they can be tested
+with injected styling.
 
 The parent can also call the `subagent` tool when you request/approve delegation.
 If you named a model, it passes it; otherwise it omits `provider` and `model`, and
