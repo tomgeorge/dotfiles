@@ -43,7 +43,9 @@ link claude/skills ~/.claude/skills
 link agents/skills ~/.agents/skills
 link pi/settings.json ~/.pi/agent/settings.json
 link pi/AGENTS.md ~/.pi/agent/AGENTS.md
-link pi/mcp.json ~/.pi/agent/mcp.json
+# MCP servers differ per machine (work Slack vs personal hey/todoist), so
+# each host gets its own file, named like the hosts in nix/modules/hosts/.
+link "pi/mcp/$(hostname -s).json" ~/.pi/agent/mcp.json
 link pi/prompts ~/.pi/agent/prompts
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
 link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json

@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "slack": {
+      "url": "https://mcp.slack.com/mcp",
+      "description": "Search and read Slack messages, threads, channels, canvases, and users",
+      "oauth": {
+        "clientId": "2308507492912.12258429359652",
+        "callbackUrl": "http://localhost:53682/callback"
+      }
+    },
+    "hey": {
+      "command": "/etc/profiles/per-user/tom.george/bin/hey",
+      "args": [
+        "mcp",
+        "--read-only",
+        "--domains",
+        "threads,search,boxes"
+      ],
+      "env": {
+        "HEY_NONINTERACTIVE": "1"
+      }
+    },
+    "hey-triage": {
+      "command": "/etc/profiles/per-user/tom.george/bin/hey",
+      "args": [
+        "mcp",
+        "--domains",
+        "contacts"
+      ],
+      "env": {
+        "HEY_NONINTERACTIVE": "1"
+      }
+    },
+    "todoist": {
+      "url": "https://ai.todoist.net/mcp"
+    },
+    "fantastical": {
+      "command": "/etc/profiles/per-user/tom.george/bin/uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/tomgeorge/fantastical-mcp@fix/all-day-local-date",
+        "fantastical-mcp"
+      ]
+    }
+  }
+}

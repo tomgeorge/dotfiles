@@ -29,6 +29,8 @@
     "fantastical": {
       "command": "/etc/profiles/per-user/tgeorge/bin/uvx",
       "args": [
+        "--from",
+        "git+https://github.com/tomgeorge/fantastical-mcp@fix/all-day-local-date",
         "fantastical-mcp"
       ]
     }

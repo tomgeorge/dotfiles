@@ -121,7 +121,7 @@
           stow
           tmux
           tree-sitter
-          # uvx runs Python MCP servers (pi/mcp.json) by a stable, non-mise path.
+          # uvx runs Python MCP servers (pi/mcp/) by a stable, non-mise path.
           uv
           wt
           yazi
