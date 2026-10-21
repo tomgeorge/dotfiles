@@ -4,15 +4,16 @@
 
 PLUGINS="$CONFIG_DIR/plugins"
 FONT="FiraCode Nerd Font"
+source "$CONFIG_DIR/colors.sh"
 
 # Tall enough to fill the notch row on the built-in display; dinky's top gap
 # (gaps.outer.top in dinky.toml) leaves room for it.
-sketchybar --bar position=top height=37 blur_radius=30 color=0xcc1e1e2e
+sketchybar --bar position=top height=37 blur_radius=30 color=$BAR_COLOR
 
 sketchybar --default \
   padding_left=5 padding_right=5 \
   icon.font="$FONT:Bold:14.0" label.font="$FONT:Bold:13.0" \
-  icon.color=0xffe1e3e4 label.color=0xffe1e3e4 \
+  icon.color=$TEXT label.color=$TEXT \
   icon.padding_left=4 icon.padding_right=4 \
   label.padding_left=4 label.padding_right=4
 
@@ -20,33 +21,44 @@ sketchybar --default \
 sketchybar --add event workspace_changing \
   --add event workspace_change \
   --add event focus_changed \
-  --add event mode_changed
+  --add event mode_changed \
+  --add event display_changed
 
 # One item per workspace; keep the count in step with `workspaces` in dinky.toml.
+# workspaces.sh paints them all from the hidden `workspaces` item below, so each
+# event costs one dinky query rather than one per workspace.
 for ws in 1 2 3 4 5; do
   sketchybar --add item "workspace.$ws" left \
-    --subscribe "workspace.$ws" workspace_changing workspace_change \
     --set "workspace.$ws" \
-    background.color=0x44ffffff background.corner_radius=5 background.height=22 \
+    background.color=$MAUVE background.corner_radius=5 background.height=22 \
     background.drawing=off \
-    label="$ws" icon.drawing=off \
-    click_script="dinky workspace $ws" \
-    script="$PLUGINS/workspace.sh $ws"
+    label="$ws" label.color=$OVERLAY0 icon.drawing=off \
+    click_script="dinky workspace $ws"
 done
+
+sketchybar --add item workspaces left \
+  --subscribe workspaces workspace_changing workspace_change focus_changed \
+  display_changed system_woke \
+  --set workspaces drawing=off updates=on script="$PLUGINS/workspaces.sh"
 
 sketchybar --add item mode left \
   --subscribe mode mode_changed \
-  --set mode drawing=off label.color=0xfff5a97f script="$PLUGINS/mode.sh"
+  --set mode drawing=off label.color=$PEACH script="$PLUGINS/mode.sh"
 
 sketchybar --add item front_app left \
   --subscribe front_app front_app_switched focus_changed \
-  --set front_app icon.drawing=off script="$PLUGINS/front_app.sh"
+  --set front_app icon.drawing=off label.color=$LAVENDER script="$PLUGINS/front_app.sh"
 
 sketchybar --add item clock right \
-  --set clock update_freq=10 icon=󰥔 script="$PLUGINS/clock.sh"
+  --set clock update_freq=10 icon=󰥔 icon.color=$BLUE script="$PLUGINS/clock.sh"
 
 sketchybar --add item battery right \
   --subscribe battery system_woke power_source_change \
   --set battery update_freq=120 script="$PLUGINS/battery.sh"
+
+sketchybar --add item wifi right \
+  --subscribe wifi wifi_change system_woke \
+  --set wifi update_freq=60 script="$PLUGINS/wifi.sh" \
+  click_script="open 'x-apple.systempreferences:com.apple.wifi-settings-extension'"
 
 sketchybar --update

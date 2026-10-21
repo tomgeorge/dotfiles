@@ -55,8 +55,8 @@ outer = { top = 45, bottom = 8, left = 8, right = 8 }
 [borders]
 enabled = true
 width = 4
-active-color = '#e1e3e4'        # '#rrggbb' or '#rrggbbaa'
-inactive-color = '#494d64'
+active-color = '#ca9ee6'        # '#rrggbb' or '#rrggbbaa'; Catppuccin Frappé mauve, as in the bar
+inactive-color = '#51576d'      # Frappé surface1
 order = 'below'                 # below | above (a click-through ring over the window)
 exclude-apps = []               # bundle IDs whose windows get no border
 
@@ -92,7 +92,8 @@ workspace-changing = ['exec-and-forget /run/current-system/sw/bin/sketchybar --t
 workspace-changed = ['exec-and-forget /run/current-system/sw/bin/sketchybar --trigger workspace_change WORKSPACE=$DINKY_WORKSPACE']
 focus-changed = ['exec-and-forget /run/current-system/sw/bin/sketchybar --trigger focus_changed']
 mode-changed = ['exec-and-forget /run/current-system/sw/bin/sketchybar --trigger mode_changed MODE=$DINKY_MODE']
-display-changed = []
+# Workspaces move between displays, so repaint which are occupied and focused.
+display-changed = ['exec-and-forget /run/current-system/sw/bin/sketchybar --trigger display_changed']
 
 # Every rule whose conditions all match a new window runs, in order.
 [[rules]]
