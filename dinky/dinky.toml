@@ -39,7 +39,8 @@ size = 0.6                      # the master's share of the display beside the s
 side = 'left'                   # left | right: the master's side
 
 [gaps]
-inner = 8                       # or { horizontal = 8, vertical = 8 }
+# 8 of daylight plus the 4-point border on each neighbour ([borders] width).
+inner = 16                      # or { horizontal = 8, vertical = 8 }
 # The top clears SketchyBar (37 high, see sketchybar/sketchybarrc) plus the usual 8.
 outer = { top = 45, bottom = 8, left = 8, right = 8 }
 
