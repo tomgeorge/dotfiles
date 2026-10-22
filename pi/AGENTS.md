@@ -41,5 +41,12 @@ Use `ketch` for external research — web pages, OSS code, library docs.
 - `ketch docs "query" --library /org/repo` for version-aware library docs
 - All commands support `--json`. `ketch config` reports active backends.
 
+## Review loop
+When I say "review this well", "review it well", "do a proper review", or something similar, run the review-fix loop:
+- Read `~/.pi/agent/prompts/review-loop.md` and follow it exactly.
+- Choose the target from what I said and the recent conversation: a PR, a branch, a path, `crew`, or `here` for work just produced in this session. Pass any extra focus I mention to the reviewers.
+- That phrase counts as my approval to delegate to the subagents and models the file names.
+- If the target is ambiguous, ask one question.
+
 ## Work
 For work-specific instructions, read `~/.pi/agent/WORK.md` if it exists. It is kept out of this repo.

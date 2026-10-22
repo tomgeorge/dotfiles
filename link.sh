@@ -42,6 +42,7 @@ link claude/skills ~/.claude/skills
 link pi/settings.json ~/.pi/agent/settings.json
 link pi/AGENTS.md ~/.pi/agent/AGENTS.md
 link pi/mcp.json ~/.pi/agent/mcp.json
+link pi/prompts ~/.pi/agent/prompts
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
 link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
 link pi/extensions/crew ~/.pi/agent/extensions/crew
