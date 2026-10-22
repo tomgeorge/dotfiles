@@ -5,9 +5,9 @@ import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, wrapTe
 import { Type } from "typebox";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
-  mergeBranch, outsidePaths, removeWorktree, repoInfo, runCheck, worktreePath,
+  mergeBranch, outsidePaths, removeWorktree, repoInfo, runChecks, worktreePath,
 } from "./git.ts";
-import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
+import { failedChecks, formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
 import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
@@ -72,6 +72,12 @@ function panelEvent(data: string): PanelInput | undefined {
 }
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
+const addError = (report: TaskReport, error: string) => {
+  report.error = [report.error, error].filter(Boolean).join("; ");
+};
+/** Planner-tool checks stop with the crew or with the tool call. */
+const checkSignal = (crewSignal: AbortSignal, toolSignal: AbortSignal | undefined) =>
+  toolSignal ? AbortSignal.any([crewSignal, toolSignal]) : crewSignal;
 
 // Tests inject a fake runWorker; Pi calls the factory with the API only.
 export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker } = {}) {
@@ -161,16 +167,21 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     crewAbort.abort();
     pi.setActiveTools(toolsBefore ?? pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));
     toolsBefore = undefined;
+    stopTimers();
+    render();
+  }
+
+  function stopTimers() {
     clearInterval(sweepTimer);
     clearInterval(renderTimer);
     sweepTimer = renderTimer = undefined;
     for (const timer of wakeTimers) clearTimeout(timer);
     wakeTimers.clear();
-    render();
   }
 
   function track<T>(work: Promise<T>): Promise<T> {
     planning.add(work);
+    // The caller handles the rejection; this branch only must not surface it as unhandled.
     work.finally(() => planning.delete(work)).catch(() => {});
     return work;
   }
@@ -220,26 +231,23 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       report.diffStat = facts.diffStat;
       report.outOfScope = outsidePaths(facts.files, task.paths);
     } catch (error) {
-      report.error = [report.error, `harness: ${(error as Error).message}`].filter(Boolean).join("; ");
+      addError(report, `harness: ${(error as Error).message}`);
     }
     // Checks are the harness's own evidence, so run them even when the worker timed out.
     if (outcome !== "cancelled" && !shuttingDown) {
-      for (const command of task.checks) {
-        if (signal.aborted) break;
-        report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS, signal));
-      }
+      report.checks = await runChecks(task.worktree, task.checks, CHECK_TIMEOUT_MS, signal);
       // npm install, lint --fix: a pass may depend on files that never reach the branch.
       if (report.checks.length) {
         try {
           report.dirtyAfterChecks = await dirtyFiles(task.worktree);
         } catch (error) {
-          report.error = [report.error, `harness: ${(error as Error).message}`].filter(Boolean).join("; ");
+          addError(report, `harness: ${(error as Error).message}`);
         }
       }
       // Cancel or shutdown while checks ran: report what ran, don't present it as verified.
       if (signal.aborted) {
         report.outcome = "cancelled";
-        report.error = [report.error, "cancelled while the harness checks were running"].filter(Boolean).join("; ");
+        addError(report, "cancelled while the harness checks were running");
       }
     }
     return report;
@@ -276,9 +284,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       if (controllers.get(task.id) === controller) controllers.delete(task.id);
       task.report = report;
       task.endedAt = Date.now();
-      task.status = shuttingDown ? "interrupted"
-        : report.outcome === "submitted" ? "submitted"
-        : report.outcome === "failed" ? "failed" : report.outcome;
+      task.status = shuttingDown ? "interrupted" : report.outcome;
       persist();
       render();
       tell("crew-handoff", formatReport(report), !quietCancels.delete(task.id));
@@ -395,18 +401,14 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       const head = (await gitOk(state.config.integrationPath, ["log", "--oneline", "-1"])).trim();
       // Informational, not a gate (Cursor: per-merge perfection serializes everything).
       // It catches clean merges that still break each other.
-      const signal = toolSignal ? AbortSignal.any([crewSignal, toolSignal]) : crewSignal;
-      const checks = [];
-      for (const command of task.checks) {
-        if (signal.aborted) break;
-        checks.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS, signal));
-      }
+      const signal = checkSignal(crewSignal, toolSignal);
+      const checks = await runChecks(state.config.integrationPath, task.checks, CHECK_TIMEOUT_MS, signal);
       // Leftovers would make the next merge fail as a false conflict.
       const dirty = await discardChanges(state.config.integrationPath);
-      const failed = checks.filter((c) => c.exit !== 0);
+      const failed = failedChecks(checks, 15);
       const summary = signal.aborted ? "Post-merge checks were cancelled (merge kept)."
         : !checks.length ? "No task checks to re-run."
-        : failed.length ? `Post-merge checks FAILED on the integration branch (merge kept):\n${failed.map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-15).map((l) => `    ${l}`).join("\n")}`).join("\n")}\nDispatch a fix task.`
+        : failed.length ? `Post-merge checks FAILED on the integration branch (merge kept):\n${failed.join("\n")}\nDispatch a fix task.`
         : `Post-merge checks passed on the integration branch: ${task.checks.join("; ")}`;
       const note = dirty.length ? `\nThe checks modified files in the integration worktree; the harness reverted them: ${dirty.join(", ")}. If a check needs them (lockfile, generated code), dispatch a task to commit them.` : "";
       return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${summary}${note}`);
@@ -469,18 +471,13 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       const state = requireCrew();
       if (runningTasks(state).length) throw new Error("Workers are still running; wait for their handoffs or crew_cancel them");
       const crewSignal = crewAbort.signal;
-      const signal = toolSignal ? AbortSignal.any([crewSignal, toolSignal]) : crewSignal;
-      const results = [];
-      for (const command of params.checks) {
-        if (signal.aborted) break;
-        results.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS, signal));
-      }
+      const signal = checkSignal(crewSignal, toolSignal);
+      const results = await runChecks(state.config.integrationPath, params.checks, CHECK_TIMEOUT_MS, signal);
       const dirty = await discardChanges(state.config.integrationPath);
       // /crew-stop (or a stop then resume) while the checks ran: this call no longer owns the crew.
       if (crewSignal.aborted || crew !== state || !isActive()) return text("NOT finished: the crew was stopped while the final checks ran.");
       if (signal.aborted) return text("NOT finished: the final checks were cancelled.");
-      const failed = results.filter((c) => c.exit !== 0);
-      const problems = failed.map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-20).map((l) => `    ${l}`).join("\n")}`);
+      const problems = failedChecks(results, 20);
       if (dirty.length) problems.push(`- the checks modified files in the integration worktree, so they passed only with uncommitted changes (the harness reverted them): ${dirty.join(", ")}`);
       if (problems.length) {
         return text(`NOT finished: the final green pass failed on ${state.config.integrationBranch}:\n${problems.join("\n")}\nDispatch a green-pass task to fix this (commit any files the checks need), integrate it, then call crew_finish again.`);
@@ -514,7 +511,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       await copyToClipboard(path);
       return `Copied ${path}`;
     } catch {
-      return path;
+      return path; // no clipboard here: the path is shown for copying by hand
     }
   }
 
@@ -733,9 +730,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     if (shuttingDown) return;
     shuttingDown = true;
     closePanel?.();
-    clearInterval(sweepTimer);
-    clearInterval(renderTimer);
-    for (const timer of wakeTimers) clearTimeout(timer);
+    stopTimers();
     for (const controller of controllers.values()) controller.abort();
     crewAbort.abort();
     await Promise.all([...pending]);
