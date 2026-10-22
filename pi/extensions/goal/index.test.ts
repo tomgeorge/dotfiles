@@ -146,13 +146,13 @@ test("the branch's latest goal entry is loaded, and mutating it leaves the entry
   assert.equal((g.entries.at(-1)!.data as { continuations: number }).continuations, 1);
 });
 
-test("a malformed goal entry is skipped, keeping the branch's earlier goal", async () => {
+test("a malformed latest goal entry leaves no goal, without resurrecting the earlier one", async () => {
   const { f, ctx } = setup();
   await f.emit("session_start", {}, ctx);
   await f.command("goal", `fix it --check ${CHECK}`, ctx);
   f.entries.push({ type: "custom", customType: "goal-state", data: { status: "bogus" } });
   await f.emit("session_start", {}, ctx);
-  assert.ok(f.active().includes("goal_park"), "the earlier active goal still loads");
+  assert.ok(!f.active().includes("goal_park"), "the earlier active goal stays dropped");
   await f.command("goal", "status", ctx);
-  assert.match(f.notes.at(-1)!, /\[active\] fix it/);
+  assert.match(f.notes.at(-1)!, /^No goal/);
 });
