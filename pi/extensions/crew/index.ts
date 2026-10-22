@@ -1,4 +1,5 @@
-import { mkdirSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
@@ -16,6 +17,7 @@ import {
   formatStatus, listCrews, loadState, runningTasks, saveState, sessionPath, slugify, spent,
   type CrewState, type ModelRef, type TaskRecord,
 } from "./state.ts";
+import { SessionCache, Transcript, type TranscriptView } from "./transcript.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
 
 // Same reason as the subagent extension: keeps Anthropic subscription auth working
@@ -76,9 +78,25 @@ function panelEvent(data: string): PanelInput | undefined {
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
 const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 
-// Tests inject a fake runWorker; Pi calls the factory with the API only.
-export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker } = {}) {
+const EXPORT_TIMEOUT_MS = 60_000;
+
+/** `pi --export`, as /export does; pi doesn't export its HTML exporter to extensions. */
+function piExport(session: string, output: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile("pi", ["--export", session, output], { timeout: EXPORT_TIMEOUT_MS }, (error, _stdout, stderr) => {
+      if (error) reject(new Error(stderr.trim() || error.message));
+      else resolve();
+    });
+  });
+}
+
+// Tests inject fakes; Pi calls the factory with the API only.
+export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker; exportSession?: typeof piExport } = {}) {
   const startWorker = deps.runWorker ?? runWorker;
+  const exportSession = deps.exportSession ?? piExport;
+  // Streamed conversations of workers started in this session, for the Live tab.
+  const transcripts = new WeakMap<TaskRecord, Transcript>();
+  const exporting = new Set<string>();
   let crew: CrewState | undefined;
   let ui: ExtensionContext | undefined;
   let toolsBefore: string[] | undefined;
@@ -259,9 +277,12 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   function launch(task: TaskRecord, job: WorkerJob, timeoutMs: number) {
     const controller = new AbortController();
     controllers.set(task.id, controller);
+    const transcript = new Transcript();
+    transcripts.set(task, transcript);
     const run = (async () => {
       const result = await startWorker(job, {
         signal: controller.signal, timeoutMs,
+        onEvent: (event) => transcript.applyEvent(event),
         onProgress: (p) => {
           task.toolCalls = p.toolCalls;
           task.activity = p.activity;
@@ -556,6 +577,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     };
     // Per panel: task ids repeat across crews.
     const diffs = new DiffCache();
+    const sessions = new SessionCache();
     void ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
       closePanel = done;
       const style = panelStyle(theme);
@@ -569,10 +591,17 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
         if ("message" in target) return { state: "unavailable" as const, message: target.message };
         return diffs.get(task.id, current().config.repoRoot, target.base, target.branch, () => tui.requestRender());
       };
+      const transcript = (task: TaskRecord): TranscriptView => {
+        // The stream is fresher than the file, which grows only as messages finish.
+        const streamed = transcripts.get(task);
+        if (streamed) return { state: "ready", transcript: streamed, source: "live" };
+        if (!task.session) return { state: "unavailable", message: "No transcript: this task started before workers recorded sessions." };
+        return sessions.get(task.session, () => tui.requestRender());
+      };
       return {
         render(width: number) {
           const height = Math.max(12, Math.floor(tui.terminal.rows * 0.85));
-          const out = panelLines(current(), state, Date.now(), width, height, style, { diff, frame, closeHint: `${PANEL_KEY} close` });
+          const out = panelLines(current(), state, Date.now(), width, height, style, { diff, transcript, frame, closeHint: `${PANEL_KEY} close` });
           page = out.page;
           return out.lines;
         },
@@ -600,6 +629,30 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
                 if (state.flash?.text === path) state.flash = { text, tone: "accent" };
                 tui.requestRender();
               });
+            }
+          }
+          if (action.type === "export") {
+            const session = shown.tasks.find((t) => t.id === action.id)?.session;
+            if (!session || !existsSync(session)) {
+              state.flash = { text: `#${action.id} has no session file yet: the worker hasn't finished its first message`, tone: "warning" };
+            } else if (exporting.has(session)) {
+              state.flash = { text: `#${action.id} is already being exported`, tone: "dim" };
+            } else {
+              const output = session.replace(/\.jsonl$/, "") + ".html";
+              const tag = `Exporting #${action.id}\u2026`;
+              exporting.add(session);
+              state.flash = { text: tag, tone: "dim" };
+              // A running worker's export is a snapshot of the messages it has finished.
+              void exportSession(session, output)
+                .then(() => ({ text: `Exported #${action.id} to ${output}`, tone: "success" as const }))
+                .catch((error: unknown) => ({ text: `Export of #${action.id} failed: ${(error as Error).message}`, tone: "error" as const }))
+                .then((flash) => {
+                  exporting.delete(session);
+                  // A later key press cleared or replaced the flash: notify instead of clobbering it.
+                  if (state.flash?.text === tag) state.flash = flash;
+                  else ctx.ui.notify(flash.text, flash.tone === "error" ? "error" : "info");
+                  tui.requestRender();
+                });
             }
           }
           tui.requestRender();

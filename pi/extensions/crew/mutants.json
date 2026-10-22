@@ -292,5 +292,65 @@
     "file": "index.ts",
     "from": "PI_CREW_ROOT: task.worktree! }, session: task.session,",
     "to": "PI_CREW_ROOT: task.worktree! },"
+  },
+  {
+    "name": "worker never reports stream events",
+    "file": "worker.ts",
+    "from": "options.onEvent?.(event);",
+    "to": "void event;"
+  },
+  {
+    "name": "live tab is not fed by the worker stream",
+    "file": "index.ts",
+    "from": "onEvent: (event) => transcript.applyEvent(event),",
+    "to": "onEvent: () => {},"
+  },
+  {
+    "name": "live tab ignores the stream for the session file",
+    "file": "index.ts",
+    "from": "if (streamed) return",
+    "to": "if (false) return"
+  },
+  {
+    "name": "export ignores a missing session file",
+    "file": "index.ts",
+    "from": "if (!session || !existsSync(session)) {",
+    "to": "if (!session) {"
+  },
+  {
+    "name": "live tab does not follow new output",
+    "file": "panel.ts",
+    "from": "if (state.tab === \"live\" && state.follow) state.scroll = max;",
+    "to": ""
+  },
+  {
+    "name": "scrolling up does not pause the live tab",
+    "file": "panel.ts",
+    "from": "if (key === \"up\" || key === \"top\") state.follow = false;",
+    "to": ""
+  },
+  {
+    "name": "final message duplicates streamed blocks",
+    "file": "transcript.ts",
+    "from": "const entry = reconcile ? this.block(i, b.type) : this.push({ kind: b.type, text: \"\" });",
+    "to": "const entry = this.push({ kind: b.type, text: \"\" });"
+  },
+  {
+    "name": "transcript is unbounded",
+    "file": "transcript.ts",
+    "from": "while (this.entries.length > 1 &&",
+    "to": "while (false &&"
+  },
+  {
+    "name": "session tail misses a replaced file",
+    "file": "transcript.ts",
+    "from": "if (info.ino !== this.ino || info.size < this.offset) {",
+    "to": "if (this.ino === -1) {"
+  },
+  {
+    "name": "session tail splits multi-byte characters",
+    "file": "transcript.ts",
+    "from": "this.consume(this.decoder.write(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)));",
+    "to": "this.consume(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length).toString(\"utf8\"));"
   }
 ]

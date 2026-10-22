@@ -74,6 +74,8 @@ export function runWorker(
     signal?: AbortSignal;
     timeoutMs: number;
     onProgress?: (progress: WorkerProgress) => void;
+    /** Every parsed stream event, for the panel's Live tab. */
+    onEvent?: (event: Record<string, any>) => void;
     command?: string;
     prefixArgs?: string[];
   },
@@ -117,7 +119,6 @@ export function runWorker(
     const timer = setTimeout(() => stop("timeout", `timed out after ${Math.round(options.timeoutMs / 60000)} min`), options.timeoutMs);
     options.signal?.addEventListener("abort", abort, { once: true });
 
-    // A live output tail for the crew panel would keep a bounded ring of these events here.
     const handle = (line: string) => {
       if (!line.trim()) return;
       progress.lastEventAt = Date.now();
@@ -126,6 +127,11 @@ export function runWorker(
         event = JSON.parse(line);
       } catch {
         return; // Non-JSON noise must not kill a worker that may be mid-task.
+      }
+      try {
+        options.onEvent?.(event);
+      } catch {
+        // A display bug must not kill the worker or lose its result.
       }
       if (event.type === "tool_execution_start") {
         progress.toolCalls++;

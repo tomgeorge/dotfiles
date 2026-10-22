@@ -11,6 +11,7 @@ import {
   type DiffView, type PanelInput, type PanelState, type RenderDeps, type Style, type Tone,
 } from "./panel.ts";
 import type { CrewState, TaskRecord } from "./state.ts";
+import { Transcript, type TranscriptView } from "./transcript.ts";
 
 // Plain text: one column per code point. `toned` wraps coloured text in <tone>…</tone> so
 // tests can check colours; `plain` drops them so assertions read like the screen.
@@ -85,7 +86,7 @@ function report(over: Partial<TaskReport> = {}): TaskReport {
   };
 }
 
-const noDiff: RenderDeps = { diff: () => ({ state: "loading" }), frame: 0 };
+const noDiff: RenderDeps = { diff: () => ({ state: "loading" }), transcript: () => ({ state: "loading" }), frame: 0 };
 const render = (crew: CrewState, state: PanelState, width = 120, height = 30, s = plain, deps = noDiff) =>
   panelLines(crew, state, NOW, width, height, s, deps).lines;
 const screen = (lines: string[]) => lines.join("\n");
@@ -194,15 +195,17 @@ test("slash starts an empty filter, and esc while filtering clears it", () => {
   assert.ok(!state.filtering);
 });
 
-test("tab and 1-5 switch the detail tab", () => {
+test("tab and 1-6 switch the detail tab", () => {
   const tasks = [task(1)];
   const state = initialPanel(crewOf(tasks));
   press(state, tasks, [key("tab")]);
   assert.equal(state.tab, "spec");
   press(state, tasks, [key("backTab"), key("backTab")]);
-  assert.equal(state.tab, "diff");
+  assert.equal(state.tab, "live");
   press(state, tasks, ["3"]);
   assert.equal(state.tab, "handoff");
+  press(state, tasks, ["6"]);
+  assert.equal(state.tab, "live");
 });
 
 test("x asks before cancelling a running task; anything but y keeps it", () => {
@@ -235,6 +238,104 @@ test("o opens the selected worktree, ? shows help, q closes", () => {
   assert.ok(!state.help, "any key closes help");
   assert.deepEqual(press(state, tasks, ["q"]), { type: "close" });
   assert.deepEqual(press(state, tasks, [key("close")]), { type: "close" });
+});
+
+// ── Live ─────────────────────────────────────────────────────────────────
+
+/** A worker that read a file, failed a test, and then printed `lines` lines of text. */
+function liveDeps(lines = 0, source: "live" | "file" = "live"): RenderDeps & { view: TranscriptView } {
+  const t = new Transcript();
+  t.applyEvent({ type: "message_start", message: { role: "user", content: Array.from({ length: 9 }, (_, i) => `spec line ${i}`).join("\n") } });
+  t.applyEvent({ type: "message_end", message: { role: "assistant", content: [
+    { type: "thinking", thinking: "Check the theme first" },
+    { type: "text", text: "Reading it." },
+    { type: "toolCall", id: "a", name: "read", arguments: { path: "theme.ts" } },
+    { type: "toolCall", id: "b", name: "bash", arguments: { command: "npm test" } },
+  ] } });
+  t.applyEvent({ type: "tool_execution_end", toolCallId: "a", toolName: "read", result: { content: [{ type: "text", text: Array.from({ length: 12 }, (_, i) => `src ${i}`).join("\n") }] } });
+  t.applyEvent({ type: "tool_execution_start", toolCallId: "b", toolName: "bash", args: { command: "npm test" } });
+  t.applyEvent({ type: "tool_execution_end", toolCallId: "b", toolName: "bash", isError: true, result: { content: [{ type: "text", text: "\x1b[31m1 failing\x1b[0m" }] } });
+  if (lines) t.applyEvent({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: Array.from({ length: lines }, (_, i) => `out ${i}`).join("\n") }] } });
+  const view: TranscriptView = { state: "ready", transcript: t, source };
+  return { ...noDiff, transcript: () => view, view };
+}
+
+test("the live tab shows the prompt, thinking, text, and tool calls with their output", () => {
+  const crew = crewOf([task(1)]);
+  const state = initialPanel(crew);
+  press(state, crew.tasks, ["6"]);
+  const text = screen(render(crew, state, 120, 60, plain, liveDeps()));
+  assert.match(text, /\[6 Live\]/);
+  assert.match(text, /streaming from the worker/);
+  assert.match(text, /following ─*┘/);
+  assert.match(text, /prompt\s*│[^\n]*\n[^\n]*spec line 0/);
+  assert.match(text, /… 3 more lines; the Spec tab has the task/);
+  assert.match(text, /∴ Check the theme first/);
+  assert.match(text, /Reading it\./);
+  assert.match(text, /✓ read theme\.ts/);
+  // Tool output keeps its newest lines.
+  assert.match(text, /… 4 earlier lines/);
+  assert.doesNotMatch(text, /src 3\b/);
+  assert.match(text, /src 11/);
+  assert.match(text, /✗ bash npm test/);
+  assert.match(text, / {4}1 failing/, "colour codes are stripped");
+
+  const coloured = screen(render(crew, state, 120, 60, toned, liveDeps()));
+  assert.match(coloured, /<error>✗<\/error>/);
+  assert.match(coloured, /<dim>∴ Check the theme first<\/dim>/);
+});
+
+test("the live tab says where the transcript comes from, or why there is none", () => {
+  const crew = crewOf([task(1, { status: "submitted" })]);
+  const state = initialPanel(crew);
+  press(state, crew.tasks, ["6"]);
+  assert.match(screen(render(crew, state, 120, 40, plain, liveDeps(0, "file"))), /from the session file, updated as messages finish/);
+  const none: RenderDeps = { ...noDiff, transcript: () => ({ state: "unavailable", message: "No transcript: too old." }) };
+  assert.match(screen(render(crew, state, 120, 40, plain, none)), /No transcript: too old\./);
+  assert.match(screen(render(crew, state, 120, 40, plain, noDiff)), /Loading the transcript…/);
+});
+
+test("the live tab follows the newest output; k pauses it and G follows again", () => {
+  const crew = crewOf([task(1)]);
+  const state = initialPanel(crew);
+  const deps = liveDeps(100);
+  press(state, crew.tasks, ["6", key("enter")]);
+  assert.match(screen(render(crew, state, 120, 30, plain, deps)), /out 99/);
+  press(state, crew.tasks, ["k", "k", "k"]);
+  assert.equal(state.follow, false);
+  let text = screen(render(crew, state, 120, 30, plain, deps));
+  assert.doesNotMatch(text, /out 99/);
+  assert.match(text, /paused · G follows · \d+-\d+\/\d+ ─*┘/);
+  // New output arrives while paused: the view stays put.
+  const before = state.scroll;
+  if (deps.view.state === "ready") deps.view.transcript.applyEvent({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "newest" }] } });
+  text = screen(render(crew, state, 120, 30, plain, deps));
+  assert.equal(state.scroll, before);
+  assert.doesNotMatch(text, /newest/);
+  press(state, crew.tasks, ["G"]);
+  assert.match(screen(render(crew, state, 120, 30, plain, deps)), /newest/);
+  assert.equal(state.follow, true);
+  // Paging up pauses too, from either pane.
+  press(state, crew.tasks, [key("left"), key("pageUp")]);
+  assert.equal(state.follow, false);
+});
+
+test("a narrow pane keeps the active tab visible", () => {
+  const crew = crewOf([task(1)]);
+  const state = initialPanel(crew);
+  press(state, crew.tasks, ["6"]);
+  // At 100 columns the panes sit side by side and the details get half.
+  const text = screen(render(crew, state, 100, 40, plain, liveDeps()));
+  assert.match(text, /│ 1 2 3 4 5 \[6 Live\] +│/);
+});
+
+test("e exports a task's session, or explains why it can't", () => {
+  const tasks = [task(1, { session: "/git/pi-crew/demo/t1.jsonl" }), task(2)];
+  const state = initialPanel(crewOf(tasks));
+  assert.equal(state.selected, 2);
+  assert.deepEqual(press(state, tasks, ["e"]), { type: "none" });
+  assert.match(state.flash?.text ?? "", /#2 has no session file/);
+  assert.deepEqual(press(state, tasks, ["k", "e"]), { type: "export", id: 1 });
 });
 
 test("enter focuses the details, where j/k scroll, and paging works from either pane", () => {

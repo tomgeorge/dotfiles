@@ -59,10 +59,10 @@ async function waitFor(cond: () => boolean, what: string) {
   assert.fail(`timed out waiting for ${what}`);
 }
 
-function boot(root: string, opts: { concurrency?: string; budget?: string; ignoreAbort?: boolean } = {}) {
+function boot(root: string, opts: { concurrency?: string; budget?: string; ignoreAbort?: boolean; exportSession?: (session: string, output: string) => Promise<void> } = {}) {
   const w = workers(opts.ignoreAbort);
   const f = fakePi();
-  crewExtension(f.pi, { runWorker: w.run as any });
+  crewExtension(f.pi, { runWorker: w.run as any, exportSession: opts.exportSession });
   f.pi.setActiveTools([...f.active(), "read", "bash", "edit", "write"]);
   const ui = {
     notify: (t: string) => { f.notes.push(t); },
@@ -462,6 +462,68 @@ crewTest("cancelling from the panel asks first, then stops the worker and wakes 
   await waitFor(() => e.handoffs().length === 1, "handoff");
   assert.equal(e.handoffs()[0].options?.triggerTurn, true, "the planner hears about a human cancel");
   assert.match(ui.screen(), /Cancelling #1/);
+});
+
+crewTest("the live tab streams the worker's events; a crew from the ledger falls back to its session file", async (e) => {
+  const ui = panelUi(e.ctx);
+  await e.dispatch({ title: "paint" });
+  const emit = e.w.list[0].opts.onEvent;
+  emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "pondering the theme" } });
+  emit({ type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: { command: "npm test" } });
+  await ui.shortcut(e.f, e.ctx);
+  ui.type("6");
+  let text = ui.screen();
+  assert.match(text, /streaming from the worker/);
+  assert.match(text, /∴ pondering the theme/);
+  assert.match(text, /▸ bash npm test/);
+  // Streamed, not polled: the next render shows a new event at once.
+  emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "all green" } });
+  assert.match(ui.screen(), /all green/);
+  ui.type("q");
+
+  // Another session sees the same crew through the ledger, so it reads the session file.
+  const session = e.state().tasks[0].session;
+  writeFileSync(session, `${JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: "from the file" }] } })}\n`);
+  const b = boot(e.root);
+  const other = panelUi(b.ctx);
+  try {
+    await b.f.emit("session_start", {}, b.ctx);
+    await other.shortcut(b.f, b.ctx);
+    other.type("6");
+    await waitFor(() => /from the file/.test(other.screen()), "the session file");
+    assert.match(other.screen(), /from the session file/);
+    other.type("q");
+  } finally {
+    await b.shutdown();
+  }
+});
+
+test("e exports the selected task's session next to it, and reports a missing file or a failure", async () => {
+  const calls: [string, string][] = [];
+  let fail = false;
+  const e = await started({ exportSession: async (session, output) => { calls.push([session, output]); if (fail) throw new Error("pi exploded"); } });
+  try {
+    const ui = panelUi(e.ctx);
+    await e.dispatch();
+    await ui.shortcut(e.f, e.ctx);
+    ui.type("e");
+    assert.match(ui.screen(), /#1 has no session file yet/);
+    assert.equal(calls.length, 0);
+
+    const session = e.state().tasks[0].session;
+    writeFileSync(session, "{}\n");
+    ui.type("e");
+    assert.match(ui.screen(), /Exporting #1…/);
+    await waitFor(() => /Exported #1 to /.test(ui.screen()), "the export");
+    assert.deepEqual(calls, [[session, session.replace(/\.jsonl$/, ".html")]]);
+
+    fail = true;
+    ui.type("e");
+    await waitFor(() => /Export of #1 failed: pi exploded/.test(ui.screen()), "the failure");
+    ui.type("q");
+  } finally {
+    await e.shutdown();
+  }
 });
 
 test("the shortcut opens a stopped crew from the ledger in a new session, read-only", async () => {

@@ -73,3 +73,15 @@ test("cancel, wrong model, and incomplete runs are reported, not thrown", async 
   assert.equal(truncated.status, "error");
   assert.equal(truncated.text, "half");
 });
+
+test("onEvent sees every parsed event, and a throwing handler doesn't break the worker", async () => {
+  const seen: string[] = [];
+  const delta = { type: "message_update", assistantMessageEvent: { type: "thinking_delta", delta: "hmm" } };
+  const r = await runWorker(job, {
+    command: process.execPath, prefixArgs: ["-e", `${emit(delta)} console.log("noise"); ${emit(end("done"))}`, "--"], timeoutMs: 5000,
+    onEvent: (event) => { seen.push(event.type); throw new Error("display bug"); },
+  });
+  assert.equal(r.status, "ok");
+  assert.equal(r.text, "done");
+  assert.deepEqual(seen, ["message_update", "message_end"]);
+});

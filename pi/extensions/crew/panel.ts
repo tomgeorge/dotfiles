@@ -1,6 +1,7 @@
 import { git as runGit, type GitResult } from "./git.ts";
 import type { CheckResult, TaskReport } from "./handoff.ts";
 import { runningTasks, spent, type CrewState, type ModelRef, type TaskRecord, type TaskStatus } from "./state.ts";
+import type { Entry, TranscriptView } from "./transcript.ts";
 
 // The /crew panel: a lazygit-style view of one crew. Styling and terminal-width handling are
 // injected (Pi's theme and pi-tui in production), as in the subagent and watch panels, so
@@ -19,9 +20,9 @@ export interface Style {
   wrap(text: string, width: number): string[];
 }
 
-export const TABS = ["overview", "spec", "handoff", "checks", "diff"] as const;
+export const TABS = ["overview", "spec", "handoff", "checks", "diff", "live"] as const;
 export type Tab = (typeof TABS)[number];
-const TAB_LABELS: Record<Tab, string> = { overview: "Overview", spec: "Spec", handoff: "Handoff", checks: "Checks", diff: "Diff" };
+const TAB_LABELS: Record<Tab, string> = { overview: "Overview", spec: "Spec", handoff: "Handoff", checks: "Checks", diff: "Diff", live: "Live" };
 
 /** Panes sit side by side from this panel width; below it they stack. */
 export const SIDE_BY_SIDE = 100;
@@ -149,6 +150,8 @@ export interface PanelState {
   followCursor?: boolean;
   /** Per `${taskId}:${index}` overrides of whether a check's output is open. */
   expanded: Record<string, boolean>;
+  /** The Live tab sticks to the newest output until the user scrolls up. */
+  follow: boolean;
   /** Detail pane fills the panel. */
   zoom: boolean;
   help: boolean;
@@ -164,13 +167,14 @@ export type PanelKey =
 
 export type PanelInput = { key: PanelKey } | { char: string };
 
-export type PanelAction = { type: "none" } | { type: "close" } | { type: "cancel"; id: number } | { type: "open"; id: number };
+export type PanelAction =
+  | { type: "none" } | { type: "close" } | { type: "cancel"; id: number } | { type: "open"; id: number } | { type: "export"; id: number };
 
 export function initialPanel(crew: CrewState | undefined): PanelState {
   const tasks = crew?.tasks ?? [];
   // Newest running task, else the newest task.
   const pick = [...tasks].reverse().find((t) => t.status === "running") ?? tasks.at(-1);
-  return { selected: pick?.id, query: "", filtering: false, focus: "list", tab: "overview", scroll: 0, checkCursor: 0, expanded: {}, zoom: false, help: false };
+  return { selected: pick?.id, query: "", filtering: false, focus: "list", tab: "overview", scroll: 0, checkCursor: 0, expanded: {}, follow: true, zoom: false, help: false };
 }
 
 /** The visible tasks and the selected one, re-anchoring the selection when the filter hides it. */
@@ -189,12 +193,14 @@ function select(state: PanelState, task: TaskRecord) {
   state.selected = task.id;
   state.scroll = 0;
   state.checkCursor = 0;
+  state.follow = true;
 }
 
 function setTab(state: PanelState, tab: Tab) {
   if (tab === state.tab) return;
   state.tab = tab;
   state.scroll = 0;
+  state.follow = true;
 }
 
 const KEY_CHARS: Record<string, PanelKey> = { j: "down", k: "up", g: "top", G: "bottom", l: "enter", h: "left", q: "close", " ": "enter" };
@@ -238,12 +244,17 @@ export function panelInput(state: PanelState, tasks: TaskRecord[], input: PanelI
   }
 
   if (char !== undefined) {
-    if (/^[1-5]$/.test(char)) { setTab(state, TABS[Number(char) - 1]); return { type: "none" }; }
+    if (/^[1-6]$/.test(char)) { setTab(state, TABS[Number(char) - 1]); return { type: "none" }; }
     if (char === "?") { state.help = true; return { type: "none" }; }
-    if (char === "x" || char === "o") {
+    if (char === "x" || char === "o" || char === "e") {
       const { task } = visible(state, tasks);
       if (!task) return { type: "none" };
       if (char === "o") return { type: "open", id: task.id };
+      if (char === "e") {
+        if (task.session) return { type: "export", id: task.id };
+        state.flash = { text: `#${task.id} has no session file: it started before sessions were recorded`, tone: "warning" };
+        return { type: "none" };
+      }
       if (task.status !== "running") state.flash = { text: `#${task.id} is not running`, tone: "warning" };
       else if (!opts.live) state.flash = { text: "This crew isn't running in this session; nothing to cancel", tone: "warning" };
       else state.confirm = task.id;
@@ -280,6 +291,7 @@ function move(state: PanelState, tasks: TaskRecord[], key: PanelKey, page: numbe
   const { shown, task, index } = visible(state, tasks);
   // Paging always scrolls the details, so a long diff reads without leaving the list.
   if (key === "pageUp" || key === "pageDown") {
+    if (key === "pageUp") state.follow = false;
     state.scroll = Math.max(0, state.scroll + (key === "pageDown" ? page : -page));
     return { type: "none" };
   }
@@ -305,6 +317,9 @@ function move(state: PanelState, tasks: TaskRecord[], key: PanelKey, page: numbe
       return { type: "none" };
     }
     if (key === "enter") { state.focus = "list"; return { type: "none" }; }
+    // Only G resumes following: a resize or eviction that clamps the scroll mustn't.
+    if (key === "up" || key === "top") state.follow = false;
+    if (key === "bottom") state.follow = true;
     if (key === "top") state.scroll = 0;
     else if (key === "bottom") state.scroll = Number.MAX_SAFE_INTEGER;
     else if (key === "up" || key === "down") state.scroll = Math.max(0, state.scroll + (key === "down" ? 1 : -1));
@@ -403,6 +418,8 @@ function paintDiff(line: string, s: Style): string {
 export interface RenderDeps {
   /** Diff for the task, loading it on demand. Only called for the Diff tab. */
   diff(task: TaskRecord): DiffView;
+  /** The worker's conversation, loading it on demand. Only called for the Live tab. */
+  transcript(task: TaskRecord): TranscriptView;
   frame: number;
   /** Shown in the footer, e.g. the shortcut that closes the panel. */
   closeHint?: string;
@@ -476,14 +493,16 @@ export function taskRow(task: TaskRecord, crew: CrewState, now: number, width: n
 }
 
 function tabBar(active: Tab, width: number, s: Style): string {
-  const parts = TABS.map((tab, i) => {
+  const bar = (short: boolean) => TABS.map((tab, i) => {
     const label = `${i + 1} ${TAB_LABELS[tab]}`;
-    return tab === active ? s.bold(s.fg("accent", `[${label}]`)) : s.fg("dim", label);
-  });
-  return s.truncate(parts.join(" "), width);
+    return tab === active ? s.bold(s.fg("accent", `[${label}]`)) : s.fg("dim", short ? `${i + 1}` : label);
+  }).join(" ");
+  // In a narrow pane, inactive tabs shrink to their number so the active one stays visible.
+  const full = bar(false);
+  return s.truncate(s.width(full) <= width ? full : bar(true), width);
 }
 
-type Body = { lines: string[]; paint?: (line: string) => string; anchor?: number };
+type Body = { lines: string[]; paint?: (line: string) => string; anchor?: number; /** Shown in the bottom border, so it never scrolls away. */ status?: string };
 
 function field(label: string, value: string, width: number, s: Style): string[] {
   const labelW = 13;
@@ -617,6 +636,56 @@ function diff(crew: CrewState, task: TaskRecord, deps: RenderDeps, s: Style): Bo
   return { lines: [head, ...view.lines], paint: (line) => (line === head ? line : paintDiff(line, s)) };
 }
 
+const PROMPT_LINES = 6;
+const RESULT_LINES = 8;
+const ERROR_LINES = 20;
+
+function entryLines(entry: Entry, width: number, s: Style): string[] {
+  const wrap = (text: string, w = width) => clean(text).split("\n").flatMap((l) => s.wrap(l, Math.max(10, w)));
+  switch (entry.kind) {
+    case "user": {
+      const lines = wrap(entry.text);
+      const shown = lines.slice(0, PROMPT_LINES).map((l) => s.fg("dim", l));
+      const more = lines.length - PROMPT_LINES;
+      return [s.fg("muted", "prompt"), ...shown, ...(more > 0 ? [s.fg("dim", `… ${more} more lines; the Spec tab has the task`)] : [])];
+    }
+    case "thinking":
+      return wrap(entry.text.trim(), width - 2).map((l, i) => s.fg("dim", `${i ? "  " : "∴ "}${l}`));
+    case "text":
+      return wrap(entry.text.trim());
+    case "note":
+      return wrap(entry.text).map((l) => s.fg("warning", l));
+    case "tool": {
+      const mark = entry.state === "ok" ? s.fg("success", "✓") : entry.state === "error" ? s.fg("error", "✗")
+        : entry.state === "running" ? s.fg("accent", "▸") : s.fg("dim", "·");
+      const call = wrap(entry.args, width - 4 - entry.name.length);
+      const lines = [`${mark} ${s.fg("accent", entry.name)} ${call[0] ?? ""}`, ...call.slice(1).map((l) => `  ${l}`)];
+      const out = clean(entry.result).trimEnd();
+      if (!out) return lines;
+      const all = out.split("\n");
+      const keep = entry.state === "error" ? ERROR_LINES : RESULT_LINES;
+      if (all.length > keep) lines.push(s.fg("dim", `    … ${all.length - keep} earlier lines`));
+      const tone: Tone = entry.state === "error" ? "error" : "dim";
+      return [...lines, ...all.slice(-keep).map((l) => s.fg(tone, s.truncate(`    ${l}`, width)))];
+    }
+  }
+}
+
+function live(task: TaskRecord, state: PanelState, width: number, s: Style, deps: RenderDeps): Body {
+  const view = deps.transcript(task);
+  if (view.state === "loading") return { lines: [s.fg("dim", "Loading the transcript…")] };
+  if (view.state === "unavailable") return { lines: [s.fg("dim", view.message)] };
+  const t = view.transcript;
+  const source = view.source === "file" ? "from the session file, updated as messages finish"
+    : task.status === "running" ? "streaming from the worker" : "as streamed in this session";
+  const status = state.follow ? "following" : s.fg("warning", "paused · G follows");
+  const lines = [s.fg("dim", source)];
+  if (t.dropped) lines.push(s.fg("dim", `… ${t.dropped} earlier entries not kept here; e exports the whole session`));
+  if (!t.entries.length) lines.push("", s.fg("dim", "No output yet."));
+  for (const entry of t.entries) lines.push("", ...entryLines(entry, width, s));
+  return { lines, status };
+}
+
 function tabBody(crew: CrewState, task: TaskRecord, state: PanelState, now: number, width: number, s: Style, deps: RenderDeps): Body {
   switch (state.tab) {
     case "overview": return overview(crew, task, now, width, s);
@@ -624,6 +693,7 @@ function tabBody(crew: CrewState, task: TaskRecord, state: PanelState, now: numb
     case "handoff": return handoff(task, width, s);
     case "checks": return checks(state, task, width, s);
     case "diff": return diff(crew, task, deps, s);
+    case "live": return live(task, state, width, s, deps);
   }
 }
 
@@ -632,12 +702,13 @@ export const HELP = [
   ["j/k, ↑/↓", "move (scroll in details)"],
   ["enter, l", "focus details · on Checks, open a check's output"],
   ["h, esc", "back to the list"],
-  ["tab, 1-5", "switch tab: overview, spec, handoff, checks, diff"],
+  ["tab, 1-6", "switch tab: overview, spec, handoff, checks, diff, live"],
   ["ctrl+d/u", "page the details"],
-  ["g/G", "top/bottom"],
+  ["g/G", "top/bottom; on Live, k pauses and G follows again"],
   ["ctrl+o", "zoom the details to the full panel"],
   ["x", "cancel the selected running task (asks first)"],
   ["o", "copy the worktree path"],
+  ["e", "export the worker's session to HTML"],
   ["esc", "clear the filter, then close"],
   ["q", "close"],
 ];
@@ -682,6 +753,7 @@ export function panelLines(crew: CrewState, state: PanelState, now: number, widt
     if (!task) return box("Details", [], w, h, false, s);
     const body = tabBody(crew, task, state, now, inner, s, deps);
     const max = Math.max(0, body.lines.length - room);
+    if (state.tab === "live" && state.follow) state.scroll = max;
     if (state.followCursor && body.anchor !== undefined) {
       if (body.anchor < state.scroll) state.scroll = body.anchor;
       else if (body.anchor >= state.scroll + room) state.scroll = body.anchor - room + 1;
@@ -691,7 +763,8 @@ export function panelLines(crew: CrewState, state: PanelState, now: number, widt
     state.scroll = Math.min(state.scroll, max);
     const paint = body.paint ?? ((line: string) => line);
     const visibleLines = body.lines.slice(state.scroll, state.scroll + room).map((l) => ` ${paint(l)}`);
-    const more = max > 0 ? s.fg("dim", `${state.scroll + 1}-${Math.min(body.lines.length, state.scroll + room)}/${body.lines.length}`) : "";
+    const range = max > 0 ? s.fg("dim", `${state.scroll + 1}-${Math.min(body.lines.length, state.scroll + room)}/${body.lines.length}`) : "";
+    const more = [body.status, range].filter(Boolean).join(s.fg("dim", " · "));
     const kind = task.kind + (task.reviewOf ? ` of #${task.reviewOf}` : "");
     const title = `${s.fg("accent", `#${task.id}`)} ${s.fg("muted", kind)} ${oneLine(task.title)}`;
     return box(title, [` ${tabBar(state.tab, inner, s)}`, ...visibleLines], w, h, state.focus === "detail" || state.zoom, s, more);
@@ -720,7 +793,7 @@ function footer(state: PanelState, crew: CrewState, width: number, s: Style, dep
   }
   if (state.flash) return s.truncate(` ${s.fg(state.flash.tone, state.flash.text)}`, width, true);
   const hint = state.filtering ? "type to filter · ↑/↓ move · enter keep filter · esc clear"
-    : state.focus === "detail" ? "j/k scroll · tab/1-5 tabs · ctrl+d/u page · ctrl+o zoom · h back · ? help"
-    : `j/k move · type to filter · tab/1-5 tabs · enter details · x cancel · o copy path · ? help · esc ${state.query ? "clear" : "close"}`;
+    : state.focus === "detail" ? "j/k scroll · tab/1-6 tabs · ctrl+d/u page · ctrl+o zoom · e export · h back · ? help"
+    : `j/k move · type to filter · tab/1-6 tabs · enter details · x cancel · o copy path · e export · ? help · esc ${state.query ? "clear" : "close"}`;
   return s.truncate(s.fg("dim", ` ${hint}${deps.closeHint ? ` · ${deps.closeHint}` : ""}`), width, true);
 }
