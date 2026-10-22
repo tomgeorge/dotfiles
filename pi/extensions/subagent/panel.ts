@@ -117,11 +117,13 @@ export interface PopupState {
   scroll: number | "end";
   /** Explicit body view; otherwise running jobs show activity, finished ones the result. */
   view?: BodyView;
+  /** When true, show the full task instead of truncating. */
+  expandTask?: boolean;
 }
 
 export type PopupKey =
   | "up" | "down" | "pageUp" | "pageDown" | "top" | "bottom"
-  | "enter" | "back" | "toggle" | "task" | "cancel" | "close";
+  | "enter" | "back" | "toggle" | "task" | "expand" | "cancel" | "close";
 
 export type PopupAction = { type: "none" } | { type: "close" } | { type: "cancel"; id: number };
 
@@ -155,7 +157,12 @@ export function popupKey(state: PopupState, jobs: JobRecord[], key: PopupKey, pa
   if (key === "task" && job) {
     // Toggle back to the job's default view.
     state.view = bodyView(state, job) === "task" ? undefined : "task";
+    state.expandTask = false;
     resetScroll(state, job);
+    return { type: "none" };
+  }
+  if (key === "expand" && job) {
+    state.expandTask = !state.expandTask;
     return { type: "none" };
   }
   if (state.focus === "list") {
@@ -223,14 +230,16 @@ function detail(job: JobRecord, state: PopupState, now: number, width: number, h
     : s.fg("accent", job.git.branch) + (job.git.worktree ? s.fg("warning", " (worktree)") : "");
   const u = job.progress.usage;
   const taskLines = s.wrap(job.task, width - 7);
+  const taskExpanded = state.expandTask ?? false;
+  const taskToShow = taskExpanded ? taskLines : taskLines.slice(0, 3);
   const head = [
     `${label("cwd")} ${tildify(job.cwd)}`,
     `${label("git")} ${git}`,
     `${label("tools")} ${job.tools.join(" ")}`,
     `${label("spend")} ${money(u.cost)} ${s.fg("dim", `· ${tokens(u.input)} in / ${tokens(u.output)} out`)}`,
     `${label("calls")} ${job.progress.toolCalls} ${s.fg("dim", `· ${doing(job)}`)}`,
-    ...taskLines.slice(0, 3).map((line, i) => `${label(i ? "" : "task")} ${line}`),
-    ...(taskLines.length > 3 ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines · t to read`)}`] : []),
+    ...taskToShow.map((line, i) => `${label(i ? "" : "task")} ${line}`),
+    ...(taskLines.length > 3 && !taskExpanded ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines · ctrl+o to expand`)}`] : []),
   ];
   const view = bodyView(state, job);
   const other = view === "activity" ? "result" : "activity";
@@ -254,7 +263,7 @@ export interface PopupRender {
 export function popupLines(jobs: JobRecord[], state: PopupState, now: number, width: number, height: number, s: Style, frame: number): PopupRender {
   const help = state.focus === "list"
     ? "j/k move · enter focus details · a activity/result · t task · x cancel · esc close"
-    : "j/k scroll · ctrl+d/u page · g/G top/bottom · a activity/result · t task · x cancel · esc back";
+    : "j/k scroll · ctrl+d/u page · g/G top/bottom · a activity/result · t task · ctrl+o expand · x cancel · esc back";
   const paneH = Math.max(4, height - 1);
   const leftW = Math.min(44, Math.max(24, Math.round(width * 0.35)));
   const rightW = Math.max(20, width - leftW);

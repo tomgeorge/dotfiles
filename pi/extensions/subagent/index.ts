@@ -48,6 +48,7 @@ const POPUP_KEYS: [KeyId[], PopupKey][] = [
   [["escape", "h", "left"], "back"],
   [["a"], "toggle"],
   [["t"], "task"],
+  [["ctrl+o"], "expand"],
   [["x"], "cancel"],
   [["q", "ctrl+c", PANEL_KEY], "close"],
 ];

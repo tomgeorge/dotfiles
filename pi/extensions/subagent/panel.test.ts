@@ -176,7 +176,7 @@ test("popup shows the full task as markdown and scrolls it", () => {
   const state = initialPopup(jobs);
   const screen = () => popupLines(jobs, state, 0, 100, 20, plain, 0).lines.join("\n");
   assert.match(screen(), /md:\*\*done\*\*/);
-  assert.match(screen(), /… 37 more lines · t to read/);
+  assert.match(screen(), /… 37 more lines · ctrl\+o to expand/);
   popupKey(state, jobs, "task", 5);
   assert.equal(state.view, "task");
   assert.match(screen(), /─ task ─+ a: activity · t: back ─/);
@@ -189,6 +189,34 @@ test("popup shows the full task as markdown and scrolls it", () => {
   assert.equal(state.view, undefined);
   assert.equal(state.scroll, 0);
   assert.match(screen(), /md:\*\*done\*\*/);
+});
+
+test("popup expands the task prompt with ctrl+o", () => {
+  const store = storeWith(0);
+  const task = Array.from({ length: 40 }, (_, i) => `step ${i}`).join("\n");
+  store.add({ id: 1, provider: "p", model: "m", task, cwd: "/tmp", tools: ["read"], started: 0, progress: progress() });
+  store.finish(1, "ok", { result: "**done**" }, 0);
+  const jobs = store.list();
+  const state = initialPopup(jobs);
+  const screen = () => popupLines(jobs, state, 0, 100, 20, plain, 0).lines.join("\n");
+  // Initially, the task is truncated with a hint to expand
+  assert.match(screen(), /… 37 more lines · ctrl\+o to expand/);
+  assert.doesNotMatch(screen(), /step 39/);
+  // Press ctrl+o to expand
+  popupKey(state, jobs, "expand", 5);
+  assert.equal(state.expandTask, true);
+  // Now all lines should be visible (no truncation hint)
+  assert.doesNotMatch(screen(), /… 37 more lines · ctrl\+o to expand/);
+  // Since the task is expanded, we should see more task lines
+  const screenText = screen();
+  // Count lines containing "step" (task content lines)
+  const taskLineCount = (screenText.match(/step \d+/g) || []).length;
+  assert.ok(taskLineCount > 3, `Expected more than 3 task lines, got ${taskLineCount}`);
+  // Toggle expand off
+  popupKey(state, jobs, "expand", 5);
+  assert.equal(state.expandTask, false);
+  // Back to truncated
+  assert.match(screen(), /… 37 more lines · ctrl\+o to expand/);
 });
 
 test("popup renders exactly width × height with details", () => {
