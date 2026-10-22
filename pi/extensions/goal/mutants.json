@@ -76,5 +76,17 @@
     "file": "index.ts",
     "from": "goal = goalFromEntry(entry.data);",
     "to": "goal = goalFromEntry(entry.data) ?? goal;"
+  },
+  {
+    "name": "loader reads other extensions' entries",
+    "file": "index.ts",
+    "from": "entry.type === \"custom\" && entry.customType === ENTRY",
+    "to": "entry.type === \"custom\""
+  },
+  {
+    "name": "exit doesn't cancel the check deadline",
+    "file": "goal.ts",
+    "from": "child.on(\"exit\", (code) => { clearTimeout(timer); ",
+    "to": "child.on(\"exit\", (code) => { "
   }
 ]
