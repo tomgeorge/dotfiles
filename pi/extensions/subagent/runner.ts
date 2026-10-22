@@ -59,6 +59,8 @@ function readUsage(raw: unknown): Usage {
 /** Joined text parts of an assistant message. Throws on content that isn't a list of parts. */
 function messageText(content: unknown): string {
   if (content === undefined || content === null) return "";
+  // A null part used to throw a TypeError on `part.type`; rejecting it keeps the event "invalid"
+  // rather than silently skipping the part. Other non-object parts are skipped, as before.
   if (!Array.isArray(content) || content.includes(null)) throw new Error("Malformed message content");
   return content.filter((part) => fields(part).type === "text").map((part) => fields(part).text).join("\n");
 }
