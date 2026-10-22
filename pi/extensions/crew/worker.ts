@@ -9,6 +9,8 @@ export interface WorkerJob {
   /** Extension sources loaded into the child with `-e`. */
   extensions: string[];
   env?: Record<string, string>;
+  /** Session file the child records its transcript to; without one it runs ephemeral. */
+  session?: string;
 }
 
 export interface Usage { input: number; output: number; cost: number }
@@ -55,7 +57,7 @@ export function buildWorkerArgs(job: WorkerJob): string[] {
   }
   if (!job.tools.length) throw new Error("tools must not be empty");
   return [
-    "-p", "--mode", "json", "--no-session", "--no-extensions",
+    "-p", "--mode", "json", ...(job.session ? ["--session", job.session] : ["--no-session"]), "--no-extensions",
     ...job.extensions.flatMap((source) => ["-e", source]),
     "--no-skills", "--no-prompt-templates", "--no-approve", "--offline",
     "--provider", job.provider, "--model", job.model,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fakePi } from "../test-support/fake-pi.ts";
 
@@ -155,6 +155,10 @@ crewTest("a dispatched implement worker runs in its own worktree with the guard 
   assert.equal(job.env.PI_CREW_ROOT, job.cwd);
   assert.equal(job.provider, "p");
   assert.equal(job.model, "m");
+  // The transcript lives beside the ledger, outside the worktree, so /crew-clean keeps it.
+  assert.equal(job.session, join(e.root, ".git", "pi-crew", e.slug, "t1.jsonl"));
+  assert.ok(existsSync(dirname(job.session)), "session directory created");
+  assert.equal(e.state().tasks[0].session, job.session);
 });
 
 crewTest("dispatch refuses beyond the concurrency limit", async (e) => {
@@ -493,7 +497,7 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
     await waitFor(() => ui.opened[1].closed, "close");
 
     // A finished crew has nothing to watch: /crew asks for a new goal.
-    const file = join(root, ".git", "pi-crew", readdirSync(join(root, ".git", "pi-crew"))[0]);
+    const file = join(root, ".git", "pi-crew", readdirSync(join(root, ".git", "pi-crew")).find((f) => f.endsWith(".json"))!);
     writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), status: "finished" }));
     await b.f.command("crew", "", b.ctx);
     assert.ok(asked);

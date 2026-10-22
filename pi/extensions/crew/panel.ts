@@ -511,6 +511,7 @@ function overview(crew: CrewState, task: TaskRecord, now: number, width: number,
   add("branch", task.branch ?? s.fg("dim", "none"));
   add("base", task.base ? task.base.slice(0, 12) : s.fg("dim", "none"));
   add("worktree", task.worktree ? tildify(task.worktree) : s.fg("dim", "removed"));
+  add("session", task.session ? tildify(task.session) : s.fg("dim", "not recorded"));
   if (task.status === "running") {
     add("time", `${duration(now - task.startedAt)} elapsed`);
     const last = `${duration(now - task.lastEventAt)} ago`;

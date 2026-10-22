@@ -55,7 +55,8 @@ The list shows each task's status, kind, title, elapsed time, cost, and activity
 with no stream event for over a minute shows `quiet 2m` in the warning colour, and in the error
 colour once it passes `stallMin`. The details pane has five tabs:
 
-1. **Overview**: status, model, branch, base, worktree, timings, cost, tool count, paths, acceptance.
+1. **Overview**: status, model, branch, base, worktree, session file, timings, cost, tool count,
+   paths, acceptance.
 2. **Spec**: the spec the worker received.
 3. **Handoff**: the worker's claims and what the harness observed, as separate sections.
 4. **Checks**: each check's verdict. Failing output starts open; `enter` opens or closes one.
@@ -137,7 +138,13 @@ At the budget, new dispatches are refused and the planner is told once. Running 
 ## State
 
 The ledger is stored at `<git-common-dir>/pi-crew/<slug>.json`, outside every working tree, and
-survives restarts. When the session ends, running workers are killed and marked `interrupted`.
+survives restarts. Each worker records its pi session, the full transcript with thinking and
+tool calls, to `<git-common-dir>/pi-crew/<slug>/t<N>.jsonl`. `/crew-clean` keeps these files.
+After a worker finishes, open its transcript with `pi --session <file>`, fork it with
+`pi --fork <file>`, or render it with `pi --export <file>`. Don't open a running worker's session
+with `pi --session`, because two processes would then write the same file.
+
+When the session ends, running workers are killed and marked `interrupted`.
 `/crew-resume` reloads the ledger and wakes the planner. Interrupted tasks keep their worktrees
 and branches.
 
@@ -168,9 +175,9 @@ and branches.
 
 ## Follow-ups
 
-- **Live worker output.** The panel only has each worker's `activity` and counters. A live tail
-  needs a bounded ring buffer of stream events per worker, filled in `handle` in `worker.ts` and
-  passed up through `onProgress`.
+- **Live worker output.** The panel only has each worker's `activity` and counters. A live tab that
+  streams tokens as they arrive needs a bounded ring buffer of stream events per
+  worker, filled in `handle` in `worker.ts` and passed up through `onProgress`.
 - **Crew workers in `/subagents`.**
 - **Better slugs.** `slugify` uses the goal's opening words (`i-d-like-to-add-a-theme-that-cop-2zw1`).
   Drop filler words, or add `/crew --name`.

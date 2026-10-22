@@ -22,6 +22,12 @@ test("args: isolated child, explicit extensions and tools, literal prompt", () =
   assert.equal(args.at(-1), "Task: --evil @file");
 });
 
+test("args: a job with a session records to that file instead of running ephemeral", () => {
+  const args = buildWorkerArgs({ ...job, session: "/crew/demo/t1.jsonl" });
+  assert.equal(args[args.indexOf("--session") + 1], "/crew/demo/t1.jsonl");
+  assert.ok(!args.includes("--no-session"));
+});
+
 test("ok result carries final text, usage, and passes env to the child", async () => {
   const r = await run(`${emit({ type: "tool_execution_start", toolName: "bash", args: { command: "npm test" } })}
     console.log(JSON.stringify(${JSON.stringify(end("x"))}).replace('"x"', JSON.stringify(process.env.PI_CREW_ROOT)));`);

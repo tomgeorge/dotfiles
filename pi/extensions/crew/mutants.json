@@ -280,5 +280,17 @@
     "file": "index.ts",
     "from": "if (ctx.hasUI && state) return openPanel(ctx, state);",
     "to": ""
+  },
+  {
+    "name": "worker ignores its session file",
+    "file": "worker.ts",
+    "from": "...(job.session ? [\"--session\", job.session] : [\"--no-session\"])",
+    "to": "\"--no-session\""
+  },
+  {
+    "name": "dispatch does not record the worker session",
+    "file": "index.ts",
+    "from": "PI_CREW_ROOT: task.worktree! }, session: task.session,",
+    "to": "PI_CREW_ROOT: task.worktree! },"
   }
 ]

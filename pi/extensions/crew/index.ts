@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
@@ -11,7 +13,7 @@ import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
 import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
-  formatStatus, listCrews, loadState, runningTasks, saveState, slugify, spent,
+  formatStatus, listCrews, loadState, runningTasks, saveState, sessionPath, slugify, spent,
   type CrewState, type ModelRef, type TaskRecord,
 } from "./state.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
@@ -339,6 +341,9 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       state.tasks.push(task);
       let prompt: string;
       try {
+        // Outside every worktree, beside the ledger, so the transcript survives /crew-clean.
+        task.session = sessionPath(c.commonDir, c.slug, task.id);
+        mkdirSync(dirname(task.session), { recursive: true, mode: 0o700 });
         if (review) {
           task.worktree = target!.worktree;
           task.base = target!.base;
@@ -370,7 +375,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       launch(task, {
         provider: model.provider, model: model.model, cwd: task.worktree!, prompt,
         tools: review ? READ_TOOLS : WRITE_TOOLS, extensions: [...CHILD_EXTENSIONS, GUARD],
-        env: { ...GIT_ENV, PI_CREW_ROOT: task.worktree! },
+        env: { ...GIT_ENV, PI_CREW_ROOT: task.worktree! }, session: task.session,
       }, (params.timeoutMinutes ?? c.taskTimeoutMin) * 60_000);
       return text(`Dispatched #${task.id} (${task.kind}) "${task.title}" to ${task.model}${review ? ` reviewing #${task.reviewOf}` : ` on ${task.branch}`}. Its handoff will arrive as a message. Don't poll: dispatch other independent work or end your turn.`);
     })()),

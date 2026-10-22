@@ -40,6 +40,8 @@ export interface TaskRecord {
   branch?: string;
   worktree?: string;
   base?: string;
+  /** The worker's pi session file: its full transcript, thinking and tool calls included. */
+  session?: string;
   status: TaskStatus;
   startedAt: number;
   endedAt?: number;
@@ -63,6 +65,7 @@ export interface CrewState {
 
 export const crewDir = (commonDir: string) => join(commonDir, "pi-crew");
 export const statePath = (commonDir: string, slug: string) => join(crewDir(commonDir), `${slug}.json`);
+export const sessionPath = (commonDir: string, slug: string, id: number) => join(crewDir(commonDir), slug, `t${id}.jsonl`);
 
 export function saveState(state: CrewState): void {
   const path = statePath(state.config.commonDir, state.config.slug);

@@ -345,10 +345,11 @@ test("ctrl+o zooms the details to the full panel", () => {
   assert.ok(!state.zoom, "esc unzooms before it closes");
 });
 
-test("the overview shows status, model, branch, base, worktree, timings, cost, paths, and acceptance", () => {
-  const crew = crewOf([task(1, { paths: ["src/", "test/"], acceptance: ["themes load"], checks: ["npm test"] })]);
+test("the overview shows status, model, branch, base, worktree, session, timings, cost, paths, and acceptance", () => {
+  const crew = crewOf([task(1, { paths: ["src/", "test/"], acceptance: ["themes load"], checks: ["npm test"], session: "/git/pi-crew/demo/t1.jsonl" })]);
   const text = screen(render(crew, initialPanel(crew)));
   for (const want of [/status +running/, /model +p\/worker/, /branch +crew\/demo-t1/, /base +bbbbbbbbbbbb /, /worktree +\/wt\/crew-demo-t1/,
+    /session +\/git\/pi-crew\/demo\/t1\.jsonl/,
     /time +1m30s elapsed/, /last event +1s ago/, /cost +\$0\.25 · 3 tools/, /activity +read file1\.ts/, /paths +src\/, test\//,
     /checks +npm test/, /- themes load/]) assert.match(text, want);
 });
