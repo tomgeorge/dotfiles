@@ -19,9 +19,9 @@
   },
   {
     "name": "loaded goal aliases its entry",
-    "file": "index.ts",
-    "from": "goal = structuredClone(entry.data as Goal)",
-    "to": "goal = entry.data as Goal"
+    "file": "goal.ts",
+    "from": "return ok ? structuredClone(data as Goal) : undefined;",
+    "to": "return ok ? (data as Goal) : undefined;"
   },
   {
     "name": "saved entry aliases the live goal",
@@ -58,5 +58,23 @@
     "file": "index.ts",
     "from": "const result = aborted ? undefined : await",
     "to": "const result = await"
+  },
+  {
+    "name": "stop decision ignores its status",
+    "file": "index.ts",
+    "from": "active.status = decision.status;",
+    "to": "active.status = \"paused\";"
+  },
+  {
+    "name": "entry status not validated",
+    "file": "goal.ts",
+    "from": "&& STATUSES.includes(g.status as GoalStatus)",
+    "to": ""
+  },
+  {
+    "name": "malformed entry drops the earlier goal",
+    "file": "index.ts",
+    "from": "goalFromEntry(entry.data) ?? goal;",
+    "to": "goalFromEntry(entry.data);"
   }
 ]

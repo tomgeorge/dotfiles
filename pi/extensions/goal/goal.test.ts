@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { continuationMessage, decide, GOAL_GUIDELINES, newGoal, parseGoalArgs, runCheck, startMessage, statusLine } from "./goal.ts";
+import { continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine } from "./goal.ts";
 
 test("parses objective, check (rest of line), max, and lifecycle words", () => {
   assert.deepEqual(parseGoalArgs(""), { kind: "status" });
@@ -26,11 +26,22 @@ test("decide: the check decides done; no-progress runs park; budget stops; inter
   const g = newGoal("x", "true", 2);
   assert.deepEqual(decide(g, { checkPassed: true, toolCalls: 0, aborted: false }), { action: "complete" });
   assert.equal(decide(g, { checkPassed: false, toolCalls: 3, aborted: false }).action, "continue");
-  assert.equal(decide(g, { checkPassed: false, toolCalls: 0, aborted: false }).action, "park");
-  assert.equal(decide(g, { checkPassed: false, toolCalls: 3, aborted: true }).action, "pause");
-  assert.match((decide(g, { checkPassed: false, toolCalls: 0, aborted: false, errored: true }) as { reason: string }).reason, /error/);
-  assert.equal(decide({ ...g, continuations: 2 }, { checkPassed: false, toolCalls: 3, aborted: false }).action, "budget");
+  assert.deepEqual(decide(g, { checkPassed: false, toolCalls: 0, aborted: false }), { action: "stop", status: "parked", reason: "the last run made no tool calls, so it wasn't making progress" });
+  assert.deepEqual(decide(g, { checkPassed: false, toolCalls: 3, aborted: true }), { action: "stop", status: "paused", reason: "you interrupted the run" });
+  const errored = decide(g, { checkPassed: false, toolCalls: 0, aborted: false, errored: true });
+  assert.ok(errored.action === "stop" && errored.status === "paused" && /error/.test(errored.reason));
+  assert.deepEqual(decide({ ...g, continuations: 2 }, { checkPassed: false, toolCalls: 3, aborted: false }), { action: "stop", status: "budget", reason: "used all 2 automatic continuations" });
   assert.equal(decide({ ...g, status: "paused" }, { checkPassed: true, toolCalls: 1, aborted: false }).action, "none");
+});
+
+test("goalFromEntry copies goal-shaped entry data and rejects anything else", () => {
+  const g = newGoal("x", "true");
+  const loaded = goalFromEntry(g);
+  assert.deepEqual(loaded, g);
+  assert.notEqual(loaded, g);
+  for (const bad of [undefined, null, "x", {}, { ...g, status: "done" }, { ...g, check: 1 }, { ...g, objective: undefined }, { ...g, continuations: "0" }, { ...g, maxContinuations: null }]) {
+    assert.equal(goalFromEntry(bad), undefined, JSON.stringify(bad));
+  }
 });
 
 test("prompts carry the objective, check, budget, and check output", () => {
