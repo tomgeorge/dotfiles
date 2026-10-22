@@ -43,6 +43,7 @@ Read this before calling any tools — it's where v1 of the skill made bad assum
 - **Fantastical output is verbose.** Each event has `id`, `calendarId`, location URLs. Extract only `title`, `startDate`, `endDate`, and (optionally) `calendarId` for grouping. Drop the rest before reasoning over the list.
 - **Todoist `find-completed-tasks`** without a `responsibleUser` parameter works correctly for solo users. With it, it returns nothing.
 - **`Todoist:find-tasks`** accepts raw filter strings like `"no date"`, `"overdue"`, `"7 days"`, `"##ProjectName"` — useful for slicing the task list without iterating projects.
+- **Todoist `find-tasks`:** `limit` must be ≤ 100. Page with the returned cursor instead of asking for more.
 - **HEY tools are gateway-style.** Call as `{"action": "...", "params": {...}}`. `{"action": "describe", "params": {"action": "NAME"}}` returns an action's full parameter schema — use it rather than guessing parameter names.
 - **"Clearance" means Screener decision.** `hey_contacts:get_clearances` is the pending Screener queue; `get_my_clearances` is senders already decided. `update_clearance` screens one sender in or out.
 - **Two HEY actions are destructive and all-or-nothing.** Both need explicit confirmation every time — never as part of a batch:

@@ -259,7 +259,7 @@ test("readGitInfo reports branch, worktree, and non-repos", async () => {
   const git = (...args: string[]) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
   assert.equal(await readGitInfo(dir), null);
   git("init", "-q", "-b", "trunk");
-  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init");
   assert.deepEqual(await readGitInfo(dir), { branch: "trunk", worktree: false });
   const linked = join(dir, "linked");
   git("worktree", "add", "-q", "-b", "feature", linked);

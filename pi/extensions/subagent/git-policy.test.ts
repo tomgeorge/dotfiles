@@ -55,7 +55,7 @@ test("allowed commands run against a real repo without changing it", () => {
   try {
     const git = (args: string[]) => execFileSync("git", args, { cwd: dir, env: { ...process.env, ...GIT_ENV }, encoding: "utf8" });
     git(["init", "-q", "-b", "main"]);
-    git(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "one"]);
+    git(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "one"]);
     writeFileSync(join(dir, "f"), "a\n");
     const refsBefore = git(["for-each-ref"]);
     const headBefore = readFileSync(join(dir, ".git", "HEAD"), "utf8");

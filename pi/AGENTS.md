@@ -20,6 +20,8 @@
 ## Verification
 - After changes, run the project's formatter, linter, and tests when available.
 - If you can't verify something, say so explicitly.
+- `node --test` (Node 24) prints spec output: grep `^ℹ (pass|fail)`, not TAP `# pass`.
+- Global git config signs commits (gpg). Test helpers that commit in temp repos must pass `-c commit.gpgsign=false`, or they hang when the gpg cache is cold.
 
 ## Git
 - Never commit, push, rebase, or rewrite history unless asked.
