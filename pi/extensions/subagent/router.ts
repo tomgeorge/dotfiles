@@ -190,7 +190,11 @@ export async function route(
     const parsed = parseBackendResult(body.results[backend]);
     results[backend] = parsed ?? { error: "missing or malformed result" };
   }
-  const errors = config.backends.flatMap((b) => { const r = results[b]; return "error" in r ? [`${b}: ${r.error}`] : []; });
+  const errors: string[] = [];
+  for (const backend of config.backends) {
+    const result = results[backend];
+    if ("error" in result) errors.push(`${backend}: ${result.error}`);
+  }
   if (errors.length === config.backends.length) return unavailable(`every backend failed (${errors.join("; ")})`);
   return { status: "ok", results };
 }

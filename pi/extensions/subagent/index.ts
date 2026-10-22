@@ -11,7 +11,7 @@ import {
   initialPopup, popupKey, popupLines, progressLine, summary, widgetLines,
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
-import { parseCommandArgs, pickModel, type Picked, type PickerUI } from "./picker.ts";
+import { parseCommandArgs, pickModel, type PickerUI } from "./picker.ts";
 import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
@@ -282,17 +282,17 @@ export default function (pi: ExtensionAPI) {
         // Fail before the picker rather than after the user has typed a task.
         checkCapacity();
         const parsed = parseCommandArgs(args, ctx.modelRegistry.getAvailable());
-        let picked: Picked | undefined;
-        let task: string | undefined;
-        if (parsed.type === "model") {
-          ({ picked, task } = parsed);
-        } else {
+        /** Ask for a task (unless given) and a model. `undefined` if the user cancels either. */
+        const pickInteractively = async (given: string) => {
           if (!ctx.hasUI) throw new Error("Specify provider/model and task in non-interactive mode");
-          task = parsed.task || await ctx.ui.editor("Subagent task (read-only)");
-          if (!task?.trim()) return;
-          picked = await confirmModel(task, ctx, "command");
-          if (!picked) return;
-        }
+          const task = given || await ctx.ui.editor("Subagent task (read-only)");
+          if (!task?.trim()) return undefined;
+          const picked = await confirmModel(task, ctx, "command");
+          return picked ? { picked, task } : undefined;
+        };
+        const chosen = parsed.type === "model" ? parsed : await pickInteractively(parsed.task);
+        if (!chosen) return;
+        const { picked, task } = chosen;
         const modelName = `${picked.provider}/${picked.model}`;
         const job: Job = {
           provider: picked.provider, model: picked.model,
