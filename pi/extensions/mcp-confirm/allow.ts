@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 
 /** Tool-name patterns: exact names, or a prefix ending in "*". */
 export function loadAllowlist(path: string): string[] {
-  const raw = JSON.parse(readFileSync(path, "utf8")) as { tools?: unknown };
-  if (!Array.isArray(raw.tools) || raw.tools.some((t) => typeof t !== "string" || !t.startsWith("mcp__"))) {
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  const tools = typeof raw === "object" && raw !== null && "tools" in raw ? raw.tools : undefined;
+  if (!Array.isArray(tools) || !tools.every((t): t is string => typeof t === "string" && t.startsWith("mcp__"))) {
     throw new Error(`${path}: "tools" must be a list of mcp__ tool names or prefixes ending in *`);
   }
-  return raw.tools as string[];
+  return tools;
 }
 
 export const allowed = (patterns: string[], tool: string) =>
