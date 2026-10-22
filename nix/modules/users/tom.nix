@@ -30,6 +30,7 @@ in
         hm.default
         hm.gpgTools
         hm.piRouter
+        hm.piCheckin
         # docker -> podman only on personal machines; work uses orbstack
         {
           programs.fish.shellAliases.docker = "podman";
