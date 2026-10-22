@@ -81,7 +81,6 @@ export class JobStore {
   get(id: number) { return this.jobs.get(id); }
   list(): JobRecord[] { return [...this.jobs.values()].sort((a, b) => a.id - b.id); }
   running(): JobRecord[] { return this.list().filter((job) => job.status === "running"); }
-  totalCost(): number { return this.list().reduce((sum, job) => sum + job.progress.usage.cost, 0); }
 
   /** Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void {

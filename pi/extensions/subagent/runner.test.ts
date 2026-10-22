@@ -85,6 +85,15 @@ test("missing final answer, malformed events, and wrong models fail", async () =
   }
 });
 
+test("malformed message content is a bad event; non-object events are ignored", async () => {
+  for (const content of ["text", [null], { type: "text" }]) {
+    const result = await run(emit(message("x", "stop", { content })));
+    assert.deepEqual([result.status, result.error], ["error", "Invalid JSON event from subagent"]);
+  }
+  const result = await run(emit(42) + emit("hello") + emit(null) + emit([1]) + emit(message("Final")));
+  assert.deepEqual(result, { status: "ok", text: "Final", error: null });
+});
+
 test("spawn failures are returned", async () => {
   const result = await runSubagent(job, { command: "/nonexistent-pi-subagent-test" });
   assert.equal(result.status, "error");
