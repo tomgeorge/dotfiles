@@ -1,7 +1,7 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { BOXES, BUBBLE_WHEN, buildArgs, MAX_IDS, type Op, runHey, summarize } from "./hey.ts";
+import { BOXES, type Box, BUBBLE_WHEN, buildArgs, MAX_IDS, type Op, runHey, summarize } from "./hey.ts";
 
 // The hey MCP server can't label or collect, and its write domains also send
 // and trash mail. These tools expose only the organizing subcommands of the
@@ -36,6 +36,11 @@ function text(op: Op, data: unknown) {
   };
 }
 
+async function confirmAndRun(op: Op, signal: AbortSignal | undefined, ctx: ExtensionContext) {
+  await confirmed(op, ctx);
+  return text(op, await runHey(buildArgs(op), signal));
+}
+
 export default function (pi: ExtensionAPI) {
   const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true };
   const read = { readOnlyHint: true, openWorldHint: true };
@@ -47,11 +52,10 @@ export default function (pi: ExtensionAPI) {
     exposure: "codemode",
     namespace,
     annotations: write,
-    parameters: Type.Object({ postingIds, to: StringEnum(Object.keys(BOXES) as (keyof typeof BOXES)[]) }),
+    parameters: Type.Object({ postingIds, to: StringEnum(Object.keys(BOXES) as Box[]) }),
     async execute(_id, { postingIds, to }, signal, _onUpdate, ctx) {
       const op: Op = { kind: "move", postingIds, to };
-      await confirmed(op, ctx);
-      return text(op, await runHey(buildArgs(op), signal));
+      return confirmAndRun(op, signal, ctx);
     },
   });
 
@@ -65,8 +69,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({ postingIds, labelId: Type.Integer({ minimum: 1 }) }),
     async execute(_id, { postingIds, labelId }, signal, _onUpdate, ctx) {
       const op: Op = { kind: "label", postingIds, labelId };
-      await confirmed(op, ctx);
-      return text(op, await runHey(buildArgs(op), signal));
+      return confirmAndRun(op, signal, ctx);
     },
   });
 
@@ -83,8 +86,7 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(_id, { threadIds, collectionId }, signal, _onUpdate, ctx) {
       const op: Op = { kind: "collection", threadIds, collectionId };
-      await confirmed(op, ctx);
-      return text(op, await runHey(buildArgs(op), signal));
+      return confirmAndRun(op, signal, ctx);
     },
   });
 
@@ -98,8 +100,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({ postingIds }),
     async execute(_id, { postingIds }, signal, _onUpdate, ctx) {
       const op: Op = { kind: "seen", postingIds };
-      await confirmed(op, ctx);
-      return text(op, await runHey(buildArgs(op), signal));
+      return confirmAndRun(op, signal, ctx);
     },
   });
 
@@ -135,8 +136,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({ postingIds }),
     async execute(_id, { postingIds }, signal, _onUpdate, ctx) {
       const op: Op = { kind: "bubble-pop", postingIds };
-      await confirmed(op, ctx);
-      return text(op, await runHey(buildArgs(op), signal));
+      return confirmAndRun(op, signal, ctx);
     },
   });
 

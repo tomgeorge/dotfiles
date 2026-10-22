@@ -72,14 +72,20 @@ export function buildArgs(op: Op): string[] {
   }
 }
 
-type Envelope = { ok?: boolean; data?: unknown; error?: string; hint?: string };
+// Fields stay unknown: they come straight from hey's output and are only compared or interpolated.
+type Envelope = { ok?: unknown; data?: unknown; error?: unknown; hint?: unknown };
 
 function envelope(text: string): Envelope | undefined {
+  let parsed: unknown;
   try {
-    return JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch {
+    // Not JSON: the caller falls back to the other stream, then to the raw text.
     return undefined;
   }
+  if (parsed === null) return undefined;
+  // Any other JSON value still counts as stdout's answer, with no envelope fields.
+  return typeof parsed === "object" ? (parsed as Envelope) : {};
 }
 
 /** Parse hey's `--json` envelope; throw with hey's error and hint when it reports failure. */
@@ -98,9 +104,11 @@ export function runHey(args: string[], signal?: AbortSignal, bin = HEY_BIN): Pro
       args,
       { signal, timeout: 60_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, HEY_NONINTERACTIVE: "1" } },
       (error, stdout, stderr) => {
-        if (error && typeof error.code !== "number") return reject(error);
+        const exitCode = error ? error.code : 0;
+        // A non-numeric code means hey never ran (ENOENT, abort, timeout), so there is no envelope to parse.
+        if (typeof exitCode !== "number") return reject(error);
         try {
-          resolve(parseResult(stdout, stderr, error ? (error.code as number) : 0));
+          resolve(parseResult(stdout, stderr, exitCode));
         } catch (e) {
           reject(e);
         }
@@ -124,7 +132,8 @@ export function summarize(op: Op): string {
       return `Bubble up ${op.postingIds.length} email(s) ${op.when === "on" ? `on ${op.on}` : op.when}: ${op.postingIds.join(", ")}`;
     case "bubble-pop":
       return `Cancel bubble-up on ${op.postingIds.length} email(s): ${op.postingIds.join(", ")}`;
-    default:
+    case "list-labels":
+    case "list-collections":
       return op.kind;
   }
 }
