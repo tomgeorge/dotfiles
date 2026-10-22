@@ -35,6 +35,25 @@ function split(id: string): Picked {
   return { provider: id.slice(0, slash), model: id.slice(slash + 1) };
 }
 
+/** `/subagent` arguments: an exact model and its task, or a task (maybe empty) to pick a model for. */
+export type CommandArgs =
+  | { type: "model"; picked: Picked; task: string }
+  | { type: "pick"; task: string };
+
+export function parseCommandArgs(args: string, available: Model[]): CommandArgs {
+  const [, first = "", rest = ""] = args.trim().match(/^(\S+)\s*([\s\S]*)$/) ?? [];
+  const slash = first.indexOf("/");
+  if (slash > 0 && available.some((m) => `${m.provider}/${m.id}` === first)) {
+    if (!rest.trim()) throw new Error("Usage: /subagent [provider/model] task");
+    return { type: "model", picked: split(first), task: rest };
+  }
+  // Looks like a model for a known provider: a typo, not the start of a task.
+  if (slash > 0 && available.some((m) => m.provider === first.slice(0, slash))) {
+    throw new Error(`Unavailable model: ${first}. Use /subagent without a model to pick one.`);
+  }
+  return { type: "pick", task: args.trim() };
+}
+
 /**
  * Rank `task` with the local router and have the user confirm a model. Falls back to the full
  * model list whenever routing is off or fails. Returns `undefined` if the user cancels.
