@@ -1,11 +1,11 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Message, uuidv7 } from "@earendil-works/pi-ai";
-import {
-  convertToLlm, serializeConversation, type ExtensionAPI, type ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import { convertToLlm, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { ADVISOR_SYSTEM_PROMPT, readConfig, trimTranscript, writeConfig, type AdvisorConfig } from "./advisor.ts";
+import {
+  ADVISOR_SYSTEM_PROMPT, readConfig, serializeTranscript, trimTranscript, writeConfig, type AdvisorConfig,
+} from "./advisor.ts";
 
 const CONFIG = join(homedir(), ".pi", "agent", "advisor.json");
 const MAX_TRANSCRIPT_CHARS = 600_000;
@@ -42,10 +42,10 @@ export default function (pi: ExtensionAPI) {
       if (!config) throw new Error("No advisor configured. Ask the user to pick one with /advisor.");
       const model = ctx.modelRegistry.getAvailable().find((m) => m.provider === config!.provider && m.id === config!.model);
       if (!model) throw new Error(`Advisor model ${config.provider}/${config.model} is unavailable. Ask the user to run /advisor.`);
-            // Exactly the messages Pi sends the agent's model: compaction, context edits,
+      // Exactly the messages Pi sends the agent's model: compaction, context edits,
       // branch summaries, and custom messages applied the same way.
       const messages = ctx.sessionManager.buildSessionProjection().messages;
-      const transcript = trimTranscript(serializeConversation(convertToLlm(messages)), MAX_TRANSCRIPT_CHARS);
+      const transcript = trimTranscript(serializeTranscript(convertToLlm(messages)), MAX_TRANSCRIPT_CHARS);
       const message: Message = {
         role: "user",
         content: [{ type: "text", text: `## Conversation so far\n\n${transcript}\n\n## The agent's question\n\n${params.question}` }],
@@ -87,4 +87,6 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_start", (_event, ctx) => load(ctx));
+  // /tree restores the tools recorded at the target entry, which may predate the last /advisor.
+  pi.on("session_tree", (_event, ctx) => load(ctx));
 }
