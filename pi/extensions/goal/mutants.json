@@ -1,0 +1,62 @@
+[
+  {
+    "name": "abort read from ctx.signal",
+    "file": "index.ts",
+    "from": "|| ctx.signal?.aborted",
+    "to": ""
+  },
+  {
+    "name": "abort read from stopReason",
+    "file": "index.ts",
+    "from": "event.message.stopReason === \"aborted\" || ",
+    "to": ""
+  },
+  {
+    "name": "verdict despite goal changing during the check",
+    "file": "index.ts",
+    "from": "if (goal !== active || active.status !== \"active\") return;",
+    "to": ""
+  },
+  {
+    "name": "loaded goal aliases its entry",
+    "file": "index.ts",
+    "from": "goal = structuredClone(entry.data as Goal)",
+    "to": "goal = entry.data as Goal"
+  },
+  {
+    "name": "saved entry aliases the live goal",
+    "file": "index.ts",
+    "from": "pi.appendEntry(ENTRY, structuredClone(goal))",
+    "to": "pi.appendEntry(ENTRY, goal)"
+  },
+  {
+    "name": "resume keeps a spent budget",
+    "file": "index.ts",
+    "from": "if (goal.continuations >= goal.maxContinuations) goal.continuations = 0;",
+    "to": ""
+  },
+  {
+    "name": "tool count not reset per run",
+    "file": "index.ts",
+    "from": "    toolCalls = 0;\n",
+    "to": ""
+  },
+  {
+    "name": "goal_park never toggled",
+    "file": "index.ts",
+    "from": "pi.setActiveTools(goal?.status === \"active\" ? [...tools, \"goal_park\"] : tools);",
+    "to": ""
+  },
+  {
+    "name": "continuation doesn't wake the agent",
+    "file": "index.ts",
+    "from": "return say(continuationMessage(active), true);",
+    "to": "return say(continuationMessage(active));"
+  },
+  {
+    "name": "check runs after an abort",
+    "file": "index.ts",
+    "from": "const result = aborted ? undefined : await",
+    "to": "const result = await"
+  }
+]
