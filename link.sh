@@ -49,6 +49,7 @@ link pi/extensions/crew ~/.pi/agent/extensions/crew
 link pi/extensions/goal ~/.pi/agent/extensions/goal
 link pi/extensions/advisor ~/.pi/agent/extensions/advisor
 link pi/extensions/handoff ~/.pi/agent/extensions/handoff
+link pi/retro ~/.pi/agent/retro
 link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
 link pi/extensions/mcp-confirm ~/.pi/agent/extensions/mcp-confirm
 link pi/extensions/watch ~/.pi/agent/extensions/watch

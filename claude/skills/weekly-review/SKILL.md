@@ -301,6 +301,10 @@ Template (HTML):
 
 Use `Read and Write Apple Notes:add_note`. Keep it tight — a long note nobody re-reads is worse than a short one that gets reread.
 
+### Phase 6.5: Harness retro (optional, Pi only)
+
+Ask once: "Run the agent harness retro too?" If yes, and you're running in Pi, follow `~/.pi/agent/prompts/retro.md` with 7 days. It proposes fixes to agent instructions and never edits. Show its numbered proposals and apply only the ones the user names. Outside Pi, say it's available as `/retro` in Pi and move on. Add one line to the review note's System hygiene section: `Harness retro: N proposals, M applied`.
+
 ### Phase 7: Wrap
 
 Briefly: what was cleaned up, where the note lives, top 3 outcomes. Stop. No motivational close.
