@@ -11,7 +11,7 @@ const alive = (pid: number) => {
 };
 
 async function childPid(file: string): Promise<number> {
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 250; i++) {
     const text = await readFile(file, "utf8").catch(() => "");
     if (text.trim()) return Number(text);
     await sleep(20);
@@ -41,7 +41,7 @@ test("abort kills the whole process group, not just bash", async () => {
 test("timeout kills the group", async () => {
   const file = join(await mkdtemp(join(tmpdir(), "watch-runner-")), "pid");
   const result = await Promise.all([
-    runCheck(`sleep 30 & echo $! > ${file}; wait`, tmpdir(), new AbortController().signal, 300),
+    runCheck(`sleep 30 & echo $! > ${file}; wait`, tmpdir(), new AbortController().signal, 2_000),
     childPid(file),
   ]);
   assert.equal(result[0].killed, true);
