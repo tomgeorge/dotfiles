@@ -50,8 +50,10 @@ outer = { top = 45, bottom = 8, left = 8, right = 8 }
 # 5 = 'secondary'
 
 # Overrides for one display.
-# [display.main]
-# gaps.outer.top = 44
+# macOS already reserves the notch row (where SketchyBar sits) on the laptop screen,
+# so the 45 above would leave the bar's height twice over.
+[display.built-in]
+gaps.outer.top = 8
 
 [borders]
 enabled = true
