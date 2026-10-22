@@ -45,6 +45,12 @@ export function elapsed(job: JobRecord, now: number) {
   return (job.ended ?? now) - job.started;
 }
 
+/** One-line run summary appended to the tool result, so spend outlives the live status line. */
+export function summary(job: JobRecord, now: number): string {
+  const { toolCalls, usage } = job.progress;
+  return `Subagent #${job.id} ${job.model} · ${duration(elapsed(job, now))} · ${toolCalls} tool calls · ${money(usage.cost)} · ${tokens(usage.input)} in / ${tokens(usage.output)} out`;
+}
+
 /** What the job is doing now, or how it ended. */
 export function doing(job: JobRecord): string {
   if (job.status === "ok") return "done";

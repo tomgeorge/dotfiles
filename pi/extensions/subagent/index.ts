@@ -8,7 +8,7 @@ import { Type } from "typebox";
 import { JobStore, readGitInfo } from "./jobs.ts";
 import { glowRenderer } from "./markdown.ts";
 import {
-  doing, duration, initialPopup, money, popupKey, popupLines, widgetLines,
+  doing, duration, initialPopup, money, popupKey, popupLines, summary, widgetLines,
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
 import { pickModel, type PickerUI } from "./picker.ts";
@@ -213,7 +213,8 @@ export default function (pi: ExtensionAPI) {
       const result = await done;
       store.finish(id, result.status, { result: result.text || undefined, error: result.error ?? undefined });
       finished = true;
-      if (result.status !== "ok") throw new Error(`Subagent #${id} ${result.status}: ${result.error}`);
+      const footer = summary(record, Date.now());
+      if (result.status !== "ok") throw new Error(`Subagent #${id} ${result.status}: ${result.error}\n\n${footer}`);
       const truncated = truncateHead(result.text);
       let text = truncated.content;
       if (truncated.truncated) {
@@ -222,9 +223,13 @@ export default function (pi: ExtensionAPI) {
         await writeFile(file, result.text, { mode: 0o600 });
         text += `\n\n[Output truncated to 2000 lines / 50 KiB. Full output: ${file}]`;
       }
+      text += `\n\n${footer}`;
       return {
         content: [{ type: "text" as const, text }],
-        details: { id, status: result.status, provider: job.provider, model: job.model, cwd: job.cwd },
+        details: {
+          id, status: result.status, provider: job.provider, model: job.model, cwd: job.cwd,
+          toolCalls: record.progress.toolCalls, usage: record.progress.usage,
+        },
       };
     } catch (error) {
       if (!finished) store.finish(id, "error", { error: error instanceof Error ? error.message : String(error) });

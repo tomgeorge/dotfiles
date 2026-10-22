@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { JobStore, LOG_LIMIT, readGitInfo } from "./jobs.ts";
 import {
-  duration, initialPopup, money, popupKey, popupLines, tokens, widgetLines, WIDGET_ROWS, type Style,
+  duration, initialPopup, money, popupKey, popupLines, summary, tokens, widgetLines, WIDGET_ROWS, type Style,
 } from "./panel.ts";
 import type { Progress } from "./runner.ts";
 
@@ -50,6 +50,14 @@ test("formats durations, money, and tokens compactly", () => {
   assert.deepEqual([0, 12_400, 64_000, 3_720_000].map(duration), ["0s", "12s", "1m04s", "1h02m"]);
   assert.deepEqual([0, 0.004, 0.281].map(money), ["$0.00", "<$0.01", "$0.28"]);
   assert.deepEqual([999, 41_200, 1_250_000].map(tokens), ["999", "41k", "1.3M"]);
+});
+
+test("summary reports spend from the finished job", () => {
+  const store = storeWith(1);
+  store.update(1, progress({ toolCalls: 18, activity: "read x", phase: "tool", usage: { input: 41_200, output: 3_000, cost: 0.412 } }));
+  store.finish(1, "ok", { result: "done" }, 134_000);
+  // `now` is ignored once the job has ended.
+  assert.equal(summary(store.get(1)!, 999_000), "Subagent #1 model-1 \u00b7 2m14s \u00b7 18 tool calls \u00b7 $0.41 \u00b7 41k in / 3k out");
 });
 
 test("store logs one line per tool call and caps the log", () => {

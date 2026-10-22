@@ -72,7 +72,9 @@ as markdown. Finished jobs stay listed for the session.
 | `q`, `ctrl+shift+s` | Close | Close |
 
 Spend is the provider-reported cost from the child's usage events, summed over its
-turns. `ctrl+shift+s` needs a terminal that reports modifier keys (kitty keyboard
+turns. The tool result ends with a one-line summary (elapsed, tool calls, spend,
+tokens), so spend stays in the transcript after the job ends. Failed jobs append it
+to the error; successful ones also carry it in `details.usage`. `ctrl+shift+s` needs a terminal that reports modifier keys (kitty keyboard
 protocol: Ghostty, kitty, WezTerm); elsewhere use `/subagents`. Rendering
 (`panel.ts`) and job state (`jobs.ts`) are separate from Pi so they can be tested
 with injected styling.
