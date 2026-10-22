@@ -15,6 +15,8 @@ export interface Style {
   /** Cut to `width` columns with an ellipsis; `pad` fills short text with spaces. */
   truncate(text: string, width: number, pad?: boolean): string;
   wrap(text: string, width: number): string[];
+  /** Render markdown (tasks and results) to lines no wider than `width`. */
+  markdown(text: string, width: number): string[];
 }
 
 export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -105,7 +107,7 @@ export function widgetLines(jobs: JobRecord[], now: number, width: number, s: St
 // ── Popup ────────────────────────────────────────────────────────────────
 
 export type Focus = "list" | "detail";
-export type BodyView = "activity" | "result";
+export type BodyView = "activity" | "result" | "task";
 
 export interface PopupState {
   /** Selected job id. */
@@ -119,7 +121,7 @@ export interface PopupState {
 
 export type PopupKey =
   | "up" | "down" | "pageUp" | "pageDown" | "top" | "bottom"
-  | "enter" | "back" | "toggle" | "cancel" | "close";
+  | "enter" | "back" | "toggle" | "task" | "cancel" | "close";
 
 export type PopupAction = { type: "none" } | { type: "close" } | { type: "cancel"; id: number };
 
@@ -147,6 +149,12 @@ export function popupKey(state: PopupState, jobs: JobRecord[], key: PopupKey, pa
   if (key === "cancel") return job?.status === "running" ? { type: "cancel", id: job.id } : { type: "none" };
   if (key === "toggle" && job) {
     state.view = bodyView(state, job) === "activity" ? "result" : "activity";
+    resetScroll(state, job);
+    return { type: "none" };
+  }
+  if (key === "task" && job) {
+    // Toggle back to the job's default view.
+    state.view = bodyView(state, job) === "task" ? undefined : "task";
     resetScroll(state, job);
     return { type: "none" };
   }
@@ -201,9 +209,12 @@ export function bodyLines(job: JobRecord, view: BodyView, width: number, s: Styl
     if (!job.log.length) return [s.fg("dim", "No tool calls yet")];
     return job.log.map((entry) => `${s.fg("dim", clock(entry.at))} ${entry.text}`);
   }
+  if (view === "task") return s.markdown(job.task, width);
   if (job.status === "running") return [s.fg("dim", "Still running")];
-  const text = [job.error && s.fg("error", job.error), job.result].filter(Boolean).join("\n\n");
-  return text ? s.wrap(text, width) : [s.fg("dim", "No output")];
+  const error = job.error ? s.wrap(s.fg("error", job.error), width) : [];
+  const result = job.result ? s.markdown(job.result, width) : [];
+  if (!error.length && !result.length) return [s.fg("dim", "No output")];
+  return error.length && result.length ? [...error, "", ...result] : [...error, ...result];
 }
 
 function detail(job: JobRecord, state: PopupState, now: number, width: number, height: number, s: Style) {
@@ -219,11 +230,11 @@ function detail(job: JobRecord, state: PopupState, now: number, width: number, h
     `${label("spend")} ${money(u.cost)} ${s.fg("dim", `· ${tokens(u.input)} in / ${tokens(u.output)} out`)}`,
     `${label("calls")} ${job.progress.toolCalls} ${s.fg("dim", `· ${doing(job)}`)}`,
     ...taskLines.slice(0, 3).map((line, i) => `${label(i ? "" : "task")} ${line}`),
-    ...(taskLines.length > 3 ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines`)}`] : []),
+    ...(taskLines.length > 3 ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines · t to read`)}`] : []),
   ];
   const view = bodyView(state, job);
   const other = view === "activity" ? "result" : "activity";
-  const divider = rule(s.fg("accent", view), `a: ${other}`, width, s);
+  const divider = rule(s.fg("accent", view), `a: ${other} · t: ${view === "task" ? "back" : "task"}`, width, s);
   const room = Math.max(1, height - head.length - 1);
   const body = bodyLines(job, view, width, s);
   const maxScroll = Math.max(0, body.length - room);
@@ -242,8 +253,8 @@ export interface PopupRender {
 
 export function popupLines(jobs: JobRecord[], state: PopupState, now: number, width: number, height: number, s: Style, frame: number): PopupRender {
   const help = state.focus === "list"
-    ? "j/k move · enter focus details · a activity/result · x cancel · esc close"
-    : "j/k scroll · g/G top/bottom · a activity/result · x cancel · esc back";
+    ? "j/k move · enter focus details · a activity/result · t task · x cancel · esc close"
+    : "j/k scroll · ctrl+d/u page · g/G top/bottom · a activity/result · t task · x cancel · esc back";
   const paneH = Math.max(4, height - 1);
   const leftW = Math.min(44, Math.max(24, Math.round(width * 0.35)));
   const rightW = Math.max(20, width - leftW);
