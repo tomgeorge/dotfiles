@@ -14,6 +14,17 @@ export function readConfig(path: string): AdvisorConfig | undefined {
   return { provider: raw.provider, model: raw.model };
 }
 
+/** "provider/model", or "off" when no advisor is set: the form /advisor takes and shows. */
+export function modelRef(config: AdvisorConfig | undefined): string {
+  return config ? `${config.provider}/${config.model}` : "off";
+}
+
+/** Split at the first "/", since model ids can themselves contain slashes. */
+export function parseModelRef(ref: string): AdvisorConfig {
+  const cut = ref.indexOf("/");
+  return { provider: ref.slice(0, cut), model: ref.slice(cut + 1) };
+}
+
 export function writeConfig(path: string, config: AdvisorConfig | undefined): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(config ?? {}, null, 2)}\n`);
@@ -31,7 +42,7 @@ export function trimTranscript(text: string, max: number, head = Math.floor(max 
   return `${text.slice(0, head)}\n\n[... ${dropped} characters of the middle of the conversation omitted ...]\n\n${text.slice(-tail)}`;
 }
 
-function textOf(content: Message["content"]): string {
+export function textOf(content: Message["content"]): string {
   if (typeof content === "string") return content;
   return content.filter((c): c is { type: "text"; text: string } => c.type === "text").map((c) => c.text).join("\n");
 }
@@ -62,6 +73,10 @@ export function serializeTranscript(messages: Message[]): string {
     }
   }
   return parts.join("\n\n");
+}
+
+export function advisorPrompt(transcript: string, question: string): string {
+  return `## Conversation so far\n\n${transcript}\n\n## The agent's question\n\n${question}`;
 }
 
 // Cognition: tell the advisor to send the agent to look rather than theorize, and to
