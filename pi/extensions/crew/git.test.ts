@@ -5,14 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-  addWorktree, branchFacts, commitAll, gitOk, mergeBranch, outsidePaths, removeWorktree, repoInfo, runCheck,
+  addWorktree, branchCommits, branchFacts, commitAll, discardChanges, gitOk, mergeBranch, outsidePaths, removeWorktree,
+  repoInfo, runCheck,
 } from "./git.ts";
 
 function repo() {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "crew-git-")));
   const root = join(dir, "proj");
   execFileSync("git", ["init", "-q", "-b", "main", root]);
-  const g = (...args: string[]) => execFileSync("git", ["-C", root, "-c", "user.name=t", "-c", "user.email=t@t", ...args]);
+  const g = (...args: string[]) => execFileSync("git", ["-C", root, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args]);
   writeFileSync(join(root, "a.txt"), "one\n");
   g("add", "."); g("commit", "-qm", "init");
   return { dir, root };
@@ -61,6 +62,39 @@ test("outsidePaths treats entries as path prefixes", () => {
   assert.deepEqual(outsidePaths(files, []), []);
   assert.deepEqual(outsidePaths(files, ["src", "docs/"]), ["srcx/c.ts", "README.md"]);
   assert.deepEqual(outsidePaths(files, ["./src/**", "README.md"]), ["srcx/c.ts", "docs/x.md"]);
+});
+
+test("outsidePaths treats a glob segment as its directory prefix", () => {
+  const files = ["src/a.ts", "src/lib/b.ts", "srcx/c.ts", "test/a.test.ts", "README.md"];
+  assert.deepEqual(outsidePaths(files, ["src/*.ts", "test/**/*.test.ts"]), ["srcx/c.ts", "README.md"]);
+  assert.deepEqual(outsidePaths(files, ["*.md"]), [], "a top-level glob is unrestricted, not a false flag");
+});
+
+test("discardChanges lists and reverts what a check left behind", async () => {
+  const { root } = repo();
+  assert.deepEqual(await discardChanges(root), []);
+  writeFileSync(join(root, "a.txt"), "changed by lint --fix\n");
+  writeFileSync(join(root, "gen out.txt"), "generated\n");
+  assert.deepEqual((await discardChanges(root)).sort(), ["a.txt", "gen out.txt"]);
+  assert.equal((await gitOk(root, ["status", "--porcelain"])).trim(), "");
+  // A check that creates a fixture repository: plain `git clean -fd` skips nested repos.
+  execFileSync("git", ["init", "-q", join(root, "fixture")]);
+  assert.deepEqual(await discardChanges(root), ["fixture/"]);
+  assert.equal((await gitOk(root, ["status", "--porcelain"])).trim(), "");
+});
+
+test("branchCommits reads commits from the branch, with no report or worktree needed", async () => {
+  const { dir, root } = repo();
+  process.env.GIT_AUTHOR_NAME = process.env.GIT_COMMITTER_NAME = "t";
+  process.env.GIT_AUTHOR_EMAIL = process.env.GIT_COMMITTER_EMAIL = "t@t";
+  const base = (await gitOk(root, ["rev-parse", "HEAD"])).trim();
+  const wt = join(dir, "t1");
+  await addWorktree(root, wt, "crew/y-t1", base);
+  assert.deepEqual(await branchCommits(root, base, "crew/y-t1"), []);
+  writeFileSync(join(wt, "c.txt"), "x\n");
+  await commitAll(wt, "crashed worker's commit");
+  await removeWorktree(root, wt);
+  assert.match((await branchCommits(root, base, "crew/y-t1")).join("\n"), /crashed worker's commit/);
 });
 
 test("runCheck reports exit codes, keeps the tail, and kills on timeout", async () => {

@@ -51,7 +51,9 @@ Planner tools:
 - `crew_status`, `crew_cancel`, and `crew_wake` (a check-in the planner schedules for itself).
 - `crew_finish`: runs the given checks on the integration branch and **refuses to finish if any
   fail**. This makes the final full test run a harness rule, not a prompt request; in testing,
-  the planner skipped it when it was only asked to.
+  the planner skipped it when it was only asked to. It also refuses if the checks modified files
+  (`npm install`, `lint --fix`), since the pass then depends on changes that aren't committed. The
+  harness reverts the integration worktree after every check run.
 
 ### Handoffs
 

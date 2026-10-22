@@ -45,6 +45,12 @@ test("report separates worker claims from harness observations", () => {
   assert.match(out, /PASS: npm run lint/);
 });
 
+test("report flags files the checks left modified", () => {
+  const out = formatReport({ ...base, dirtyAfterChecks: ["package-lock.json"] });
+  assert.match(out, /checks left uncommitted changes[^\n]*:\n- package-lock.json/);
+  assert.doesNotMatch(formatReport(base), /checks left uncommitted/);
+});
+
 test("report flags unverified work and shows partial output when the handoff is missing", () => {
   const out = formatReport({ ...base, checks: [], handoff: undefined, parseError: "no block", partial: "was editing a.ts", outcome: "timeout" });
   assert.match(out, /TIMEOUT/);

@@ -3,8 +3,8 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  addWorktree, branchFacts, commitAll, commonDirOf, diffText, GIT_ENV, gitOk, mergeBranch, outsidePaths,
-  removeWorktree, repoInfo, runCheck, worktreePath,
+  addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
+  mergeBranch, outsidePaths, removeWorktree, repoInfo, runCheck, worktreePath,
 } from "./git.ts";
 import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
@@ -41,6 +41,8 @@ export default function (pi: ExtensionAPI) {
   const quietCancels = new Set<number>();
   const wakeTimers = new Set<ReturnType<typeof setTimeout>>();
   const pending = new Set<Promise<void>>();
+  // Planner-tool checks (post-merge, crew_finish) stop with the crew; workers have their own controllers.
+  let crewAbort = new AbortController();
 
   const isActive = () => crew?.status === "active";
 
@@ -101,6 +103,7 @@ export default function (pi: ExtensionAPI) {
 
   function activate() {
     toolsBefore ??= pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t));
+    crewAbort = new AbortController();
     // The planner gets read tools and crew tools only. Cursor's executor broke down
     // when it also edited, merged, and judged.
     pi.setActiveTools([...READ_TOOLS, ...CREW_TOOLS]);
@@ -112,6 +115,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function deactivate() {
+    crewAbort.abort();
     pi.setActiveTools(toolsBefore ?? pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));
     toolsBefore = undefined;
     clearInterval(sweepTimer);
@@ -153,6 +157,14 @@ export default function (pi: ExtensionAPI) {
       for (const command of task.checks) {
         if (signal.aborted) break;
         report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS, signal));
+      }
+      // npm install, lint --fix: a pass may depend on files that never reach the branch.
+      if (report.checks.length) {
+        try {
+          report.dirtyAfterChecks = await dirtyFiles(task.worktree);
+        } catch (error) {
+          report.error = [report.error, `harness: ${(error as Error).message}`].filter(Boolean).join("; ");
+        }
       }
       // Cancel or shutdown while checks ran: report what ran, don't present it as verified.
       if (signal.aborted) {
@@ -284,13 +296,15 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }),
     // Two merges in one worktree at once collide on index.lock, which would be misread as a conflict.
     executionMode: "sequential",
-    async execute(_id, params) {
+    async execute(_id, params, toolSignal) {
       const state = requireCrew();
+      const crewSignal = crewAbort.signal;
       const task = state.tasks.find((t) => t.id === params.taskId);
       if (!task || task.kind !== "implement" || !task.branch || !task.base) throw new Error(`#${params.taskId} is not an implement task`);
       if (task.status === "running") throw new Error(`#${task.id} is still running`);
       if (task.status === "integrated") throw new Error(`#${task.id} is already integrated`);
-      if (!task.report?.commits.length) throw new Error(`#${task.id} has no commits to merge`);
+      // Read the branch, not the report: a task interrupted by a crash has no report but may have commits.
+      if (!(await branchCommits(state.config.repoRoot, task.base, task.branch)).length) throw new Error(`#${task.id} has no commits to merge`);
       const result = await mergeBranch(state.config.integrationPath, task.branch, `crew: merge #${task.id} ${task.title}`);
       if (!result.ok) {
         task.status = "conflict";
@@ -303,13 +317,21 @@ export default function (pi: ExtensionAPI) {
       const head = (await gitOk(state.config.integrationPath, ["log", "--oneline", "-1"])).trim();
       // Informational, not a gate (Cursor: per-merge perfection serializes everything).
       // It catches clean merges that still break each other.
+      const signal = toolSignal ? AbortSignal.any([crewSignal, toolSignal]) : crewSignal;
       const checks = [];
-      for (const command of task.checks) checks.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS));
+      for (const command of task.checks) {
+        if (signal.aborted) break;
+        checks.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS, signal));
+      }
+      // Leftovers would make the next merge fail as a false conflict.
+      const dirty = await discardChanges(state.config.integrationPath);
       const failed = checks.filter((c) => c.exit !== 0);
-      const summary = !checks.length ? "No task checks to re-run."
+      const summary = signal.aborted ? "Post-merge checks were cancelled (merge kept)."
+        : !checks.length ? "No task checks to re-run."
         : failed.length ? `Post-merge checks FAILED on the integration branch (merge kept):\n${failed.map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-15).map((l) => `    ${l}`).join("\n")}`).join("\n")}\nDispatch a fix task.`
         : `Post-merge checks passed on the integration branch: ${task.checks.join("; ")}`;
-      return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${summary}`);
+      const note = dirty.length ? `\nThe checks modified files in the integration worktree; the harness reverted them: ${dirty.join(", ")}. If a check needs them (lockfile, generated code), dispatch a task to commit them.` : "";
+      return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${summary}${note}`);
     },
   });
 
@@ -365,14 +387,25 @@ export default function (pi: ExtensionAPI) {
       summary: Type.String({ minLength: 1 }),
       checks: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "Full verification commands (tests, lint, typecheck) to run on the integration branch" }),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, toolSignal) {
       const state = requireCrew();
       if (runningTasks(state).length) throw new Error("Workers are still running; wait for their handoffs or crew_cancel them");
+      const crewSignal = crewAbort.signal;
+      const signal = toolSignal ? AbortSignal.any([crewSignal, toolSignal]) : crewSignal;
       const results = [];
-      for (const command of params.checks) results.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS));
+      for (const command of params.checks) {
+        if (signal.aborted) break;
+        results.push(await runCheck(state.config.integrationPath, command, CHECK_TIMEOUT_MS, signal));
+      }
+      const dirty = await discardChanges(state.config.integrationPath);
+      // /crew-stop (or a stop then resume) while the checks ran: this call no longer owns the crew.
+      if (crewSignal.aborted || crew !== state || !isActive()) return text("NOT finished: the crew was stopped while the final checks ran.");
+      if (signal.aborted) return text("NOT finished: the final checks were cancelled.");
       const failed = results.filter((c) => c.exit !== 0);
-      if (failed.length) {
-        return text(`NOT finished: the final green pass failed on ${state.config.integrationBranch}:\n${failed.map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-20).map((l) => `    ${l}`).join("\n")}`).join("\n")}\nDispatch a green-pass task to fix this, integrate it, then call crew_finish again.`);
+      const problems = failed.map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-20).map((l) => `    ${l}`).join("\n")}`);
+      if (dirty.length) problems.push(`- the checks modified files in the integration worktree, so they passed only with uncommitted changes (the harness reverted them): ${dirty.join(", ")}`);
+      if (problems.length) {
+        return text(`NOT finished: the final green pass failed on ${state.config.integrationBranch}:\n${problems.join("\n")}\nDispatch a green-pass task to fix this (commit any files the checks need), integrate it, then call crew_finish again.`);
       }
       state.status = "finished";
       state.summary = params.summary;
@@ -519,6 +552,7 @@ export default function (pi: ExtensionAPI) {
     clearInterval(renderTimer);
     for (const timer of wakeTimers) clearTimeout(timer);
     for (const controller of controllers.values()) controller.abort();
+    crewAbort.abort();
     await Promise.all([...pending]);
     persist();
   });

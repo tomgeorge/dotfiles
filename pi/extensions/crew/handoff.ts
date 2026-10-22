@@ -41,6 +41,8 @@ export interface TaskReport {
   /** Harness committed changes the worker left uncommitted. */
   autoCommitted: boolean;
   checks: CheckResult[];
+  /** Files the harness checks modified or created; passes may depend on them. */
+  dirtyAfterChecks?: string[];
   cost: number;
   durationMs: number;
   error?: string;
@@ -126,6 +128,9 @@ export function formatReport(r: TaskReport): string {
     }
   } else if (r.kind === "implement") {
     lines.push("checks: none declared (UNVERIFIED)");
+  }
+  if (r.dirtyAfterChecks?.length) {
+    lines.push(...list("checks left uncommitted changes (not on the branch; passes may depend on them)", r.dirtyAfterChecks));
   }
   return lines.join("\n");
 }

@@ -87,6 +87,38 @@ export async function branchFacts(cwd: string, base: string): Promise<BranchFact
   };
 }
 
+/** One-line commits on `branch` since `base`; needs no worktree, so it works after a crash or /crew-clean. */
+export async function branchCommits(cwd: string, base: string, branch: string): Promise<string[]> {
+  return (await gitOk(cwd, ["log", "--oneline", "--no-decorate", `${base}..${branch}`]))
+    .split("\n").map((l) => l.trim()).filter(Boolean);
+}
+
+/** Paths with uncommitted changes (tracked or untracked, not ignored). */
+export async function dirtyFiles(cwd: string): Promise<string[]> {
+  // -z: no quoting of odd names; a rename's entry is followed by its old path, which we skip.
+  const entries = (await gitOk(cwd, ["status", "--porcelain", "-z", "--untracked-files=all"])).split("\0");
+  const files: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    if (!entries[i]) continue;
+    files.push(entries[i].slice(3));
+    if (/^[RC]/.test(entries[i])) i++;
+  }
+  return files;
+}
+
+/** Revert the worktree to HEAD. Returns what was dirty, so callers can report it. */
+export async function discardChanges(cwd: string): Promise<string[]> {
+  const files = await dirtyFiles(cwd);
+  if (files.length) {
+    await gitOk(cwd, ["reset", "-q", "--hard", "HEAD"]);
+    // -ff: a check that ran `git init fixture` leaves a nested repo that a single -f skips.
+    await gitOk(cwd, ["clean", "-q", "-ffd"]);
+    const left = await dirtyFiles(cwd);
+    if (left.length) throw new Error(`could not restore ${cwd}; still dirty: ${left.join(", ")}`);
+  }
+  return files;
+}
+
 export async function diffText(cwd: string, base: string, maxBytes: number): Promise<string> {
   const diff = await gitOk(cwd, ["diff", `${base}..HEAD`]);
   return diff.length > maxBytes ? `${diff.slice(0, maxBytes)}\n[diff truncated at ${maxBytes} bytes]` : diff;
@@ -95,7 +127,13 @@ export async function diffText(cwd: string, base: string, maxBytes: number): Pro
 /** Files outside every prefix in `paths`. Empty `paths` means unrestricted. */
 export function outsidePaths(files: string[], paths: string[]): string[] {
   if (!paths.length) return [];
-  const prefixes = paths.map((p) => p.replace(/^\.\//, "").replace(/\*+$/, ""));
+  // A glob segment widens to its directory: "src/*.ts" allows everything under src/.
+  const prefixes = paths.map((p) => {
+    const segments = p.replace(/^\.\//, "").split("/");
+    const glob = segments.findIndex((s) => /[*?[{]/.test(s));
+    return glob === -1 ? segments.join("/") : segments.slice(0, glob).join("/") + "/";
+  });
+  if (prefixes.includes("/")) return []; // a top-level glob like "*.md" restricts nothing we can check
   return files.filter((f) => !prefixes.some((p) => f === p || f.startsWith(p.endsWith("/") ? p : `${p}/`)));
 }
 
