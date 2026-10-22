@@ -3,11 +3,12 @@
 // undo step.
 
 import { before, firstNonBlank, graphemeStarts, lastCol, nextCol, snapCol, type Pos, type Range } from "./chars.ts";
+import type { Operator } from "./keys.ts";
 import type { Motion } from "./motions.ts";
 
 export type Register = { text: string; linewise: boolean };
 export type Edit = { lines: string[]; cursor: Pos };
-export type OpResult = Edit & { register: Register | null; insert: boolean };
+export type OpResult = Edit & { register: Register; insert: boolean };
 
 const indentOf = (line: string) => /^\s*/u.exec(line)![0];
 
@@ -34,7 +35,7 @@ export function lineRange(lines: string[], pos: Pos, count = 1): Range {
   return { start: { line: pos.line, col: 0 }, end: { line: last, col: 0 }, linewise: true };
 }
 
-export function textOf(lines: string[], r: Range): string {
+function textOf(lines: string[], r: Range): string {
   if (r.linewise) return lines.slice(r.start.line, r.end.line + 1).join("\n");
   if (r.start.line === r.end.line) return lines[r.start.line].slice(r.start.col, r.end.col);
   return [
@@ -51,7 +52,7 @@ function removeChars(lines: string[], r: Range): string[] {
 
 // d, c and y. cursor is where the command started (y on lines keeps its
 // column).
-export function operate(op: "d" | "c" | "y", lines: string[], r: Range, cursor: Pos): OpResult {
+export function operate(op: Operator, lines: string[], r: Range, cursor: Pos): OpResult {
   const register = { text: textOf(lines, r), linewise: r.linewise };
   if (op === "y") {
     const to = r.linewise ? { line: r.start.line, col: cursor.line === r.start.line ? cursor.col : Math.min(cursor.col, lastCol(lines[r.start.line])) } : r.start;

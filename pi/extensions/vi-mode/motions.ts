@@ -1,9 +1,9 @@
 // Pure motions over (lines, cursor). They know nothing about Pi, so they can
 // be tested with plain arrays.
 
-import { BLANK, charClass, firstNonBlank, graphemeStarts, lastCol, nextCol, prevCol, snapCol, type Pos } from "./chars.ts";
+import { BLANK, charClass, type CharClass, firstNonBlank, graphemeStarts, lastCol, nextCol, prevCol, snapCol, type Pos } from "./chars.ts";
 
-export type MotionKind = "exclusive" | "inclusive" | "linewise";
+type MotionKind = "exclusive" | "inclusive" | "linewise";
 export type Motion = { to: Pos; kind: MotionKind };
 
 export function left(lines: string[], pos: Pos, count = 1): Motion | null {
@@ -32,7 +32,7 @@ export function vertical(lines: string[], pos: Pos, delta: number, want: number)
   return { to: { line, col: columnFor(lines[line], want) }, kind: "linewise" };
 }
 
-export function columnFor(text: string, want: number): number {
+function columnFor(text: string, want: number): number {
   return want === Infinity ? lastCol(text) : snapCol(text, Math.min(want, lastCol(text)));
 }
 
@@ -58,7 +58,7 @@ export function gotoLine(lines: string[], n: number): Motion {
 
 // One entry per grapheme, plus a blank at each line break. An empty line is
 // its own entry, which w, b and ge stop on and e skips, as in Vim.
-type Cell = { line: number; col: number; cls: number; empty?: boolean; eol?: boolean };
+type Cell = { line: number; col: number; cls: CharClass; empty?: boolean; eol?: boolean };
 
 function cells(lines: string[], big: boolean): Cell[] {
   const out: Cell[] = [];
