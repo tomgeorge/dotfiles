@@ -3,7 +3,8 @@
 // Reads pi/extensions/<extension>/mutants.json: [{ "name", "file", "from", "to" }], where
 // `from` must occur exactly once in `file`. Each mutant is applied to a temporary copy (the
 // checkout is never touched), and the extension's tests must fail. Exit 0 when every mutant
-// is killed; exit 1 lists the survivors; exit 2 on a usage error or malformed mutants.json. MUTATE_TIMEOUT_MS bounds each test run (default 5 min).
+// is killed; exit 1 lists the survivors; exit 2 on a usage error or an unreadable, invalid or
+// malformed mutants.json. MUTATE_TIMEOUT_MS bounds each test run (default 5 min).
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,7 +21,14 @@ if (!extension) {
   process.exit(2);
 }
 const source = join(extensions, extension);
-const all: unknown = JSON.parse(readFileSync(join(source, "mutants.json"), "utf8"));
+// Bad input must exit 2, not crash with exit 1, which reads like "mutants survived".
+let all: unknown;
+try {
+  all = JSON.parse(readFileSync(join(source, "mutants.json"), "utf8"));
+} catch (e) {
+  console.error(`${extension}/mutants.json: ${(e as Error).message}`);
+  process.exit(2);
+}
 const isMutant = (m: unknown): m is Mutant =>
   typeof m === "object" && m !== null && ["name", "file", "from", "to"].every((k) => typeof (m as Record<string, unknown>)[k] === "string");
 if (!Array.isArray(all) || !all.every(isMutant)) {
