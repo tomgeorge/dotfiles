@@ -14,7 +14,7 @@ This is a playbook for the Pi setup in this repository. Every tool here exists b
 | Multi-session work (big feature, long investigation) | `/execplan <task>`, then `/handoff continue <plan>` when context fills | The plan file is the memory |
 | Work that splits into independent, checkable pieces | `/crew <goal>` | A planner plus isolated workers; the harness merges |
 | Hard decision, error recurring, about to declare a big task done | The agent calls `advisor` (set the model once with `/advisor`) | A second model, ideally from another vendor, sees the full transcript |
-| Code is written; check it before I read it | "review this well" or `/review-loop [target]` | Three clean-context reviewers; findings must reproduce as failing tests |
+| Code is written; check it before I read it | "review this well" or `/review-loop [target]` | Three clean-context reviewers; findings must reproduce as failing tests. A PR with no local checkout gets one round, posted as my review: request changes, or approve if clean |
 | Context getting long or drifting | `/handoff <next goal>` | A fresh, focused session instead of lossy compaction |
 | Waiting on CI or a deploy | Ask for a watch ("tell me when CI finishes") | A shell check loops; the model wakes only when it's true |
 | Weekly | Weekly review, then its harness-retro step, or `/retro` | Turn repeated friction into fixes. Proposals only; I approve |

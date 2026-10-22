@@ -1,5 +1,5 @@
 ---
-description: Review a PR with clean-context reviewers, fix accepted findings, and loop until they call it good
+description: Review a change with clean-context reviewers, fix accepted findings, and loop until they call it good; or, for a PR with no local checkout, review once and post the findings to the PR
 argument-hint: "[here | PR | branch | worktree path | crew [slug] | A..B] [extra focus]"
 ---
 Run a review-fix loop on target "${1:-here}". ${@:2}
@@ -22,9 +22,9 @@ Work out three things: `DIR`, the checkout where the change lives; `BASE`, the c
   - The intent is its `config.goal` plus `summary`.
   - If the crew is still `active`, ask me first, because its workers may still be merging.
 - **A PR number or URL:**
-  - Run `gh pr view <pr> --json number,title,body,baseRefName,headRefName,url`.
-  - Find the checkout of `headRefName` with `git worktree list`. If none exists, ask me before running `gh pr checkout` in the current repo, and stop if that checkout has uncommitted changes.
-  - `BASE=$(git merge-base origin/<baseRefName> HEAD)`, run in `DIR`.
+  - Run `gh pr view <pr> --json number,title,body,url,baseRefName,baseRefOid,headRefName,headRefOid`. A bare number only resolves inside a clone of the PR's repo; outside one, ask me for the URL.
+  - If the current directory is a clone of the PR's repo and `git worktree list` shows `headRefName` checked out, `DIR` is that worktree and `BASE=$(git merge-base origin/<baseRefName> HEAD)`, run in `DIR`. Continue with the loop below.
+  - Otherwise, don't check anything out. Switch to **Review-only mode** at the end of this file and follow it instead of steps 0–5.
 - **An existing directory:** a worktree, such as a crew task's or a teammate's.
   - `DIR` is that path.
   - `BASE` is set as for `here`, but run inside `DIR`.
@@ -104,3 +104,55 @@ Keep it short.
 - **Unresolved:** anything still open, with your recommendation.
 - **Checks:** the commands run and their final status.
 - **Spend:** the total subagent cost reported by the jobs.
+
+## Review-only mode: a PR with no local checkout
+One round of review, no fixes, then a review posted to the PR from my GitHub account (`gh` is authenticated as me): request changes if findings survive, approve if none do. Steps 1 and 2 apply with the changes below; steps 3 and 4 don't.
+
+### Set up
+- `OWNER/REPO` and `N` come from the PR URL. `HEAD` is `headRefOid`.
+- `BASE=$(gh api repos/OWNER/REPO/compare/<baseRefOid>...<headRefOid> --jq .merge_base_commit.sha)`. That is the merge base GitHub diffs against.
+- Make a throwaway shallow checkout so the reviewers can read surrounding code. `pull/N/head` also covers PRs from forks:
+  ```sh
+  DIR=$(mktemp -d)/repo
+  gh repo clone OWNER/REPO "$DIR" -- --depth=1 --filter=blob:none --no-checkout
+  git -C "$DIR" fetch --depth=1 --filter=blob:none origin "pull/N/head" "$BASE"
+  git -C "$DIR" checkout -q --detach "$HEAD"
+  ```
+  Check that `git -C "$DIR" diff --stat $BASE $HEAD` matches the PR's changed files. If the clone fails, tell me and stop.
+- Fetch what's already been said, so the review doesn't repeat it: `gh api --paginate repos/OWNER/REPO/pulls/N/comments` and `gh api --paginate repos/OWNER/REPO/pulls/N/reviews`.
+- Don't install dependencies or run the project's checks.
+- Write the intent statement from the PR title and body plus my message.
+
+### Review
+Run step 1 as written, with `DIR` the throwaway checkout. Have reviewers use `git diff $BASE $HEAD`; there is no uncommitted work.
+
+### Triage
+Run step 2, but you can't execute tests, so reason instead. Accept a high or medium finding only if you can name the exact input or scenario that fails and trace it through the code in `DIR`. Otherwise reject it as unverified. Also reject anything already raised in the PR's existing comments or reviews.
+
+### Post
+Pick the verdict:
+- **Any accepted finding:** `REQUEST_CHANGES`, with the findings as below.
+- **No accepted findings:** `APPROVE`, with my rocket-frog image as the body: `![rocket-frog](https://github.com/user-attachments/assets/eacbe96a-fe74-4b61-9fc8-a56a46f898fc)`. No inline comments.
+- **I'm the PR's author** (`gh api user --jq .login`): GitHub rejects both, so post findings as `COMMENT`, and if there are none, post nothing and tell me it looks clean.
+
+Then ask me whether I want to see a draft first:
+- **Yes:** show me the draft: the verdict, the body, and each inline comment with its `path:line`. Apply any edits I ask for, including a different verdict, then post it once I approve. If I decline, don't post.
+- **No:** post it straight away.
+
+Post one review:
+- Each accepted finding whose line falls inside a hunk of `git diff $BASE $HEAD` for its file (new-side line numbers) becomes an inline comment. Any other finding goes in the review body as `path:line`.
+- Write as me, to a colleague: plain, specific, short. Open with the severity in bold, state the problem and the failing scenario, and suggest a fix only when it's obvious. Don't mention reviewers, models, or AI.
+- The body is a one-line summary, followed by any findings that couldn't go inline.
+- Write the payload to a temp file and post it:
+  ```sh
+  gh api -X POST repos/OWNER/REPO/pulls/N/reviews --input review.json
+  ```
+  with `{"commit_id": "<headRefOid>", "event": "<verdict>", "body": "...", "comments": [{"path": "...", "line": 42, "side": "RIGHT", "body": "..."}]}`.
+- If GitHub rejects an inline comment's line with a 422, move that finding into the body and post again. Don't post twice successfully.
+- Delete the throwaway checkout when done.
+
+### Report
+- **Target:** the PR URL, `BASE`, and `HEAD`.
+- **Posted:** the verdict, the review URL, and each finding posted with its reviewer.
+- **Rejected:** each finding with its one-line reason (including "unverified" and "already raised"), so I can overrule you and add it myself.
+- **Overturn rate** and **Spend**, as in step 5.
