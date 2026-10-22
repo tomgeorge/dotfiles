@@ -3,7 +3,9 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { readConfig, serializeTranscript, trimTranscript, writeConfig } from "./advisor.ts";
+import {
+  advisorPrompt, modelRef, parseModelRef, readConfig, serializeTranscript, textOf, trimTranscript, writeConfig,
+} from "./advisor.ts";
 
 test("config round-trips, 'off' is an empty object, and junk is rejected", () => {
   const path = join(mkdtempSync(join(tmpdir(), "advisor-")), "nested", "advisor.json");
@@ -24,7 +26,25 @@ test("trimTranscript keeps the head and the recent tail", () => {
   assert.ok(out.endsWith(":RECENT"));
   assert.match(out, /\[\.\.\. 812 characters of the middle of the conversation omitted \.\.\.\]/);
 });
+test("modelRef and parseModelRef use provider/model, splitting at the first slash", () => {
+  assert.equal(modelRef(undefined), "off");
+  assert.equal(modelRef({ provider: "openai-codex", model: "gpt-6.1-sol" }), "openai-codex/gpt-6.1-sol");
+  assert.deepEqual(parseModelRef("openrouter/anthropic/claude"), { provider: "openrouter", model: "anthropic/claude" });
+});
 
+test("advisorPrompt puts the transcript before the question", () => {
+  assert.equal(advisorPrompt("T", "Q?"), "## Conversation so far\n\nT\n\n## The agent's question\n\nQ?");
+});
+
+test("textOf joins text parts and skips the rest", () => {
+  assert.equal(textOf("plain"), "plain");
+  assert.equal(textOf([
+    { type: "thinking", thinking: "hmm" },
+    { type: "text", text: "a" },
+    { type: "toolCall", id: "1", name: "bash", arguments: {} },
+    { type: "text", text: "b" },
+  ] as never), "a\nb");
+});
 
 test("serializeTranscript keeps whole tool results, calls, thinking, and text", () => {
   const out = serializeTranscript([
