@@ -119,6 +119,8 @@ export function runWorker(
       } catch (error) {
         if (!gone(error)) return report(error);
         if (child.exitCode !== null || child.signalCode !== null) return;
+        // child.kill reports EPERM and the like as an 'error' event, not a throw; the error handler
+        // drops it because `ending` is already set: the worker is being stopped either way.
         try { child.kill(sig); } catch (childError) { if (!gone(childError)) report(childError); }
       }
     };
@@ -183,6 +185,7 @@ export function runWorker(
     });
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-8192); });
+    // An error after `ending` is set (e.g. a failed kill while stopping) is dropped: the result already says why it ended.
     child.on("error", (error) => { ending ??= { status: "error", error: error.message }; });
     child.on("close", (code, sig) => {
       if (buffer.trim()) handle(buffer);
