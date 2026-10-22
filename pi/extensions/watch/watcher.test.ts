@@ -140,6 +140,9 @@ test("buildSpec validates and applies defaults", () => {
   assert.equal(buildSpec({ prompt: "check slack" }, "/").intervalMs, 600_000);
   assert.throws(() => buildSpec({}, "/"), /exactly one/);
   assert.throws(() => buildSpec({ command: "a", prompt: "b" }, "/"), /exactly one/);
+  // Blank fields count as missing, so a blank command with a prompt is a loop.
+  const blank = buildSpec({ command: "   ", prompt: "x" }, "/");
+  assert.deepEqual([blank.kind, blank.text], ["prompt", "x"]);
   assert.throws(() => buildSpec({ command: "a", interval: "1s" }, "/"), /at least 5s/);
   assert.throws(() => buildSpec({ prompt: "a", interval: "30s" }, "/"), /at least 1m/);
   assert.throws(() => buildSpec({ prompt: "a", deliver: "steer" }, "/"), /only to command/);

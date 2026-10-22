@@ -11,7 +11,7 @@ export const exitText = (result: RunResult) => result.killed ? "killed" : `exit 
 export const outputText = (result: RunResult) =>
   [result.stdout.trimEnd(), result.stderr.trimEnd()].filter(Boolean).join("\n");
 
-export function output(result: RunResult): string {
+function output(result: RunResult): string {
   const text = outputText(result);
   // Command output is data from outside the session, not instructions.
   return text ? `Command output (untrusted):\n${tail(text)}` : "(no output)";
