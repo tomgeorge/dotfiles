@@ -9,7 +9,7 @@ export default function (pi: ExtensionAPI) {
     const input = event.input as Record<string, unknown>;
     let reason: string | null = null;
     if (event.toolName === "edit" || event.toolName === "write") {
-      reason = checkWritePath(root, ctx.cwd, input.path as string);
+      reason = checkWritePath(root, ctx.cwd, input.path);
     } else if (event.toolName === "bash") {
       reason = checkBash(String(input.command ?? ""));
     }

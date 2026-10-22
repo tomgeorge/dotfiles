@@ -61,8 +61,8 @@ export interface CrewState {
   summary?: string;
 }
 
-export const crewDir = (commonDir: string) => join(commonDir, "pi-crew");
-export const statePath = (commonDir: string, slug: string) => join(crewDir(commonDir), `${slug}.json`);
+const crewDir = (commonDir: string) => join(commonDir, "pi-crew");
+const statePath = (commonDir: string, slug: string) => join(crewDir(commonDir), `${slug}.json`);
 
 export function saveState(state: CrewState): void {
   const path = statePath(state.config.commonDir, state.config.slug);
