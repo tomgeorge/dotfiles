@@ -102,24 +102,32 @@ export function runWorker(
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Kill the process group so bash/test grandchildren die with the worker.
-    // The child leads its group (detached), so while it lives the group signal reaches it.
-    const signalGroup = (sig: NodeJS.Signals) => {
+    // The child leads its group (detached), but it can leave it (setsid/setpgid), so when the
+    // group looks gone and the child hasn't exited, signal the child directly.
+    // Takes the ending to annotate so it needn't re-check the shared `ending` variable.
+    const signalGroup = (sig: NodeJS.Signals, end: { error: string }) => {
       if (child.pid === undefined) return; // never spawned; its error event ends the run
+      // A worker we can't stop must not crash Pi; say so in its result instead.
+      const report = (error: unknown) => { end.error += `; could not send ${sig} to the worker: ${(error as Error).message}`; };
+      // Gone: ESRCH, or EPERM, which macOS returns when the group's remaining members are exiting or zombies.
+      const gone = (error: unknown) => {
+        const code = (error as NodeJS.ErrnoException).code;
+        return code === "ESRCH" || code === "EPERM";
+      };
       try {
         process.kill(-child.pid, sig);
       } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        // Already gone: ESRCH, or EPERM, which macOS returns when the group's remaining members are exiting or zombies.
-        if (code === "ESRCH" || code === "EPERM") return;
-        // A worker we can't stop must not crash Pi; say so in its result instead.
-        if (ending) ending.error += `; could not send ${sig} to the worker: ${(error as Error).message}`;
+        if (!gone(error)) return report(error);
+        if (child.exitCode !== null || child.signalCode !== null) return;
+        try { child.kill(sig); } catch (childError) { if (!gone(childError)) report(childError); }
       }
     };
     const stop = (status: WorkerResult["status"], error: string) => {
       if (ending) return;
-      ending = { status, error };
-      signalGroup("SIGTERM");
-      killTimer = setTimeout(() => signalGroup("SIGKILL"), 2000);
+      const end = { status, error };
+      ending = end;
+      signalGroup("SIGTERM", end);
+      killTimer = setTimeout(() => signalGroup("SIGKILL", end), 2000);
     };
     const abort = () => stop("cancelled", "cancelled");
     const timer = setTimeout(() => stop("timeout", `timed out after ${Math.round(options.timeoutMs / 60000)} min`), options.timeoutMs);

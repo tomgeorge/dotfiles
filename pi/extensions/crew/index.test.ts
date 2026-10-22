@@ -139,14 +139,14 @@ test("crew tools are hidden until a crew starts, and the tools come back after /
   onCancel(t, e.shutdown);
   try {
     await e.f.emit("session_start", {}, e.ctx);
-    for (const t of CREW) assert.ok(!e.f.active().includes(t), `${t} hidden outside crew mode`);
+    for (const tool of CREW) assert.ok(!e.f.active().includes(tool), `${tool} hidden outside crew mode`);
     assert.ok(e.f.active().includes("bash"));
     await e.f.command("crew", "goal two", e.ctx);
     assert.ok(e.f.active().includes("crew_dispatch"));
     assert.ok(!e.f.active().includes("bash"));
     await e.f.command("crew-stop", "", e.ctx);
     assert.ok(e.f.active().includes("bash") && e.f.active().includes("edit"));
-    for (const t of CREW) assert.ok(!e.f.active().includes(t));
+    for (const tool of CREW) assert.ok(!e.f.active().includes(tool));
   } finally {
     await e.shutdown();
   }
