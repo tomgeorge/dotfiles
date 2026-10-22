@@ -68,13 +68,13 @@
   {
     "name": "entry status not validated",
     "file": "goal.ts",
-    "from": "&& STATUSES.includes(g.status as GoalStatus)",
+    "from": "&& isGoalStatus(g.status)",
     "to": ""
   },
   {
-    "name": "malformed entry drops the earlier goal",
+    "name": "malformed latest entry resurrects the earlier goal",
     "file": "index.ts",
-    "from": "goalFromEntry(entry.data) ?? goal;",
-    "to": "goalFromEntry(entry.data);"
+    "from": "goal = goalFromEntry(entry.data);",
+    "to": "goal = goalFromEntry(entry.data) ?? goal;"
   }
 ]

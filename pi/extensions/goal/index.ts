@@ -150,8 +150,9 @@ export default function (pi: ExtensionAPI) {
     ui = ctx;
     goal = undefined;
     for (const entry of ctx.sessionManager.getBranch()) {
-      // A malformed entry can't be a goal we wrote; skip it rather than run on garbage.
-      if (entry.type === "custom" && entry.customType === ENTRY) goal = goalFromEntry(entry.data) ?? goal;
+      // A malformed latest entry can't be a goal we wrote; leave no goal rather than run on
+      // garbage or resurrect an earlier goal that entry replaced.
+      if (entry.type === "custom" && entry.customType === ENTRY) goal = goalFromEntry(entry.data);
     }
     render();
   }

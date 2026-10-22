@@ -5,7 +5,9 @@ import { spawn } from "node:child_process";
 // it runs the check whenever the agent settles and continues only while the
 // check fails and the run is making progress.
 
-export type GoalStatus = "active" | "paused" | "complete" | "parked" | "budget" | "cleared";
+const STATUSES = ["active", "paused", "complete", "parked", "budget", "cleared"] as const;
+
+export type GoalStatus = (typeof STATUSES)[number];
 
 export interface CheckResult { exit: number | null; tail: string; timedOut: boolean; at: number }
 
@@ -23,13 +25,15 @@ export interface Goal {
 
 export const DEFAULT_MAX_CONTINUATIONS = 20;
 
-const STATUSES: readonly GoalStatus[] = ["active", "paused", "complete", "parked", "budget", "cleared"];
+function isGoalStatus(value: unknown): value is GoalStatus {
+  return STATUSES.some((status) => status === value);
+}
 
 /** A goal read back from a session entry, or undefined if the entry isn't shaped like one. */
 export function goalFromEntry(data: unknown): Goal | undefined {
   if (typeof data !== "object" || data === null) return undefined;
   const g = data as Record<string, unknown>;
-  const ok = typeof g.objective === "string" && typeof g.check === "string" && STATUSES.includes(g.status as GoalStatus)
+  const ok = typeof g.objective === "string" && typeof g.check === "string" && isGoalStatus(g.status)
     && typeof g.continuations === "number" && typeof g.maxContinuations === "number";
   // Copy, so mutating the live goal never rewrites the entry it came from.
   return ok ? structuredClone(data as Goal) : undefined;
