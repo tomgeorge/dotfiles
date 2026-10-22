@@ -80,3 +80,16 @@ test("runCheck reports exit codes, keeps the tail, and kills on timeout", async 
   assert.ok(Date.now() - started < 2000, "aborted check returned promptly");
   assert.notEqual(aborted.exit, 0);
 });
+
+test("runCheck: a timeout never reads as a pass, and leftovers are cleaned up", async () => {
+  const hung = await runCheck(tmpdir(), "sleep 5", 200);
+  assert.deepEqual([hung.exit, hung.timedOut], [null, true]);
+  // A daemon that left the process group still holds stdout; the check must not wait for it.
+  const started = Date.now();
+  const escaped = await runCheck(tmpdir(), "perl -MPOSIX -e 'setsid(); sleep 6' & exit 0", 5000);
+  assert.ok(Date.now() - started < 4000, `took ${Date.now() - started} ms`);
+  assert.deepEqual([escaped.exit, escaped.timedOut], [0, false]);
+  const bg = await runCheck(tmpdir(), "sleep 30 >/dev/null 2>&1 & echo $!", 5000);
+  await new Promise((done) => setTimeout(done, 100));
+  assert.throws(() => process.kill(Number(bg.tail.trim()), 0), /ESRCH/);
+});

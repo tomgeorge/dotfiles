@@ -118,19 +118,32 @@ export function runCheck(cwd: string, command: string, timeoutMs: number, signal
     });
     let out = "";
     let timedOut = false;
+    let done = false;
+    let drain: ReturnType<typeof setTimeout> | undefined;
     const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-16_384); };
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
     // Kill the whole process group: test runners spawn their own children.
     const kill = () => { try { process.kill(-child.pid!, "SIGKILL"); } catch { /* already gone */ } };
-    const timer = setTimeout(() => { timedOut = true; kill(); }, timeoutMs);
-    signal?.addEventListener("abort", kill, { once: true });
     const finish = (exit: number | null) => {
+      if (done) return;
+      done = true;
       clearTimeout(timer);
-      signal?.removeEventListener("abort", kill);
+      clearTimeout(drain);
+      signal?.removeEventListener("abort", stop);
+      kill(); // background jobs the check left behind would pile up across checks
+      // A daemon that left the process group can hold the pipes open forever; stop reading.
+      child.stdout.destroy();
+      child.stderr.destroy();
       resolve({ command, exit, tail: out.split("\n").slice(-30).join("\n"), timedOut });
     };
+    // exit is null on timeout or abort, so it can never read as a pass.
+    const stop = () => finish(null);
+    const timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
+    signal?.addEventListener("abort", stop, { once: true });
     child.on("error", (error) => { out += error.message; finish(null); });
+    // "close" waits for every pipe holder; after the shell exits, give output a moment to drain.
+    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), 500); });
     child.on("close", (code) => finish(code));
   });
 }

@@ -91,7 +91,9 @@ and branches.
 
 - **Guardrails, not a sandbox.** Edit and write calls are confined to the worker's worktree, and
   symlinks are resolved. Bash has a small denylist: `git push`, `worktree`, `remote`, `switch`,
-  `rebase`, `reset --hard`, `config`, and `commit --amend`. Beyond that, workers run arbitrary
+  `rebase`, `reset --hard`, `config`, `commit --amend`, inline aliases, and branch-switching
+  `checkout` or `branch` forms. It reads shell words, so it sees through quoting and `$(...)`,
+  but not through `eval`, variables, or scripts written to disk. Beyond that, workers run arbitrary
   shell commands as you, with your network and credentials. Only use `/crew` on code and
   commands you'd let an agent run unattended.
 - **Some state is shared.** Worktrees share the git object store, global caches, and fixed ports.
