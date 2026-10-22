@@ -13,6 +13,7 @@ function harness(results: RunResult[] | (() => Promise<RunResult>)) {
     async () => typeof results === "function" ? results() : results[Math.min(calls++, results.length - 1)],
     {
       onFire: (w, r) => fired.push({ id: w.id, result: r }),
+      onDue: (w) => fired.push({ id: w.id }),
       onEnd: (w, reason, detail) => ended.push({ id: w.id, reason, detail }),
       onUpdate: () => {},
     },
@@ -58,7 +59,7 @@ test("stop aborts a running check and suppresses its result", async () => {
   const ended: EndReason[] = [];
   const registry = new Registry(
     (_c, _cwd, s) => { signal = s; return sleep(30).then(() => result(0)); },
-    { onFire: (w) => fired.push(w), onEnd: (_w, r) => ended.push(r), onUpdate: () => {} },
+    { onFire: (w) => fired.push(w), onDue: (w) => fired.push(w), onEnd: (_w, r) => ended.push(r), onUpdate: () => {} },
   );
   const watch = registry.start(spec());
   assert.ok(registry.stop(watch.id));

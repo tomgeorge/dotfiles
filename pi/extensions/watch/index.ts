@@ -6,10 +6,13 @@ import {
   anyChecking, initialPopup, popupKey, popupLines, widgetLines, WatchStore,
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
+import {
+  describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt,
+} from "./report.ts";
 import { runCheck } from "./runner.ts";
 import {
-  buildSpec, DELIVER, formatDuration, oneLine, parseArgs, Registry, tail, UNTIL,
-  type EndReason, type RunResult, type Watch, type WatchInput,
+  buildSpec, DELIVER, oneLine, parseArgs, Registry, UNTIL,
+  type EndReason, type Kind, type RunResult, type Watch, type WatchInput,
 } from "./watcher.ts";
 
 type Message = { customType: string; content: string; display: boolean; details: unknown };
@@ -48,8 +51,6 @@ const POPUP_KEYS: [KeyId[], PopupKey][] = [
   [["q", "ctrl+c", PANEL_KEY], "close"],
 ];
 
-const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
-
 export default function (pi: ExtensionAPI) {
   let ctx: ExtensionContext | undefined;
   let shuttingDown = false;
@@ -61,10 +62,9 @@ export default function (pi: ExtensionAPI) {
   // Keyed by object: an id can be reused as soon as its watch ends.
   const startingByTool = new Map<Watch, string | undefined>();
 
-  const registry = new Registry(runCheck, { onFire, onEnd, onUpdate });
+  const registry = new Registry(runCheck, { onFire, onDue, onEnd, onUpdate });
   // Every watch this session, ended ones included, for the widget and popup.
   const store = new WatchStore();
-  const exit = (result: RunResult) => result.killed ? "killed" : `exit ${result.code}`;
   let frame = 0;
   let ticker: ReturnType<typeof setTimeout> | undefined;
   let widgetTui: TUI | undefined;
@@ -153,27 +153,19 @@ export default function (pi: ExtensionAPI) {
     syncWidget();
   }
 
-  function onFire(watch: Watch, result: RunResult | undefined) {
+  function onFire(watch: Watch, result: RunResult) {
     if (shuttingDown) return;
     store.sync(watch);
-    if (watch.kind === "command") {
-      store.note(watch, watch.until === "success" ? "reported: condition met" : `reported: changed${watch.previous ? ` (was ${exit(watch.previous)})` : ""}`, "success");
-    }
-    if (watch.kind === "prompt") {
-      store.note(watch, `iteration ${watch.fires} due`, "warning");
-      dueLoops.push(watch.id);
-      if (idle()) runDueLoop();
-      return;
-    }
-    const verb = watch.until === "success" ? "condition met" : `output changed (change ${watch.fires})`;
-    const lines = [
-      `Watch #${watch.id} ${verb}: ${watch.description}`,
-      `Command: ${watch.text}`,
-      `Exit ${result!.code}${watch.until === "change" && watch.previous ? ` (was ${exit(watch.previous)})` : ""} on check ${watch.checks}, ${formatDuration(Date.now() - watch.startedAt)} after starting.`,
-    ];
-    if (watch.until === "change") lines.push(`Still watching; stop it with watch_stop id ${watch.id}.`);
-    lines.push("", output(result!));
-    deliver(watch, lines.join("\n"), "fired");
+    store.note(watch, firedNote(watch), "success");
+    deliver(watch, fireReport(watch, result, Date.now()), "fired");
+  }
+
+  function onDue(watch: Watch) {
+    if (shuttingDown) return;
+    store.sync(watch);
+    store.note(watch, `iteration ${watch.fires} due`, "warning");
+    dueLoops.push(watch.id);
+    if (idle()) runDueLoop();
   }
 
   function onEnd(watch: Watch, reason: EndReason, detail?: string) {
@@ -184,25 +176,8 @@ export default function (pi: ExtensionAPI) {
     syncWidget();
     // "met" already reported through onFire; "stopped" was asked for.
     if (reason === "met" || reason === "stopped") return;
-    const name = watch.kind === "prompt" ? "Loop" : "Watch";
-    const lines = reason === "timeout"
-      ? [`${name} #${watch.id} timed out after ${formatDuration(watch.timeoutMs)}${watch.kind === "command" && watch.until === "success" ? " without its condition being met" : ""}: ${watch.description}`]
-      : [`${name} #${watch.id} stopped on an error: ${watch.description}`, detail ?? ""];
-    if (watch.kind === "command") {
-      lines.push(`Command: ${watch.text}`);
-      if (watch.last) {
-        const last = watch.last.killed ? "Last check was still running and was killed" : `Last exit ${watch.last.code}`;
-        lines.push(`${last} after ${count(watch.checks, "check")}.`, "", output(watch.last));
-      }
-    }
     // A loop's prompt needs no closing turn; tell the user without waking the model.
-    deliver(watch, lines.join("\n"), reason, watch.kind === "prompt" ? "notify" : undefined);
-  }
-
-  function output(result: RunResult): string {
-    const text = [result.stdout.trimEnd(), result.stderr.trimEnd()].filter(Boolean).join("\n");
-    // Command output is data from outside the session, not instructions.
-    return text ? `Command output (untrusted):\n${tail(text)}` : "(no output)";
+    deliver(watch, endReport(watch, reason, detail), reason, watch.kind === "prompt" ? "notify" : undefined);
   }
 
   function deliver(watch: Watch, content: string, event: string, mode = watch.deliver) {
@@ -232,7 +207,7 @@ export default function (pi: ExtensionAPI) {
       customType: "watch-loop",
       display: true,
       details: { id, iteration: watch.fires },
-      content: `${watch.text}\n\n[Loop #${id}, iteration ${watch.fires}, every ${formatDuration(watch.intervalMs)}. When this no longer needs checking, call watch_stop with id ${id}.]`,
+      content: loopPrompt(watch),
     }, { triggerTurn: true });
     registry.rearm(id);
   }
@@ -257,39 +232,6 @@ export default function (pi: ExtensionAPI) {
     return watch;
   }
 
-  /** One line, so it also works as a select row. */
-  function describe(watch: Watch): string {
-    const parts = [`#${watch.id} ${watch.description}`];
-    if (watch.kind === "prompt") parts.push("loop");
-    else parts.push(`until ${watch.until}`, watch.deliver);
-    parts.push(`every ${formatDuration(watch.intervalMs)}`, `${formatDuration(Math.max(0, watch.deadline - Date.now()))} left`);
-    if (watch.kind === "prompt") parts.push(count(watch.fires, "run"));
-    else {
-      parts.push(count(watch.checks, "check"));
-      if (watch.last) parts.push(`last ${exit(watch.last)}`);
-      if (watch.description !== oneLine(watch.text, 60)) parts.push(`$ ${oneLine(watch.text, 80)}`);
-    }
-    return parts.join(" · ");
-  }
-
-  /** For the tool result (`full`: with output) or a one-line notification. */
-  function firstCheckText(watch: Watch, first: RunResult | undefined | "pending", full: boolean): string {
-    if (watch.kind !== "command" || first === undefined) return "";
-    if (first === "pending") return `First check still running after ${formatDuration(FIRST_CHECK_WAIT_MS)}; fine for a command that blocks until done.`;
-    const meaning = watch.until === "change"
-      ? "this is the baseline; it reports when the output or exit code changes"
-      : "not met yet; still watching";
-    if (!full) {
-      const err = first.code !== 0 ? oneLine(first.stderr, 120) : "";
-      return `Watch #${watch.id} first check: ${exit(first)}${err ? `: ${err}` : ""} · ${meaning}`;
-    }
-    return [
-      `First check: ${exit(first)}; ${meaning}.`,
-      output(first),
-      "If this output shows the check itself is broken (auth, typo, wrong path), stop it with watch_stop and start a corrected one.",
-    ].join("\n");
-  }
-
   /** Wait briefly for the first check, so a broken command shows up while the caller is watching. */
   async function firstCheck(watch: Watch): Promise<RunResult | undefined | "pending"> {
     if (watch.kind !== "command") return "pending";
@@ -304,7 +246,7 @@ export default function (pi: ExtensionAPI) {
 
   function listText(): string {
     const watches = registry.list();
-    return watches.length ? watches.map(describe).join("\n") : "No active watches";
+    return watches.length ? watches.map((watch) => describe(watch, Date.now())).join("\n") : "No active watches";
   }
 
   pi.on("session_start", async (_event, context) => {
@@ -369,8 +311,8 @@ export default function (pi: ExtensionAPI) {
       const text = report
         ? `${report}\n\n(Reported on the first check; watch #${watch.id} has ended.)`
         : [
-          `Started watch: ${describe(watch)}`,
-          firstCheckText(watch, first, true),
+          `Started watch: ${describe(watch, Date.now())}`,
+          firstCheckReport(watch, first, FIRST_CHECK_WAIT_MS),
           "You'll get a message when it reports. Stop it with watch_stop.",
         ].filter(Boolean).join("\n");
       return { content: [{ type: "text", text }], details: { id: watch.id } };
@@ -398,18 +340,18 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  function commandHandler(kind: "command" | "prompt") {
+  function commandHandler(kind: Kind) {
     return async (args: string, context: ExtensionContext) => {
       try {
         const watch = start(parseArgs(args, kind), context);
         if (!context.hasUI) return;
-        context.ui.notify(`Started ${describe(watch)}`, "info");
+        context.ui.notify(`Started ${describe(watch, Date.now())}`, "info");
         // Don't await: Pi blocks input while a command handler runs.
         void firstCheck(watch).then((first) => {
           // A watch that ended on its first check already sent a report.
           if (shuttingDown || first === "pending" || !first || registry.get(watch.id) !== watch) return;
           const failed = first.code !== 0 && first.stderr.trim() !== "";
-          context.ui.notify(firstCheckText(watch, first, false), failed ? "warning" : "info");
+          context.ui.notify(firstCheckNote(watch, first), failed ? "warning" : "info");
         });
       } catch (error) {
         if (!context.hasUI) throw error;
