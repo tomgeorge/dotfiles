@@ -126,7 +126,7 @@ test("a goal cleared or replaced while its check runs gets no verdict", async ()
   }
 });
 
-test("the branch's latest goal entry is loaded, and mutating it leaves the entry alone", async () => {
+test("the branch's latest goal entry is loaded, past other extensions' entries, and mutating it leaves the entry alone", async () => {
   const { f, ctx } = setup();
   await f.emit("session_start", {}, ctx);
   await f.command("goal", `fix it --check ${CHECK} --max 3`, ctx);
@@ -135,6 +135,8 @@ test("the branch's latest goal entry is loaded, and mutating it leaves the entry
   const g = fakePi();
   goalExtension(g.pi);
   g.entries.push(...f.entries);
+  // Another extension's later entry isn't a goal entry, so it can't replace or drop the goal.
+  g.entries.push({ type: "custom", customType: "other-state", data: { status: "bogus" } });
   const ctx2 = g.ctx(ctx.cwd);
   await g.emit("session_start", {}, ctx2);
   assert.ok(g.active().includes("goal_park"));
