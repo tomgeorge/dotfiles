@@ -58,3 +58,16 @@ test("background processes left by a finished check are cleaned up", async () =>
   await sleep(50);
   assert.equal(alive(pid), false);
 });
+
+// On macOS, signalling a group whose last members are still exiting gives EPERM
+// (not ESRCH), which used to escape the "exit" handler and crash. It's a race,
+// so try it enough times that the old code fails most runs.
+test("killing a group that is already exiting doesn't throw", async () => {
+  for (let i = 0; i < 50; i++) {
+    const controller = new AbortController();
+    const done = runCheck("sleep 30 & wait", tmpdir(), controller.signal, 60_000);
+    await sleep(20);
+    controller.abort();
+    assert.equal((await done).killed, true);
+  }
+});
