@@ -102,8 +102,18 @@ export function runWorker(
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Kill the process group so bash/test grandchildren die with the worker.
+    // The child leads its group (detached), so while it lives the group signal reaches it.
     const signalGroup = (sig: NodeJS.Signals) => {
-      try { process.kill(-child.pid!, sig); } catch { try { child.kill(sig); } catch { /* gone */ } }
+      if (child.pid === undefined) return; // never spawned; its error event ends the run
+      try {
+        process.kill(-child.pid, sig);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // Already gone: ESRCH, or EPERM, which macOS returns when the group's remaining members are exiting or zombies.
+        if (code === "ESRCH" || code === "EPERM") return;
+        // A worker we can't stop must not crash Pi; say so in its result instead.
+        if (ending) ending.error += `; could not send ${sig} to the worker: ${(error as Error).message}`;
+      }
     };
     const stop = (status: WorkerResult["status"], error: string) => {
       if (ending) return;
