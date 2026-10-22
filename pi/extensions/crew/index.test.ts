@@ -399,14 +399,31 @@ crewTest("a dispatch still setting up when the crew stops never launches its wor
 
 /** Capture the component ctx.ui.custom builds, with a plain-text theme and a fixed terminal. */
 function panelUi(ctx: any) {
-  const opened: { component: any; closed: boolean; renders: number }[] = [];
+  const opened: { component: any; closed: boolean; renders: number; close: () => void }[] = [];
   ctx.ui.custom = (factory: any) => new Promise<void>((resolve) => {
-    const panel = { component: undefined as any, closed: false, renders: 0 };
+    const panel = { component: undefined as any, closed: false, renders: 0, close: () => {} };
     const tui = { terminal: { rows: 40 }, requestRender: () => { panel.renders++; } };
     const theme = { fg: (_tone: string, text: string) => text, bold: (text: string) => text, bg: (_tone: string, text: string) => text };
-    panel.component = factory(tui, theme, {}, () => { panel.closed = true; panel.component.dispose?.(); resolve(); });
+    panel.close = () => {
+      if (panel.closed) return;
+      panel.closed = true;
+      panel.component.dispose?.();
+      resolve();
+    };
+    panel.component = factory(tui, theme, {}, panel.close);
     opened.push(panel);
   });
+  const closeAll = () => { for (const panel of opened) panel.close(); };
+  // Pi blocks the editor while a command handler runs, so a command must return with the panel
+  // still open. A handler that waits for the panel would hang the test; close it and fail instead.
+  const returnsOpen = async (command: Promise<unknown>) => {
+    const returned = await Promise.race([command.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]);
+    if (!returned) {
+      closeAll();
+      await command;
+    }
+    assert.equal(returned, true, "the command returned while the panel is still open");
+  };
   const screen = () => opened.at(-1)!.component.render(120).join("\n") as string;
   // Pi doesn't await shortcut handlers; neither does this.
   const shortcut = async (f: any, context: any) => {
@@ -414,7 +431,7 @@ function panelUi(ctx: any) {
     await waitFor(() => opened.length > 0, "the panel");
   };
   const type = (...keys: string[]) => { for (const k of keys) opened.at(-1)!.component.handleInput(k); };
-  return { opened, screen, type, shortcut };
+  return { opened, screen, type, shortcut, closeAll, returnsOpen };
 }
 
 crewTest("/crew with no goal opens the panel on live, in-memory task state without blocking", async (e) => {
@@ -424,11 +441,8 @@ crewTest("/crew with no goal opens the panel on live, in-memory task state witho
   await e.dispatch({ title: "paint the panel" });
   // Fresher than the ledger on disk: progress isn't persisted on every event.
   e.w.list[0].opts.onProgress({ toolCalls: 7, activity: "edit theme.ts", usage: { input: 0, output: 0, cost: 0.37 }, lastEventAt: Date.now() });
-  const command = e.f.command("crew", "", e.ctx);
   try {
-    // Pi blocks the editor while a command handler runs, so it must return with the panel open.
-    const returned = await Promise.race([command.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]);
-    assert.equal(returned, true, "the command returned while the panel is still open");
+    await ui.returnsOpen(e.f.command("crew", "", e.ctx));
     assert.equal(ui.opened.length, 1);
     assert.equal(edited, false, "no goal prompt for a running crew");
     const text = ui.screen();
@@ -436,28 +450,32 @@ crewTest("/crew with no goal opens the panel on live, in-memory task state witho
     assert.match(text, /#1 impl paint the panel .*\$0\.37 +edit theme\.ts/);
     assert.match(text, /1\/3 running · \$0\.37\/\$10\.00/);
     // One panel at a time.
-    await e.f.command("crew", "", e.ctx);
+    await ui.returnsOpen(e.f.command("crew", "", e.ctx));
     assert.equal(ui.opened.length, 1);
+    ui.type("q");
+    assert.ok(ui.opened[0].closed);
   } finally {
-    if (ui.opened.length) ui.type("q");
-    await command;
+    ui.closeAll();
   }
-  assert.ok(ui.opened[0].closed);
 });
 
 crewTest("cancelling from the panel asks first, then stops the worker and wakes the planner", async (e) => {
   const ui = panelUi(e.ctx);
   await e.dispatch();
   await ui.shortcut(e.f, e.ctx);
-  ui.type("x");
-  assert.match(ui.screen(), /Cancel #1 "do it"\?/);
-  ui.type("n");
-  assert.equal(e.w.list[0].opts.signal.aborted, false, "n keeps it running");
-  ui.type("x", "y");
-  assert.equal(e.w.list[0].opts.signal.aborted, true);
-  await waitFor(() => e.handoffs().length === 1, "handoff");
-  assert.equal(e.handoffs()[0].options?.triggerTurn, true, "the planner hears about a human cancel");
-  assert.match(ui.screen(), /Cancelling #1/);
+  try {
+    ui.type("x");
+    assert.match(ui.screen(), /Cancel #1 "do it"\?/);
+    ui.type("n");
+    assert.equal(e.w.list[0].opts.signal.aborted, false, "n keeps it running");
+    ui.type("x", "y");
+    assert.equal(e.w.list[0].opts.signal.aborted, true);
+    await waitFor(() => e.handoffs().length === 1, "handoff");
+    assert.equal(e.handoffs()[0].options?.triggerTurn, true, "the planner hears about a human cancel");
+    assert.match(ui.screen(), /Cancelling #1/);
+  } finally {
+    ui.closeAll();
+  }
 });
 
 test("the shortcut opens a stopped crew from the ledger in a new session, read-only", async () => {
@@ -471,9 +489,9 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
   await a.shutdown();
 
   const b = boot(root);
+  const ui = panelUi(b.ctx);
   try {
     await b.f.emit("session_start", {}, b.ctx);
-    const ui = panelUi(b.ctx);
     await ui.shortcut(b.f, b.ctx);
     const text = ui.screen();
     assert.match(text, /stopped · ledger goal/);
@@ -486,7 +504,7 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
     // /crew with no goal opens it too, while it's unfinished.
     let asked = false;
     b.ctx.ui.editor = async () => { asked = true; return undefined; };
-    await b.f.command("crew", "", b.ctx);
+    await ui.returnsOpen(b.f.command("crew", "", b.ctx));
     assert.equal(ui.opened.length, 2);
     assert.equal(asked, false);
     ui.type("q");
@@ -499,6 +517,7 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
     assert.ok(asked);
     assert.equal(ui.opened.length, 2);
   } finally {
+    ui.closeAll();
     await b.shutdown();
   }
 });
@@ -518,10 +537,14 @@ test("the shortcut says so when the repository has no crews", async () => {
 crewTest("/crew-status opens the panel, and prints the text ledger without a UI", async (e) => {
   const ui = panelUi(e.ctx);
   await e.dispatch({ title: "status me" });
-  await e.f.command("crew-status", "", e.ctx);
-  assert.equal(ui.opened.length, 1);
-  assert.match(ui.screen(), /#1 impl status me/);
-  ui.type("q");
+  try {
+    await ui.returnsOpen(e.f.command("crew-status", "", e.ctx));
+    assert.equal(ui.opened.length, 1);
+    assert.match(ui.screen(), /#1 impl status me/);
+    ui.type("q");
+  } finally {
+    ui.closeAll();
+  }
   const logged: string[] = [];
   const log = console.log;
   console.log = (text: string) => { logged.push(text); };
