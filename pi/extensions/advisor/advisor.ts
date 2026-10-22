@@ -6,10 +6,13 @@ export interface AdvisorConfig { provider: string; model: string }
 
 export function readConfig(path: string): AdvisorConfig | undefined {
   if (!existsSync(path)) return undefined;
-  const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<AdvisorConfig>;
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  const invalid = new Error(`${path} must contain {"provider": "...", "model": "..."}`);
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw invalid;
   if (Object.keys(raw).length === 0) return undefined; // "off"
-  if (typeof raw.provider !== "string" || typeof raw.model !== "string" || !raw.provider || !raw.model) {
-    throw new Error(`${path} must contain {"provider": "...", "model": "..."}`);
+  if (!("provider" in raw) || !("model" in raw)
+    || typeof raw.provider !== "string" || typeof raw.model !== "string" || !raw.provider || !raw.model) {
+    throw invalid;
   }
   return { provider: raw.provider, model: raw.model };
 }

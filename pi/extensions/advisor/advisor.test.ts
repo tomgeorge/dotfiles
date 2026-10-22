@@ -16,6 +16,10 @@ test("config round-trips, 'off' is an empty object, and junk is rejected", () =>
   assert.equal(readConfig(path), undefined);
   writeFileSync(path, '{"provider": "p"}');
   assert.throws(() => readConfig(path), /must contain/);
+  for (const json of ["null", "0", '"off"', "true", "[]", '["p", "m"]']) {
+    writeFileSync(path, json);
+    assert.throws(() => readConfig(path), /must contain/, json);
+  }
 });
 
 test("trimTranscript keeps the head and the recent tail", () => {
@@ -26,6 +30,7 @@ test("trimTranscript keeps the head and the recent tail", () => {
   assert.ok(out.endsWith(":RECENT"));
   assert.match(out, /\[\.\.\. 812 characters of the middle of the conversation omitted \.\.\.\]/);
 });
+
 test("modelRef and parseModelRef use provider/model, splitting at the first slash", () => {
   assert.equal(modelRef(undefined), "off");
   assert.equal(modelRef({ provider: "openai-codex", model: "gpt-6.1-sol" }), "openai-codex/gpt-6.1-sol");
