@@ -220,6 +220,8 @@ export class Registry {
   }
 }
 
+const DURATION_UNITS: Record<string, number> = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+
 /** `30s`, `5m`, `2h`, `1d`; a bare number is seconds. */
 export function parseDuration(value: string | number): number {
   if (typeof value === "number") {
@@ -228,7 +230,7 @@ export function parseDuration(value: string | number): number {
   }
   const match = value.trim().match(/^(\d+(?:\.\d+)?)\s*(s|m|h|d)?$/i);
   if (!match) throw new Error(`Invalid duration "${value}"; use e.g. 30s, 5m, 2h`);
-  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[(match[2] ?? "s").toLowerCase() as "s"];
+  const unit = DURATION_UNITS[(match[2] ?? "s").toLowerCase()];
   const ms = Math.round(Number(match[1]) * unit);
   if (ms <= 0) throw new Error(`Invalid duration "${value}"`);
   return ms;
@@ -247,7 +249,8 @@ export interface WatchInput {
 export function buildSpec(input: WatchInput, cwd: string): WatchSpec {
   const command = input.command?.trim();
   const prompt = input.prompt?.trim();
-  if (!command === !prompt) throw new Error("Give exactly one of command or prompt");
+  const text = command || prompt;
+  if (!text || (command && prompt)) throw new Error("Give exactly one of command or prompt");
   const kind: Kind = command ? "command" : "prompt";
   if (kind === "prompt" && (input.until || input.deliver)) {
     throw new Error("until and deliver apply only to command watches; loops always run when the agent is idle");
@@ -259,7 +262,6 @@ export function buildSpec(input: WatchInput, cwd: string): WatchSpec {
   }
   const timeoutMs = input.timeout === undefined ? limits.timeout : parseDuration(input.timeout);
   if (timeoutMs > LIMITS.maxTimeout) throw new Error(`Timeout must be at most ${formatDuration(LIMITS.maxTimeout)}`);
-  const text = (command ?? prompt)!;
   return {
     kind, text, cwd, intervalMs, timeoutMs,
     description: input.description?.trim() || oneLine(text, 60),
@@ -281,6 +283,7 @@ export function parseArgs(args: string, kind: Kind): WatchInput {
     if (!match) break;
     const [, token, after] = match;
     if (token === "--") { rest = after; break; }
+    const deliver = kind === "command" ? DELIVER.find((mode) => token === `--${mode}`) : undefined;
     if (/^\d+(?:\.\d+)?[smhd]$/i.test(token) && input.interval === undefined) {
       input.interval = token;
     } else if (token.startsWith("--timeout")) {
@@ -295,8 +298,8 @@ export function parseArgs(args: string, kind: Kind): WatchInput {
       } else break;
     } else if (kind === "command" && token === "--change") {
       input.until = "change";
-    } else if (kind === "command" && ["--wake", "--steer", "--notify"].includes(token)) {
-      input.deliver = token.slice(2) as Deliver;
+    } else if (deliver) {
+      input.deliver = deliver;
     } else break;
     rest = after;
   }
