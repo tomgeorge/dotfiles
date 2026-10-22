@@ -3,7 +3,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  addWorktree, branchFacts, commitAll, diffText, GIT_ENV, gitOk, mergeBranch, outsidePaths,
+  addWorktree, branchFacts, commitAll, commonDirOf, diffText, GIT_ENV, gitOk, mergeBranch, outsidePaths,
   removeWorktree, repoInfo, runCheck, worktreePath,
 } from "./git.ts";
 import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
@@ -127,7 +127,7 @@ export default function (pi: ExtensionAPI) {
     return crew;
   }
 
-  async function buildReport(task: TaskRecord, result: WorkerResult): Promise<TaskReport> {
+  async function buildReport(task: TaskRecord, result: WorkerResult, signal: AbortSignal): Promise<TaskReport> {
     const outcome = result.status === "ok" ? "submitted" : result.status === "error" ? "failed" : result.status;
     const parsed = parseHandoff(result.text);
     const report: TaskReport = {
@@ -150,7 +150,15 @@ export default function (pi: ExtensionAPI) {
     }
     // Checks are the harness's own evidence, so run them even when the worker timed out.
     if (outcome !== "cancelled" && !shuttingDown) {
-      for (const command of task.checks) report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS));
+      for (const command of task.checks) {
+        if (signal.aborted) break;
+        report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS, signal));
+      }
+      // Cancel or shutdown while checks ran: report what ran, don't present it as verified.
+      if (signal.aborted) {
+        report.outcome = "cancelled";
+        report.error = [report.error, "cancelled while the harness checks were running"].filter(Boolean).join("; ");
+      }
     }
     return report;
   }
@@ -168,11 +176,13 @@ export default function (pi: ExtensionAPI) {
           task.lastEventAt = p.lastEventAt;
         },
       });
-      controllers.delete(task.id);
       task.cost = result.progress.usage.cost;
+      task.activity = "harness checks";
       let report: TaskReport;
       try {
-        report = await buildReport(task, result);
+        // The controller stays registered through the checks, so crew_cancel,
+        // /crew-stop, and shutdown can still stop them.
+        report = await buildReport(task, result, controller.signal);
       } catch (error) {
         report = {
           id: task.id, kind: task.kind, title: task.title, outcome: "failed", model: task.model,
@@ -180,6 +190,7 @@ export default function (pi: ExtensionAPI) {
           durationMs: Date.now() - task.startedAt, error: (error as Error).message,
         };
       }
+      controllers.delete(task.id);
       task.report = report;
       task.endedAt = Date.now();
       task.status = shuttingDown ? "interrupted"
@@ -210,6 +221,8 @@ export default function (pi: ExtensionAPI) {
       reviewOf: Type.Optional(Type.Integer({ minimum: 1, description: "Task id to review (kind review only)" })),
       timeoutMinutes: Type.Optional(Type.Integer({ minimum: 1, maximum: 180 })),
     }),
+    // Worktree creation and HEAD reads touch shared git state; dispatch returns fast anyway.
+    executionMode: "sequential",
     async execute(_id, params) {
       const state = requireCrew();
       const c = state.config;
@@ -269,6 +282,8 @@ export default function (pi: ExtensionAPI) {
     label: "Crew integrate",
     description: "Merge a finished implement task's branch into the crew integration branch (harness-run git merge --no-ff). On conflict the merge is aborted and the conflicting files are returned, so you can dispatch a repair task.",
     parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }),
+    // Two merges in one worktree at once collide on index.lock, which would be misread as a conflict.
+    executionMode: "sequential",
     async execute(_id, params) {
       const state = requireCrew();
       const task = state.tasks.find((t) => t.id === params.taskId);
@@ -423,7 +438,11 @@ export default function (pi: ExtensionAPI) {
     description: "Show the crew ledger",
     async handler(_args, ctx) {
       let state = crew;
-      if (!state) state = listCrews((await repoInfo(ctx.cwd)).commonDir)[0];
+      try {
+        state ??= listCrews(await commonDirOf(ctx.cwd))[0];
+      } catch {
+        state = undefined; // not a git repository
+      }
       const message = state ? formatStatus(state) : "No crews in this repository";
       if (ctx.hasUI) ctx.ui.notify(message, "info");
       else console.log(message);
@@ -447,7 +466,7 @@ export default function (pi: ExtensionAPI) {
     async handler(args, ctx) {
       try {
         if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active`);
-        const crews = listCrews((await repoInfo(ctx.cwd)).commonDir).filter((s) => s.status !== "finished");
+        const crews = listCrews(await commonDirOf(ctx.cwd)).filter((s) => s.status !== "finished");
         const state = args.trim() ? crews.find((s) => s.config.slug === args.trim()) : crews[0];
         if (!state) throw new Error("No resumable crew in this repository");
         // Processes from a previous session are gone; keep their worktrees as evidence.
@@ -466,9 +485,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("crew-clean", {
     description: "Remove worktrees and branches of finished crew tasks (not the integration branch)",
     async handler(_args, ctx) {
-      const state = crew ?? listCrews((await repoInfo(ctx.cwd)).commonDir)[0];
+      const state = crew ?? listCrews(await commonDirOf(ctx.cwd))[0];
       if (!state) return ctx.ui.notify("No crews in this repository", "info");
-      const done = state.tasks.filter((t) => t.kind === "implement" && t.worktree && t.status !== "running");
+      const reviewing = new Set(state.tasks.filter((t) => t.kind === "review" && t.status === "running").map((t) => t.reviewOf));
+      const done = state.tasks.filter((t) => t.kind === "implement" && t.worktree && t.status !== "running" && !reviewing.has(t.id));
       if (!done.length) return ctx.ui.notify("Nothing to clean", "info");
       const ok = await ctx.ui.confirm("Remove task worktrees?", `${done.length} worktrees and branches of crew ${state.config.slug} (${done.map((t) => `#${t.id} ${t.status}`).join(", ")}). Unintegrated work on those branches is deleted.`);
       if (!ok) return;

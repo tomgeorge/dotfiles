@@ -38,6 +38,11 @@ export interface RepoInfo {
   dirty: boolean;
 }
 
+/** The shared .git directory, without needing a commit (status commands use this). */
+export async function commonDirOf(cwd: string): Promise<string> {
+  return (await gitOk(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"])).trim();
+}
+
 export async function repoInfo(cwd: string): Promise<RepoInfo> {
   const root = (await gitOk(cwd, ["rev-parse", "--show-toplevel"])).trim();
   const commonDir = (await gitOk(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"])).trim();

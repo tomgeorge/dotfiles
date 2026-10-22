@@ -72,4 +72,11 @@ test("runCheck reports exit codes, keeps the tail, and kills on timeout", async 
   assert.doesNotMatch(bad.tail, /line1\n/);
   const slow = await runCheck(tmpdir(), "sleep 5 & sleep 5; wait", 200);
   assert.equal(slow.timedOut, true);
+  // An abort (crew_cancel, shutdown) stops a running check promptly.
+  const controller = new AbortController();
+  const started = Date.now();
+  setTimeout(() => controller.abort(), 100);
+  const aborted = await runCheck(tmpdir(), "sleep 5", 10_000, controller.signal);
+  assert.ok(Date.now() - started < 2000, "aborted check returned promptly");
+  assert.notEqual(aborted.exit, 0);
 });

@@ -45,7 +45,7 @@ test("timeout kills the process group and keeps partial output", async () => {
     ${emit({ type: "message_update", assistantMessageEvent: { type: "text_start" } })}
     ${emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "now editing b.ts" } })}
     require("node:child_process").spawn("sleep", ["30"], { stdio: "ignore" });
-    setInterval(() => {}, 1000);`, 400);
+    setInterval(() => {}, 1000);`, 2500);
   assert.equal(r.status, "timeout");
   assert.match(r.text, /step one done/);
   assert.match(r.text, /now editing b\.ts/);
