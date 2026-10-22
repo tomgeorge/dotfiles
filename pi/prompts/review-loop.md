@@ -58,12 +58,13 @@ Don't give them your reasoning or earlier rounds' discussion. They should judge 
 | B | `openai-codex/gpt-6.1-sol` | Security and robustness: injection, authz, secrets, unsafe input, resource leaks, failure modes. |
 | C | `anthropic/claude-sonnet-5-5` | Tests and fit: missing or weak tests, behavior changes without tests, departures from the codebase's existing conventions, dead code. |
 
-Tell every reviewer:
+Reviewers asked to "find problems" invent them: in studies, models rejected 25–75% of correct code, and asking them to explain and fix made it worse. So don't presume a problem exists. Tell every reviewer:
 - Use `git diff $BASE` to see the change, including uncommitted work, and read the new files directly.
 - Read the surrounding code before judging it.
-- Report only real problems, one per line, as `[high|medium|low] path:line: problem. Suggested fix: ...`.
-- Write `No findings.` if there are none.
-- Don't report style nitpicks unless they hide a bug.
+- **The bar:** report a finding only if it breaks correctness, security, or a stated requirement. Style, alternative designs, and "more tests would be nice" are not findings.
+- **"If the change is correct and meets the stated requirements, say so and report no findings."** Write `No findings.` in that case. That is a good outcome, not a failed review.
+- **Evidence:** every high or medium finding must include a concrete failing input, counterexample, or a test that would fail. A finding without one can be at most low.
+- Report one finding per line, as `[high|medium|low] path:line: problem. Evidence: ...`. Don't propose fixes; the fix comes later, after the evidence holds up.
 - In rounds 2 and later, also send the "already decided" list (see below), with the instruction: "Don't re-raise these unless the code changed in a way that makes them newly relevant."
 
 ## 2. Triage against the intent
@@ -72,19 +73,24 @@ Merge duplicates. Decide on each finding:
 - **Reject** if it's wrong, out of scope, contradicts my request or the intent, or is pure taste. Give a one-line reason.
 - **Defer** if it's real but belongs in a separate change.
 
-You make the call, not the reviewers. Don't accept a finding just because a reviewer was confident, and verify any claim you're unsure about by reading the code.
+You make the call, not the reviewers. Don't accept a finding just because a reviewer was confident.
+
+**Execution decides, not confidence.** For each high or medium finding, turn its evidence into a failing test (red), and run it in `DIR`:
+- If it fails, the finding is real. Accept it, and keep the test.
+- If it passes, or you can't reproduce it, downgrade the finding to low and reject it as unreproduced. Note that in the report.
+- If a finding truly can't be expressed as a test, such as a race or a security property, reason it through against the code. Accept it only if you can explain the exact failing scenario.
 
 Add every rejected and deferred finding to the "already decided" list.
 
 ## 3. Fix and verify
-- Fix the accepted findings with minimal changes that match the existing style.
-- Add or adjust tests where a finding showed missing coverage.
+- Fix each accepted finding until its failing test passes (green). Change only what the finding names, minimally, in the existing style. Don't add abstractions, defensive checks, or options that no finding asked for.
+- You may skip a fix that seems unsafe or would need a wider change. List it as unresolved instead of forcing it.
 - Run all the checks in `DIR`. Fix any failures your changes caused.
 - Don't commit, push, or change git history. Leave the changes uncommitted in `DIR` for me. For a crew target, this means the integration branch's worktree.
 
 ## 4. Loop or stop
 - **Stop** when a round produces no accepted high or medium findings and the checks pass. That's "the reviewers call it good."
-- **Otherwise** start another round from step 1, with fresh subagent calls and the "already decided" list.
+- **Otherwise** start another round from step 1, with fresh subagent calls and the "already decided" list. Rounds 2 and later review **only this round's fix diff** (`git diff` of your changes since the previous round) against the accepted findings, not the whole change again. A full re-review just generates new findings forever.
 - **Hard limit:** 3 rounds. If high or medium findings remain after round 3, stop.
 - If the same issue survives two fix attempts, stop and escalate it to me instead of looping.
 
@@ -93,7 +99,8 @@ Keep it short.
 - **Target:** `DIR` and `BASE`.
 - **Verdict:** clean after N rounds, or stopped at the limit with issues left.
 - **Fixed:** each finding, its reviewer, and what changed (path:line).
-- **Rejected and deferred:** each finding with its one-line reason, so I can overrule you.
+- **Rejected and deferred:** each finding with its one-line reason (including "unreproduced"), so I can overrule you.
+- **Overturn rate:** findings raised vs accepted. If most were rejected, say so; the reviewers are overcorrecting on this code.
 - **Unresolved:** anything still open, with your recommendation.
 - **Checks:** the commands run and their final status.
 - **Spend:** the total subagent cost reported by the jobs.
