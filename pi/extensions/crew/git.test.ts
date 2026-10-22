@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, discardChanges, gitOk, mergeBranch, outsidePaths, removeWorktree,
-  repoInfo, runCheck,
+  repoInfo, runCheck, runChecks,
 } from "./git.ts";
 
 function repo() {
@@ -95,6 +95,13 @@ test("branchCommits reads commits from the branch, with no report or worktree ne
   await commitAll(wt, "crashed worker's commit");
   await removeWorktree(root, wt);
   assert.match((await branchCommits(root, base, "crew/y-t1")).join("\n"), /crashed worker's commit/);
+});
+
+test("runChecks runs in order and starts nothing once aborted", async () => {
+  const { root } = repo();
+  const ran = await runChecks(root, ["true", "exit 4"], 5_000, new AbortController().signal);
+  assert.deepEqual(ran.map((c) => [c.command, c.exit]), [["true", 0], ["exit 4", 4]]);
+  assert.deepEqual(await runChecks(root, ["true"], 1_000, AbortSignal.abort()), []);
 });
 
 test("runCheck reports exit codes, keeps the tail, and kills on timeout", async () => {
