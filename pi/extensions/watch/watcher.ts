@@ -55,8 +55,10 @@ export interface Watch extends WatchSpec {
 }
 
 export interface Events {
-  /** Command: condition met or output changed. Prompt: an iteration is due; call `rearm` once delivered. */
-  onFire(watch: Watch, result: RunResult | undefined): void;
+  /** A command's condition was met or its output changed. */
+  onFire(watch: Watch, result: RunResult): void;
+  /** A loop's iteration is due; call `rearm` once it is delivered. */
+  onDue(watch: Watch): void;
   onEnd(watch: Watch, reason: EndReason, detail?: string): void;
   onUpdate(watch: Watch): void;
 }
@@ -160,7 +162,7 @@ export class Registry {
     watch.nextAt = undefined;
     watch.fires++;
     this.events.onUpdate(watch);
-    this.events.onFire(watch, undefined);
+    this.events.onDue(watch);
   }
 
   private async check(entry: Entry) {
