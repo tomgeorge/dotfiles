@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine } from "./goal.ts";
 
@@ -74,11 +76,41 @@ test("runCheck kills background jobs the check leaves in its process group", asy
   const r = await runCheck(tmpdir(), "sleep 30 & echo $!; exit 0", 5000);
   const pid = Number(r.tail.trim());
   assert.ok(pid > 0);
-  await new Promise((done) => setTimeout(done, 100));
+  // The killed job lingers as a zombie until init reaps it, which can be slow on a loaded machine.
+  await until(() => gone(pid));
   assert.throws(() => process.kill(pid, 0), /ESRCH/);
 });
 
-test("runCheck keeps the real exit code when the timeout lands while output drains", async () => {
-  const r = await runCheck(tmpdir(), "sleep 5 & sleep 0.1; exit 0", 300);
+test("runCheck keeps the real exit code when the timeout lands while output drains", async (t) => {
+  // Mocked timers put the deadline inside the drain window no matter how slow a loaded machine
+  // spawns the shell; real time would race the spawn against a few hundred milliseconds.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const pidFile = join(mkdtempSync(join(tmpdir(), "goal-check-")), "pid");
+  const pending = runCheck(tmpdir(), `echo $$ > ${pidFile}; sleep 5 & exit 0`, 300);
+  // The child is reaped, and its exit seen, only once its pid is gone.
+  await until(() => existsSync(pidFile) && /\n$/.test(readFileSync(pidFile, "utf8")));
+  await until(() => gone(Number(readFileSync(pidFile, "utf8"))));
+  t.mock.timers.tick(300);
+  t.mock.timers.tick(500);
+  const r = await pending;
   assert.deepEqual([r.exit, r.timedOut], [0, false]);
 });
+
+// Polls on setImmediate, which mocked setTimeout leaves alone; gives up after 10 s of real time.
+async function until(ready: () => boolean) {
+  const deadline = Date.now() + 10_000;
+  while (!ready()) {
+    assert.ok(Date.now() < deadline, "timed out waiting");
+    await new Promise((done) => setImmediate(done));
+  }
+}
+
+function gone(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+    throw error;
+  }
+}
