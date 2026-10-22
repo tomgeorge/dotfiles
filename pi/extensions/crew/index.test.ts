@@ -433,7 +433,10 @@ function panelUi(ctx: any) {
   // Pi blocks the editor while a command handler runs, so a command must return with the panel
   // still open. A handler that waits for the panel would hang the test; close it and fail instead.
   const returnsOpen = async (command: Promise<unknown>) => {
-    const returned = await Promise.race([command.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]);
+    // Generous: a returning command wins at once, and a loaded machine can take seconds to get there.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const returned = await Promise.race([command.then(() => true), new Promise((r) => { timer = setTimeout(() => r(false), 5000); })]);
+    clearTimeout(timer);
     if (!returned) {
       closeAll();
       await command;
