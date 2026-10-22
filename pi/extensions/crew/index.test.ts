@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { fakePi } from "../test-support/fake-pi.ts";
 
 // Worktrees go under $HOME/git/worktrees; keep them out of the real home.
@@ -93,14 +93,24 @@ async function started(opts: Parameters<typeof boot>[1] = {}) {
   return { ...e, slug, stateFile, integ, state: () => JSON.parse(readFileSync(stateFile, "utf8")) };
 }
 
+// A broken drain or abort hangs rather than fails; bound each test so the suite reports it.
+const BOUND = { timeout: 20_000 };
+
+/** A timed-out test's body never reaches its finally; clean up anyway, or the extension's timers keep the file running. */
+const onCancel = (t: TestContext, cleanup: () => Promise<unknown>) =>
+  t.signal.addEventListener("abort", () => void cleanup(), { once: true });
+
 /** Run a test body and always shut the extension down so no timers outlive it. */
 const crewTest = (name: string, body: (e: Awaited<ReturnType<typeof started>>) => Promise<void>, opts: Parameters<typeof boot>[1] = {}) =>
-  // A broken drain or abort hangs rather than fails; bound it so the suite reports it.
-  test(name, { timeout: 20_000 }, async () => {
+  test(name, BOUND, async (t) => {
     const e = await started(opts);
-    try { await body(e); } finally {
+    const cleanup = async () => {
       for (const worker of e.w.list) worker.finish(result("cancelled", ""));
       await e.shutdown();
+    };
+    onCancel(t, cleanup);
+    try { await body(e); } finally {
+      await cleanup();
     }
   });
 
@@ -123,9 +133,10 @@ crewTest("starting a crew shows the planner prompt, wakes the planner, and limit
   assert.deepEqual([...e.f.active()].sort(), [...READ, ...CREW].sort());
 });
 
-test("crew tools are hidden until a crew starts, and the tools come back after /crew-stop", async () => {
+test("crew tools are hidden until a crew starts, and the tools come back after /crew-stop", BOUND, async (t) => {
   const root = makeRepo();
   const e = boot(root);
+  onCancel(t, e.shutdown);
   try {
     await e.f.emit("session_start", {}, e.ctx);
     for (const t of CREW) assert.ok(!e.f.active().includes(t), `${t} hidden outside crew mode`);
@@ -310,9 +321,13 @@ crewTest("a dispatch racing /crew-stop is refused rather than started for a stop
   assert.equal(e.state().tasks[0].status, "cancelled");
 });
 
-test("resuming after a crash marks dead tasks interrupted, re-sends the planner prompt, and integrates their commits", async () => {
+test("resuming after a crash marks dead tasks interrupted, re-sends the planner prompt, and integrates their commits", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root, { ignoreAbort: true });
+  onCancel(t, async () => {
+    for (const worker of a.w.list) worker.finish(result("cancelled", ""));
+    await a.shutdown();
+  });
   await a.f.emit("session_start", {}, a.ctx);
   await a.f.command("crew", "crashy", a.ctx);
   await a.dispatch();
@@ -320,6 +335,7 @@ test("resuming after a crash marks dead tasks interrupted, re-sends the planner 
   const down = a.shutdown(); // the old process goes away without ever reporting
 
   const b = boot(root);
+  onCancel(t, b.shutdown);
   try {
     await b.f.emit("session_start", {}, b.ctx);
     await b.f.command("crew-resume", "", b.ctx);
@@ -478,9 +494,10 @@ crewTest("cancelling from the panel asks first, then stops the worker and wakes 
   }
 });
 
-test("the shortcut opens a stopped crew from the ledger in a new session, read-only", async () => {
+test("the shortcut opens a stopped crew from the ledger in a new session, read-only", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root);
+  onCancel(t, a.shutdown);
   await a.f.emit("session_start", {}, a.ctx);
   await a.f.command("crew", "ledger goal", a.ctx);
   await a.dispatch({ title: "left behind" });
@@ -490,6 +507,10 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
 
   const b = boot(root);
   const ui = panelUi(b.ctx);
+  onCancel(t, async () => {
+    ui.closeAll();
+    await b.shutdown();
+  });
   try {
     await b.f.emit("session_start", {}, b.ctx);
     await ui.shortcut(b.f, b.ctx);
@@ -522,8 +543,9 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
   }
 });
 
-test("the shortcut says so when the repository has no crews", async () => {
+test("the shortcut says so when the repository has no crews", BOUND, async (t) => {
   const e = boot(makeRepo());
+  onCancel(t, e.shutdown);
   try {
     const ui = panelUi(e.ctx);
     await e.f.shortcuts.get("ctrl+shift+c").handler(e.ctx);
