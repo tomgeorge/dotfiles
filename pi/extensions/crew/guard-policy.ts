@@ -66,7 +66,7 @@ const inside = (root: string, path: string) => {
 };
 
 /** A reason to block an edit/write to `path`, or null to allow it. */
-export function checkWritePath(root: string, cwd: string, path: string): string | null {
+export function checkWritePath(root: string, cwd: string, path: unknown): string | null {
   if (typeof path !== "string" || !path.trim()) return "missing path";
   let target: string;
   try {

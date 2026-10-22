@@ -51,6 +51,21 @@ test("timeout kills the process group and keeps partial output", async () => {
   assert.match(r.text, /now editing b\.ts/);
 });
 
+test("a live child is killed directly when its group looks gone", { timeout: 10_000 }, async (t) => {
+  // Simulates a child that left its group: group signals fail with ESRCH, so only child.kill can stop it.
+  const realKill = process.kill;
+  t.after(() => { process.kill = realKill; });
+  process.kill = ((pid: number, sig?: NodeJS.Signals | number) => {
+    if (pid < 0) throw Object.assign(new Error("kill ESRCH"), { code: "ESRCH" });
+    return realKill(pid, sig);
+  }) as typeof process.kill;
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 100);
+  const r = await run("setInterval(() => {}, 1000);", 5000, controller.signal);
+  assert.equal(r.status, "cancelled");
+  assert.equal(r.error, "cancelled", "an already-gone group is not reported as a failure");
+});
+
 test("cancel, wrong model, and incomplete runs are reported, not thrown", async () => {
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 100);

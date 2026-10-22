@@ -1,3 +1,5 @@
+import { money } from "./state.ts";
+
 // The handoff is the only thing that flows back up from a worker (Cursor's
 // "self-driving codebases" design). Worker claims live in `handoff`; everything
 // else in a TaskReport is observed by the harness, so the planner can tell them apart.
@@ -89,8 +91,11 @@ export function parseHandoff(text: string): { handoff?: Handoff; error?: string 
 const list = (title: string, items: string[]) =>
   items.length ? [`${title}:`, ...items.map((item) => `- ${item}`)] : [];
 
-const money = (usd: number) => `$${usd.toFixed(2)}`;
 const minutes = (ms: number) => `${Math.round(ms / 6000) / 10}m`;
+
+/** `- exit 2: <command>` and its last `tailLines` lines of output, for each check that didn't pass. */
+export const failedChecks = (checks: CheckResult[], tailLines: number): string[] =>
+  checks.filter((c) => c.exit !== 0).map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-tailLines).map((l) => `    ${l}`).join("\n")}`);
 
 /** The follow-up message the planner receives. */
 export function formatReport(r: TaskReport): string {

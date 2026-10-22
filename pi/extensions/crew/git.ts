@@ -45,7 +45,7 @@ export async function commonDirOf(cwd: string): Promise<string> {
 
 export async function repoInfo(cwd: string): Promise<RepoInfo> {
   const root = (await gitOk(cwd, ["rev-parse", "--show-toplevel"])).trim();
-  const commonDir = (await gitOk(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"])).trim();
+  const commonDir = await commonDirOf(cwd);
   const head = (await gitOk(cwd, ["rev-parse", "HEAD"])).trim();
   const dirty = (await gitOk(cwd, ["status", "--porcelain"])).trim() !== "";
   // The main worktree's directory name, even when called from a linked worktree.
@@ -74,13 +74,12 @@ export async function commitAll(cwd: string, message: string): Promise<boolean> 
   return true;
 }
 
-export interface BranchFacts { head: string; commits: string[]; diffStat: string; files: string[] }
+export interface BranchFacts { commits: string[]; diffStat: string; files: string[] }
+
+const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 
 export async function branchFacts(cwd: string, base: string): Promise<BranchFacts> {
-  const head = (await gitOk(cwd, ["rev-parse", "HEAD"])).trim();
-  const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
   return {
-    head,
     commits: lines(await gitOk(cwd, ["log", "--oneline", "--no-decorate", `${base}..HEAD`])),
     diffStat: await gitOk(cwd, ["diff", "--stat", `${base}..HEAD`]),
     files: lines(await gitOk(cwd, ["diff", "--name-only", `${base}..HEAD`])),
@@ -89,8 +88,7 @@ export async function branchFacts(cwd: string, base: string): Promise<BranchFact
 
 /** One-line commits on `branch` since `base`; needs no worktree, so it works after a crash or /crew-clean. */
 export async function branchCommits(cwd: string, base: string, branch: string): Promise<string[]> {
-  return (await gitOk(cwd, ["log", "--oneline", "--no-decorate", `${base}..${branch}`]))
-    .split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines(await gitOk(cwd, ["log", "--oneline", "--no-decorate", `${base}..${branch}`]));
 }
 
 /** Paths with uncommitted changes (tracked or untracked, not ignored). */
@@ -146,6 +144,16 @@ export async function mergeBranch(cwd: string, branch: string, message: string):
   const conflicts = (await git(cwd, ["diff", "--name-only", "--diff-filter=U"])).stdout.split("\n").filter(Boolean);
   await git(cwd, ["merge", "--abort"]);
   return { ok: false, conflicts, output: (r.stdout + r.stderr).trim() };
+}
+
+/** Run `commands` in order until one is aborted; returns the results of those that ran. */
+export async function runChecks(cwd: string, commands: string[], timeoutMs: number, signal: AbortSignal): Promise<CheckResult[]> {
+  const results: CheckResult[] = [];
+  for (const command of commands) {
+    if (signal.aborted) break;
+    results.push(await runCheck(cwd, command, timeoutMs, signal));
+  }
+  return results;
 }
 
 /** Run a shell check; keep only the tail so failures don't flood the planner's context. */
