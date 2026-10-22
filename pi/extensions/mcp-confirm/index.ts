@@ -14,7 +14,7 @@ export default function (pi: ExtensionAPI) {
   try {
     extraReadOnly = loadAllowlist(ALLOWLIST);
   } catch (error) {
-    console.error(`mcp-confirm: ignoring allowlist: ${(error as Error).message}`);
+    console.error(`mcp-confirm: ignoring allowlist: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   pi.on("tool_call", async (event, ctx) => {
@@ -26,8 +26,7 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) {
       return { block: true, reason: `${event.toolName} may modify data and needs confirmation, but no UI is available` };
     }
-    const input = "input" in event ? event.input : undefined;
-    const ok = await ctx.ui.confirm(`Allow ${event.toolName}?`, JSON.stringify(input, null, 2));
+    const ok = await ctx.ui.confirm(`Allow ${event.toolName}?`, JSON.stringify(event.input, null, 2));
     if (!ok) return { block: true, reason: `User declined ${event.toolName}` };
   });
 }
