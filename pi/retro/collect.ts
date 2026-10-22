@@ -27,6 +27,10 @@ export interface SessionSummary { source: Source; file: string; cwd: string; use
 // Short user messages that push back on what the agent just did.
 const CORRECTION = /^\s*(no\b|nope\b|don'?t\b|do not\b|stop\b|actually\b|wait\b|undo\b|revert\b|wrong\b|that'?s (wrong|not)|not what|i said\b|i meant\b|why did you\b|you (didn'?t|forgot|should|shouldn'?t)\b|instead\b)/i;
 
+// Claude Code records a tool call the user declined as a failed tool_result with this preamble.
+const REJECTED = /^(Error: )?The user doesn't want to proceed with this tool use\./;
+const USER_SAID = /the user said:\n([\s\S]*)$/;
+
 const clip = (s: string, n = 160) => {
   const one = s.replace(/\s+/g, " ").trim();
   return one.length > n ? `${one.slice(0, n - 1)}…` : one;
@@ -46,29 +50,39 @@ function describeCall(name: string, args: unknown): string {
 
 interface Call { name: string; args: string; desc: string; ref: Ref }
 
-/** Parse one transcript. Unknown lines are skipped, never fatal. */
-export function analyze(file: string, text: string, source: Source): { summary: SessionSummary; signals: Signal[] } {
+/** Parse one transcript. Unknown lines are skipped, never fatal. Events stamped before sinceMs are ignored. */
+export function analyze(file: string, text: string, source: Source, sinceMs = 0): { summary: SessionSummary; signals: Signal[] } {
   const summary: SessionSummary = { source, file, cwd: "", userMessages: 0, toolCalls: 0, errors: 0 };
   const signals: Signal[] = [];
   const calls = new Map<string, Call>();
   const seen = new Map<string, { count: number; call: Call }>();
   const lines = text.split("\n");
 
+  let inWindow = true;
   const onCall = (id: string, name: string, args: unknown, line: number) => {
-    summary.toolCalls++;
     const call: Call = { name, args: JSON.stringify(args ?? {}), desc: describeCall(name, args), ref: { file, line } };
-    calls.set(id, call);
+    calls.set(id, call); // even before the window, so a result inside it can name its call
+    if (!inWindow) return;
+    summary.toolCalls++;
     const key = `${name} ${call.args}`;
     const prev = seen.get(key);
     seen.set(key, { count: (prev?.count ?? 0) + 1, call: prev?.call ?? call });
   };
   const onResult = (id: string, isError: boolean, content: unknown, line: number) => {
-    if (!isError) return;
-    summary.errors++;
+    if (!isError || !inWindow) return;
     const call = calls.get(id);
-    signals.push({ kind: "error", source, cwd: summary.cwd, ref: { file, line }, tool: call?.name, detail: `${call?.desc ?? "?"} → ${clip(textOf(content) || String(content ?? ""))}` });
+    const text = textOf(content) || String(content ?? "");
+    if (source === "claude" && REJECTED.test(text)) {
+      // A bare rejection is followed by an "[Request interrupted …]" message, which records the interrupt.
+      const said = USER_SAID.exec(text)?.[1];
+      if (said) onUser(said, line);
+      return;
+    }
+    summary.errors++;
+    signals.push({ kind: "error", source, cwd: summary.cwd, ref: { file, line }, tool: call?.name, detail: `${call?.desc ?? "?"} → ${clip(text)}` });
   };
   const onUser = (text: string, line: number) => {
+    if (!inWindow) return;
     if (!text.trim() || text.startsWith("<") || text.startsWith("Task: ")) return;
     summary.userMessages++;
     if (/\[Request interrupted by user/.test(text)) {
@@ -83,28 +97,32 @@ export function analyze(file: string, text: string, source: Source): { summary: 
     let e: any;
     try { e = JSON.parse(raw); } catch { return; }
     if (!e || typeof e !== "object") return;
+    if (source === "pi" && e.type === "session" && typeof e.cwd === "string") summary.cwd = e.cwd;
+    if (source === "claude" && typeof e.cwd === "string" && !summary.cwd) summary.cwd = e.cwd;
+    // Long-running sessions keep old events in a recently modified file.
+    const at = typeof e.timestamp === "string" ? Date.parse(e.timestamp) : NaN;
+    inWindow = !(sinceMs && at < sinceMs);
     if (source === "pi") {
-      if (e.type === "session" && typeof e.cwd === "string") summary.cwd = e.cwd;
       if (e.type !== "message" || !e.message) return;
       const m = e.message;
       if (m.role === "user") onUser(textOf(m.content), line);
       if (m.role === "assistant") {
-        for (const p of m.content ?? []) if (p?.type === "toolCall") onCall(p.id, p.name, p.arguments, line);
-        if (m.stopReason === "aborted") signals.push({ kind: "abort", source, cwd: summary.cwd, ref: { file, line }, detail: "user aborted the agent mid-response" });
+        for (const p of Array.isArray(m.content) ? m.content : []) if (p?.type === "toolCall") onCall(p.id, p.name, p.arguments, line);
+        if (m.stopReason === "aborted" && inWindow) signals.push({ kind: "abort", source, cwd: summary.cwd, ref: { file, line }, detail: "user aborted the agent mid-response" });
       }
       if (m.role === "toolResult") onResult(m.toolCallId, m.isError === true, m.content, line);
     } else {
-      if (typeof e.cwd === "string" && !summary.cwd) summary.cwd = e.cwd;
       const content = e.message?.content;
       if (e.type === "assistant" && Array.isArray(content)) {
         for (const p of content) if (p?.type === "tool_use") onCall(p.id, p.name, p.input, line);
       }
       if (e.type === "user") {
-        if (typeof content === "string") onUser(content, line);
+        // A subagent's transcript opens with the parent agent's prompt, not the user's.
+        if (typeof content === "string") { if (!e.isSidechain) onUser(content, line); }
         else if (Array.isArray(content)) {
           const results = content.filter((p) => p?.type === "tool_result");
           for (const p of results) onResult(p.tool_use_id, p.is_error === true, p.content, line);
-          if (!results.length && !e.isMeta) onUser(textOf(content), line);
+          if (!results.length && !e.isMeta && !e.isSidechain) onUser(textOf(content), line);
         }
       }
     }
@@ -123,7 +141,11 @@ function walk(dir: string, sinceMs: number, out: string[] = []): string[] {
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) walk(path, sinceMs, out);
-    else if (entry.name.endsWith(".jsonl") && statSync(path).mtimeMs >= sinceMs) out.push(path);
+    else if (entry.name.endsWith(".jsonl")) {
+      let mtime;
+      try { mtime = statSync(path).mtimeMs; } catch { continue; } // dangling symlink
+      if (mtime >= sinceMs) out.push(path);
+    }
   }
   return out;
 }
@@ -144,7 +166,9 @@ export function clusterErrors(signals: Signal[]): { key: string; count: number; 
   const groups = new Map<string, Signal[]>();
   for (const s of signals.filter((x) => x.kind === "error")) {
     const key = `${s.tool ?? "?"}: ${commandShape(s.detail.split(" → ")[0], s.tool)}`;
-    groups.set(key, [...(groups.get(key) ?? []), s]);
+    const list = groups.get(key);
+    if (list) list.push(s);
+    else groups.set(key, [s]);
   }
   return [...groups.entries()]
     .map(([key, list]) => ({ key, count: list.length, sessions: new Set(list.map((s) => s.ref.file)).size, example: list[0] }))
@@ -196,7 +220,7 @@ function main(argv: string[]) {
   const signals: Signal[] = [];
   for (const [source, root] of roots) {
     for (const file of walk(root, since)) {
-      const result = analyze(file, readFileSync(file, "utf8"), source);
+      const result = analyze(file, readFileSync(file, "utf8"), source, since);
       summaries.push(result.summary);
       signals.push(...result.signals);
     }

@@ -76,3 +76,68 @@ test("runs as a script through a symlink, as /retro invokes it", () => {
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   assert.match(out, /# Agent friction signals, last 1 days\n\n1 sessions \(1 Pi, 0 Claude Code\)/);
 });
+
+test("claude: a rejected tool call is the user steering, not a tool failure", () => {
+  const rejected = "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file).";
+  const text = j(
+    { type: "assistant", cwd: "/w", message: { content: [{ type: "tool_use", id: "t1", name: "Edit", input: { file_path: "dev.nix" } }, { type: "tool_use", id: "t2", name: "Bash", input: { command: "git push" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", is_error: true, content: `${rejected} To tell you how to proceed, the user said:\nactually this isn't a good fit for dev.nix` }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t2", is_error: true, content: rejected }] } },
+    // Claude Code follows a bare rejection with this marker, so it alone stands for the interrupt.
+    { type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user for tool use]" }] } },
+  );
+  const { summary, signals } = analyze("/s/c.jsonl", text, "claude");
+  assert.deepEqual([summary.errors, summary.userMessages], [0, 2]);
+  assert.ok(signals.some((s) => s.kind === "correction" && s.detail === "actually this isn't a good fit for dev.nix"));
+  assert.equal(signals.filter((s) => s.kind === "abort").length, 1);
+  assert.ok(!signals.some((s) => s.kind === "error"));
+});
+
+test("claude: subagent (sidechain) prompts aren't the user", () => {
+  const text = j({ type: "user", isSidechain: true, cwd: "/w", message: { role: "user", content: "Don't modify files; list the failing tests." } });
+  const { summary, signals } = analyze("/s/agent-1.jsonl", text, "claude");
+  assert.deepEqual([summary.userMessages, signals.length], [0, 0]);
+});
+
+test("unexpected content shapes are skipped, not fatal", () => {
+  const text = j(
+    { type: "message", message: { role: "assistant", content: {} } },
+    { type: "message", message: { role: "user", content: 7 } },
+  );
+  assert.doesNotThrow(() => analyze("/s/p.jsonl", text, "pi"));
+  assert.doesNotThrow(() => analyze("/s/c.jsonl", j({ type: "assistant", message: { content: [null] } }), "claude"));
+});
+
+test("only events inside the window count, even in a long-running session", () => {
+  const old = "2026-01-05T10:00:00.000Z";
+  const now = "2026-10-20T10:00:00.000Z";
+  const text = j(
+    { type: "session", cwd: "/repo", timestamp: old },
+    { type: "message", timestamp: old, message: { role: "assistant", content: [{ type: "toolCall", id: "a", name: "bash", arguments: { command: "x" } }] } },
+    { type: "message", timestamp: old, message: { role: "toolResult", toolCallId: "a", isError: true, content: "boom" } },
+    { type: "message", timestamp: now, message: { role: "user", content: "no, stop" } },
+  );
+  const { summary, signals } = analyze("/s/p.jsonl", text, "pi", Date.parse("2026-10-13T00:00:00Z"));
+  assert.deepEqual([summary.cwd, summary.toolCalls, summary.errors, summary.userMessages], ["/repo", 0, 0, 1]);
+  assert.deepEqual(signals.map((s) => s.kind), ["correction"]);
+});
+
+test("a dangling .jsonl symlink doesn't stop the run", () => {
+  const dir = mkdtempSync(join(tmpdir(), "retro-"));
+  mkdirSync(join(dir, "pi"), { recursive: true });
+  symlinkSync(join(dir, "nonexistent"), join(dir, "pi", "dead.jsonl"));
+  const out = execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), "collect.ts"), "--pi", join(dir, "pi"), "--claude", join(dir, "none")],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  assert.match(out, /0 sessions/);
+});
+
+test("a result inside the window still names a call made just before it", () => {
+  const text = j(
+    { type: "message", timestamp: "2026-10-12T23:59:59.000Z", message: { role: "assistant", content: [{ type: "toolCall", id: "a", name: "bash", arguments: { command: "make" } }] } },
+    { type: "message", timestamp: "2026-10-13T00:00:01.000Z", message: { role: "toolResult", toolCallId: "a", isError: true, content: "boom" } },
+  );
+  const { summary, signals } = analyze("/s/p.jsonl", text, "pi", Date.parse("2026-10-13T00:00:00Z"));
+  assert.deepEqual([summary.toolCalls, summary.errors], [0, 1]);
+  assert.equal(signals[0].tool, "bash");
+  assert.match(signals[0].detail, /^bash make → boom/);
+});
