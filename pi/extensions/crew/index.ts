@@ -151,8 +151,6 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   }
 
   function activate() {
-    // A start or resume still draining at session_shutdown must not start timers nothing will stop.
-    if (shuttingDown) return;
     toolsBefore ??= pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t));
     crewAbort = new AbortController();
     // The planner gets read tools and crew tools only. Cursor's executor broke down
