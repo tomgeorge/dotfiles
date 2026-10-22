@@ -95,3 +95,11 @@ pi stores the tokens in `~/.pi/agent/mcp-auth.json`.
   fewer, set `oauth.scope` to its user scopes, separated by spaces.
 - Client secret errors: the app doesn't use PKCE. Add `oauth.clientSecret`,
   which accepts `${VAR}` or `!command`.
+
+## Allowlist
+
+`readonly.json` lists MCP tools you vouch for as read-only when their server
+doesn't mark them (exact names, or a prefix ending in `*`). They run without
+confirmation, including in print mode, which headless jobs like `pi/checkin`
+rely on. Fantastical's `get_*` and `search_events` tools are listed because
+the server sets no hints. Keep the list short: a wrong entry lets a write through.

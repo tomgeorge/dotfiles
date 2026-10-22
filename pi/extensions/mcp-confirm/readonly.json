@@ -1,0 +1,7 @@
+{
+  "comment": "MCP tools I vouch for as read-only although their server doesn't set readOnlyHint. Exact names, or a prefix ending in *. Keep this short; anything listed runs without confirmation, including headless.",
+  "tools": [
+    "mcp__fantastical__get_*",
+    "mcp__fantastical__search_events"
+  ]
+}
