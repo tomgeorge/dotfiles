@@ -61,7 +61,10 @@ test("a live child is killed directly when its group looks gone", { timeout: 10_
   }) as typeof process.kill;
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 100);
-  const r = await run("setInterval(() => {}, 1000);", 5000, controller.signal);
+  // The child exits by itself after 4 s so a broken fallback fails this test instead of hanging the file.
+  const started = Date.now();
+  const r = await run("setInterval(() => {}, 1000); setTimeout(() => process.exit(0), 4000);", 5000, controller.signal);
+  assert.ok(Date.now() - started < 2000, "child.kill stopped the worker before it exited by itself");
   assert.equal(r.status, "cancelled");
   assert.equal(r.error, "cancelled", "an already-gone group is not reported as a failure");
 });
