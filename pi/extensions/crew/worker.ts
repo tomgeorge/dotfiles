@@ -115,6 +115,7 @@ export function runWorker(
     const timer = setTimeout(() => stop("timeout", `timed out after ${Math.round(options.timeoutMs / 60000)} min`), options.timeoutMs);
     options.signal?.addEventListener("abort", abort, { once: true });
 
+    // A live output tail for the crew panel would keep a bounded ring of these events here.
     const handle = (line: string) => {
       if (!line.trim()) return;
       progress.lastEventAt = Date.now();

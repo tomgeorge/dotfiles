@@ -15,7 +15,8 @@ It is independent of the [`subagent`](../subagent/) extension, which stays read-
 
 ```text
 /crew <goal>       # start: pick worker and reviewer models, concurrency, and budget
-/crew-status       # ledger: tasks, status, spend, liveness
+/crew              # no goal: open the panel of the current or last unfinished crew
+/crew-status       # open the crew panel; prints the text ledger in print mode
 /crew-stop         # cancel running workers (worktrees kept) and leave planner mode
 /crew-resume [slug]  # resume a stopped or interrupted crew in this repo
 /crew-clean        # delete the worktrees and branches of finished tasks
@@ -30,6 +31,57 @@ Uncommitted changes in your checkout are not included. `/crew` warns you about t
 Before merging, `/review-loop crew` (from [`pi/prompts`](../../prompts/review-loop.md)) can review
 the integration branch with three reviewers that share no context, fix what they find, and
 repeat. Its fixes are left uncommitted in the integration worktree.
+
+## Panel
+
+`ctrl+shift+c` or `/crew-status` opens a panel over the session, on the crew in this session or
+else the newest one in this repository's ledger. `/crew` with no goal does the same for an
+unfinished crew.
+
+```text
+ Crew add-theme-2zw1 active · Add a lazygit-like theme to every panel
+ crew/add-theme-2zw1 · 2/3 running · $1.13/$10.00 █░░░░░░░░░
+ worker anthropic/claude-sonnet · reviewer same
+┌─ Tasks 4 ──────────────────────────────────────┐┌─ #2 implement Port the widget ─────────────────┐
+│ ● #1 Add the theme    4m10s  $0.41  integrated ││ [1 Overview] 2 Spec 3 Handoff 4 Checks 5 Diff  │
+│▸⠋ #2 Port the widget  3m20s  $0.38  edit src/w…││ status       running                           │
+│ ⠋ #3 Port the panel   3m20s  $0.22  quiet 2m ·…││ kind         implement                         │
+│ ✓ #4 Review #1          40s  $0.12  submitted  ││ model        anthropic/claude-sonnet           │
+│                                                ││ branch       crew/add-theme-2zw1-t2            │
+└────────────────────────────────────────────────┘└────────────────────────────────────── 1-11/15 ─┘
+```
+
+The list shows each task's status, kind, title, elapsed time, cost, and activity. A running task
+with no stream event for over a minute shows `quiet 2m` in the warning colour, and in the error
+colour once it passes `stallMin`. The details pane has five tabs:
+
+1. **Overview**: status, model, branch, base, worktree, timings, cost, tool count, paths, acceptance.
+2. **Spec**: the spec the worker received.
+3. **Handoff**: the worker's claims and what the harness observed, as separate sections.
+4. **Checks**: each check's verdict. Failing output starts open; `enter` opens or closes one.
+5. **Diff**: `git diff <base>..<branch>`. A review shows the diff of the task it reviews.
+
+| Key | Action |
+|---|---|
+| type, `/` | Filter by title, id, status, kind, or branch |
+| `j`/`k`, arrows | Move; in the details, scroll |
+| `enter`, `l` / `h` | Focus the details / back to the list |
+| `tab`, `1`-`5` | Switch tab |
+| `ctrl+d`/`ctrl+u` | Page the details |
+| `ctrl+o` | Zoom the details to the full panel |
+| `x` | Cancel the selected running task, after a `y` to confirm. Its handoff wakes the planner |
+| `o` | Copy the selected task's worktree path |
+| `?` | Help |
+| `esc` | Clear the filter, then close |
+
+The panel is read-only apart from `x`: integrating and dispatching stay with the planner. While
+the crew runs in this session, the panel reads its in-memory state, which is fresher than the
+ledger for running tasks. A crew from the ledger is re-read every 2 seconds. Diffs are loaded
+only for the task and tab on screen, and cached per branch tip. The panel never waits on the
+planner, so handoffs keep waking it while the panel is open.
+
+`ctrl+shift+c` needs a terminal that reports modifier keys (kitty keyboard protocol, as in
+Ghostty). On Linux, many terminals bind it to copy; use `/crew` there.
 
 ## How it works
 
@@ -113,6 +165,15 @@ and branches.
 - **Ledger can drift.** A task may stay `submitted` after you finish its work by hand. Recover
   with `/crew-status`, re-dispatch, or `/crew-clean`.
 - **One crew per session**, and planner spend isn't budgeted.
+
+## Follow-ups
+
+- **Live worker output.** The panel only has each worker's `activity` and counters. A live tail
+  needs a bounded ring buffer of stream events per worker, filled in `handle` in `worker.ts` and
+  passed up through `onProgress`.
+- **Crew workers in `/subagents`.**
+- **Better slugs.** `slugify` uses the goal's opening words (`i-d-like-to-add-a-theme-that-cop-2zw1`).
+  Drop filler words, or add `/crew --name`.
 
 ## Checks
 

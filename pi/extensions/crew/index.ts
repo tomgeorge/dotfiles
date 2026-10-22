@@ -1,15 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type KeyId } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
   mergeBranch, outsidePaths, removeWorktree, repoInfo, runCheck, worktreePath,
 } from "./git.ts";
 import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
+import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
-  formatStatus, listCrews, runningTasks, saveState, slugify, spent,
+  formatStatus, listCrews, loadState, runningTasks, saveState, slugify, spent,
   type CrewState, type ModelRef, type TaskRecord,
 } from "./state.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
@@ -26,6 +28,48 @@ const SWEEP_MS = 30_000;
 const RENDER_MS = 1_000;
 const REVIEW_DIFF_BYTES = 60_000;
 const DEFAULTS = { maxConcurrent: 3, budgetUsd: 10, taskTimeoutMin: 45, stallMin: 10 };
+// Free in Pi's defaults and in Ghostty on macOS; Linux terminals often bind it to copy.
+const PANEL_KEY = "ctrl+shift+c";
+const PANEL_TICK_MS = 500;
+// A crew that isn't live in this session is re-read from its ledger at most this often.
+const LEDGER_RELOAD_MS = 2_000;
+
+// First match wins. Printable keys that aren't listed go to the panel as characters.
+const PANEL_KEYS: [KeyId[], PanelKey][] = [
+  [["up", "ctrl+p"], "up"],
+  [["down", "ctrl+n"], "down"],
+  [["pageUp", "ctrl+u"], "pageUp"],
+  [["pageDown", "ctrl+d"], "pageDown"],
+  [["home"], "top"],
+  [["end"], "bottom"],
+  [["enter", "right"], "enter"],
+  [["left"], "left"],
+  [["escape"], "escape"],
+  [["tab"], "tab"],
+  [["shift+tab"], "backTab"],
+  [["backspace"], "backspace"],
+  [["ctrl+o"], "zoom"],
+  [["ctrl+c", PANEL_KEY], "close"],
+];
+
+function panelStyle(theme: Theme): Style {
+  return {
+    fg: (tone, text) => theme.fg(tone, text),
+    bold: (text) => theme.bold(text),
+    selected: (text) => theme.bg("selectedBg", text),
+    width: visibleWidth,
+    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
+    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
+  };
+}
+
+function panelEvent(data: string): PanelInput | undefined {
+  const key = PANEL_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1];
+  if (key) return { key };
+  // Kitty's keyboard protocol sends even plain letters as escape sequences.
+  const char = data.length === 1 && data >= " " && data !== "\x7f" ? data : decodeKittyPrintable(data);
+  return char ? { char } : undefined;
+}
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
 const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
@@ -49,6 +93,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   let switching = false;
   // Planner-tool checks (post-merge, crew_finish) stop with the crew; workers have their own controllers.
   let crewAbort = new AbortController();
+  let panelOpen = false;
+  let closePanel: (() => void) | undefined;
 
   const isActive = () => crew?.status === "active";
 
@@ -80,7 +126,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     }
     const now = Date.now();
     const running = runningTasks(crew);
-    const lines = [`crew ${crew.config.slug} · ${running.length}/${crew.config.maxConcurrent} running · $${spent(crew).toFixed(2)}/$${crew.config.budgetUsd.toFixed(2)} · /crew-status`];
+    const lines = [`crew ${crew.config.slug} · ${running.length}/${crew.config.maxConcurrent} running · $${spent(crew).toFixed(2)}/$${crew.config.budgetUsd.toFixed(2)} · ${PANEL_KEY} or /crew`];
     for (const t of running) {
       const secs = Math.round((now - t.startedAt) / 1000);
       const quiet = Math.round((now - t.lastEventAt) / 1000);
@@ -457,6 +503,117 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     })()),
   });
 
+  // ---- panel -------------------------------------------------------------
+
+  /** The in-session crew, else the newest crew in the ledger of this repo. `unfinished` skips finished ones. */
+  async function panelCrew(ctx: ExtensionContext, unfinished = false): Promise<CrewState | undefined> {
+    const open = (s: CrewState) => !unfinished || s.status !== "finished";
+    if (crew && open(crew)) return crew;
+    try {
+      return listCrews(await commonDirOf(ctx.cwd)).find(open);
+    } catch {
+      return undefined; // not a git repository
+    }
+  }
+
+  async function copyPath(path: string): Promise<string> {
+    try {
+      // Imported here so the tests, which have no Pi runtime, never load it.
+      const { copyToClipboard } = await import("@earendil-works/pi-coding-agent");
+      await copyToClipboard(path);
+      return `Copied ${path}`;
+    } catch {
+      return path;
+    }
+  }
+
+  /** Show the panel. Resolves once it's up, not when it closes: Pi blocks the editor while a command handler runs. */
+  async function openPanel(ctx: ExtensionContext, found?: CrewState) {
+    if (!ctx.hasUI || panelOpen) return;
+    // Claimed before the await so a double press opens one panel.
+    panelOpen = true;
+    const initial = found ?? await panelCrew(ctx);
+    if (!initial) {
+      panelOpen = false;
+      return ctx.ui.notify("No crews in this repository. Start one with /crew <goal>.", "info");
+    }
+    const { slug, commonDir } = initial.config;
+    let ledger = initial;
+    let loadedAt = Date.now();
+    // Memory is fresher than the ledger for running tasks (cost, activity, last event).
+    const current = (): CrewState => {
+      if (crew?.config.slug === slug) return crew;
+      if (Date.now() - loadedAt >= LEDGER_RELOAD_MS) {
+        loadedAt = Date.now();
+        try { ledger = loadState(commonDir, slug); } catch { /* keep the last good copy */ }
+      }
+      return ledger;
+    };
+    // Per panel: task ids repeat across crews.
+    const diffs = new DiffCache();
+    void ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
+      closePanel = done;
+      const style = panelStyle(theme);
+      const state = initialPanel(initial);
+      let frame = 0;
+      let page = 1;
+      // The panel never awaits planner work, so handoffs keep waking the planner while it's open.
+      const ticker = setInterval(() => { frame++; tui.requestRender(); }, PANEL_TICK_MS);
+      const diff = (task: TaskRecord) => {
+        const target = diffTarget(current(), task);
+        if ("message" in target) return { state: "unavailable" as const, message: target.message };
+        return diffs.get(task.id, current().config.repoRoot, target.base, target.branch, () => tui.requestRender());
+      };
+      return {
+        render(width: number) {
+          const height = Math.max(12, Math.floor(tui.terminal.rows * 0.85));
+          const out = panelLines(current(), state, Date.now(), width, height, style, { diff, frame, closeHint: `${PANEL_KEY} close` });
+          page = out.page;
+          return out.lines;
+        },
+        handleInput(data: string) {
+          const event = panelEvent(data);
+          if (!event) return;
+          const shown = current();
+          const live = shown === crew && isActive();
+          const action = panelInput(state, shown.tasks, event, { page, live });
+          if (action.type === "close") return done();
+          if (action.type === "cancel") {
+            const controller = live ? controllers.get(action.id) : undefined;
+            // Not quiet: the planner should hear that the human stopped a task.
+            controller?.abort();
+            state.flash = controller ? { text: `Cancelling #${action.id}; its handoff will wake the planner`, tone: "warning" }
+              : { text: `#${action.id} is no longer running`, tone: "dim" };
+          }
+          if (action.type === "open") {
+            const task = shown.tasks.find((t) => t.id === action.id);
+            if (!task?.worktree) state.flash = { text: `#${action.id} has no worktree`, tone: "warning" };
+            else {
+              const path = task.worktree;
+              state.flash = { text: path, tone: "accent" };
+              void copyPath(path).then((text) => {
+                if (state.flash?.text === path) state.flash = { text, tone: "accent" };
+                tui.requestRender();
+              });
+            }
+          }
+          tui.requestRender();
+        },
+        invalidate() {},
+        dispose() {
+          clearInterval(ticker);
+        },
+      };
+    }, { overlay: true, overlayOptions: { anchor: "center", width: "95%", minWidth: 60, maxHeight: "85%" } })
+      .catch((error: unknown) => warn(`crew panel: ${(error as Error).message}`))
+      .finally(() => { panelOpen = false; closePanel = undefined; });
+  }
+
+  pi.registerShortcut(PANEL_KEY, {
+    description: "Open the crew panel",
+    handler: (ctx) => openPanel(ctx),
+  });
+
   // ---- commands ----------------------------------------------------------
 
   async function pickModel(ctx: ExtensionContext, title: string, first?: string): Promise<ModelRef | undefined> {
@@ -468,8 +625,12 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   }
 
   pi.registerCommand("crew", {
-    description: "Start a crew: a planner (this session) delegating to worktree workers. /crew <goal>",
+    description: `Start a crew: a planner (this session) delegating to worktree workers. /crew <goal>. With no goal, open the current or last unfinished crew's panel (${PANEL_KEY})`,
     handler: (args, ctx) => switchCrew(ctx, async () => {
+      if (!args.trim() && ctx.hasUI) {
+        const found = await panelCrew(ctx, true);
+        if (found) return openPanel(ctx, found);
+      }
       if (!ctx.hasUI) throw new Error("/crew needs an interactive UI to confirm models and budget");
       if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active. /crew-stop it first.`);
       await drain(ctx);
@@ -508,14 +669,11 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   });
 
   pi.registerCommand("crew-status", {
-    description: "Show the crew ledger",
+    description: `Open the crew panel (${PANEL_KEY}); prints the ledger without a UI`,
     async handler(_args, ctx) {
-      let state = crew;
-      try {
-        state ??= listCrews(await commonDirOf(ctx.cwd))[0];
-      } catch {
-        state = undefined; // not a git repository
-      }
+      const state = await panelCrew(ctx);
+      // The text ledger stays for print mode and the planner's crew_status tool.
+      if (ctx.hasUI && state) return openPanel(ctx, state);
       const message = state ? formatStatus(state) : "No crews in this repository";
       if (ctx.hasUI) ctx.ui.notify(message, "info");
       else console.log(message);
@@ -583,6 +741,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   pi.on("session_shutdown", async () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    closePanel?.();
     clearInterval(sweepTimer);
     clearInterval(renderTimer);
     for (const timer of wakeTimers) clearTimeout(timer);

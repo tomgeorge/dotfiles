@@ -8,9 +8,26 @@ const STUB = `data:text/javascript,${encodeURIComponent(`
   export const Type = any;
   export const StringEnum = () => ({});
 `)}`;
+// pi-tui, likewise: plain-text stand-ins, one column per code point, keys matched by their raw text.
+const TUI_STUB = `data:text/javascript,${encodeURIComponent(`
+  export const visibleWidth = (s) => [...s].length;
+  export const truncateToWidth = (s, w, e = "…", pad = false) => {
+    const c = [...s];
+    const cut = c.length > w ? c.slice(0, Math.max(0, w - 1)).join("") + (w > 0 ? e : "") : s;
+    return pad ? cut + " ".repeat(Math.max(0, w - [...cut].length)) : cut;
+  };
+  export const wrapTextWithAnsi = (s, w) => s.split("\\n").flatMap((line) => {
+    const out = [];
+    for (let i = 0; i < Math.max(1, line.length); i += w) out.push(line.slice(i, i + w));
+    return out;
+  });
+  export const matchesKey = (data, id) => data === id;
+  export const decodeKittyPrintable = () => undefined;
+`)}`;
 registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "typebox" || specifier === "@earendil-works/pi-ai") return { url: STUB, shortCircuit: true };
+    if (specifier === "@earendil-works/pi-tui") return { url: TUI_STUB, shortCircuit: true };
     return next(specifier, context);
   },
 });
@@ -23,6 +40,7 @@ export function fakePi() {
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, any>();
   const commands = new Map<string, any>();
+  const shortcuts = new Map<string, any>();
   const sent: Sent[] = [];
   const entries: { type: "custom"; customType: string; data: unknown }[] = [];
   const notes: string[] = [];
@@ -30,6 +48,7 @@ export function fakePi() {
   const pi = {
     registerTool(tool: any) { tools.set(tool.name, tool); active.push(tool.name); },
     registerCommand(name: string, command: any) { commands.set(name, command); },
+    registerShortcut(key: string, shortcut: any) { shortcuts.set(key, shortcut); },
     on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
     sendMessage(message: Sent["message"], options?: Sent["options"]) { sent.push({ message, options }); },
     appendEntry(customType: string, data: unknown) { entries.push({ type: "custom", customType, data }); },
@@ -48,7 +67,7 @@ export function fakePi() {
     ...extra,
   });
   return {
-    pi: pi as any, tools, commands, sent, entries, notes, ctx,
+    pi: pi as any, tools, commands, shortcuts, sent, entries, notes, ctx,
     active: () => [...active],
     async emit(event: string, payload: unknown, context: unknown) {
       for (const handler of handlers.get(event) ?? []) await handler(payload, context);
