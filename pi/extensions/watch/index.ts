@@ -1,6 +1,11 @@
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import {
+  anyChecking, initialPopup, popupKey, popupLines, widgetLines, WatchStore,
+  type PopupKey, type PopupState, type Style,
+} from "./panel.ts";
 import { runCheck } from "./runner.ts";
 import {
   buildSpec, DELIVER, formatDuration, oneLine, parseArgs, Registry, tail, UNTIL,
@@ -10,6 +15,38 @@ import {
 type Message = { customType: string; content: string; display: boolean; details: unknown };
 
 const FIRST_CHECK_WAIT_MS = 10_000;
+const PANEL_KEY = "ctrl+shift+w";
+const WIDGET_KEY = "watches";
+// Fast while a check runs (spinner), slow otherwise (countdowns): watches can
+// live for hours, so don't redraw at spinner speed the whole time.
+const SPINNER_MS = 120;
+const IDLE_TICK_MS = 1_000;
+
+function makeStyle(theme: Theme): Style {
+  return {
+    fg: (tone, text) => theme.fg(tone, text),
+    bold: (text) => theme.bold(text),
+    selected: (text) => theme.bg("selectedBg", text),
+    width: visibleWidth,
+    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
+    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
+  };
+}
+
+// First match wins; letters mirror lazygit/vim, as in /subagents.
+const POPUP_KEYS: [KeyId[], PopupKey][] = [
+  [["up", "k"], "up"],
+  [["down", "j"], "down"],
+  [["pageUp", "ctrl+u"], "pageUp"],
+  [["pageDown", "ctrl+d"], "pageDown"],
+  [["home", "g"], "top"],
+  [["end", "shift+g"], "bottom"],
+  [["enter", "tab", "l", "right"], "enter"],
+  [["escape", "h", "left"], "back"],
+  [["a"], "toggle"],
+  [["x"], "stop"],
+  [["q", "ctrl+c", PANEL_KEY], "close"],
+];
 
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
@@ -25,27 +62,105 @@ export default function (pi: ExtensionAPI) {
   const startingByTool = new Map<Watch, string | undefined>();
 
   const registry = new Registry(runCheck, { onFire, onEnd, onUpdate });
+  // Every watch this session, ended ones included, for the widget and popup.
+  const store = new WatchStore();
   const exit = (result: RunResult) => result.killed ? "killed" : `exit ${result.code}`;
+  let frame = 0;
+  let ticker: ReturnType<typeof setTimeout> | undefined;
+  let widgetTui: TUI | undefined;
+  let widgetCtx: ExtensionContext | undefined;
+  let popupOpen = false;
+
+  function tick() {
+    frame++;
+    widgetTui?.requestRender();
+    ticker = setTimeout(tick, anyChecking(store.list()) ? SPINNER_MS : IDLE_TICK_MS);
+  }
+
+  /** Show the below-editor widget while watches are active. */
+  function syncWidget() {
+    if (shuttingDown || !ctx?.hasUI) return;
+    const active = store.active().length > 0;
+    if (active && !widgetCtx) {
+      widgetCtx = ctx;
+      ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
+        widgetTui = tui;
+        const component: Component = {
+          render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
+          invalidate() {},
+        };
+        return component;
+      }, { placement: "belowEditor" });
+      tick();
+    } else if (!active && widgetCtx) {
+      clearTimeout(ticker);
+      ticker = undefined;
+      widgetCtx.ui.setWidget(WIDGET_KEY, undefined);
+      widgetCtx = undefined;
+      widgetTui = undefined;
+    } else if (anyChecking(store.list()) && ticker) {
+      // A check just started: pick up spinner speed now, not after the slow tick.
+      clearTimeout(ticker);
+      tick();
+    }
+  }
+
+  async function openPopup(context: ExtensionContext) {
+    if (!context.hasUI || popupOpen) return;
+    popupOpen = true;
+    try {
+      await context.ui.custom<void>((tui, theme, _keybindings, done) => {
+        const state: PopupState = initialPopup(store.list());
+        let page = 1;
+        const unsubscribe = store.subscribe(() => tui.requestRender());
+        // The widget's ticker stops when nothing is active; tick here too.
+        const popupTicker = setInterval(() => { frame++; tui.requestRender(); }, SPINNER_MS);
+        return {
+          render(width) {
+            const height = Math.max(8, Math.floor(tui.terminal.rows * 0.8));
+            const out = popupLines(store.list(), state, Date.now(), width, height, makeStyle(theme), frame);
+            page = out.page;
+            return out.lines;
+          },
+          handleInput(data) {
+            const key = POPUP_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1]
+              ?? (data === "G" ? "bottom" : undefined);
+            if (!key) return;
+            const action = popupKey(state, store.list(), key, page);
+            if (action.type === "close") return done();
+            // Ids are reused: stop only if the id still belongs to this watch.
+            if (action.type === "stop" && registry.get(action.watch.id) === action.watch) registry.stop(action.watch.id);
+            tui.requestRender();
+          },
+          invalidate() {},
+          dispose() {
+            unsubscribe();
+            clearInterval(popupTicker);
+          },
+        };
+      }, { overlay: true, overlayOptions: { anchor: "center", width: "90%", minWidth: 60, maxHeight: "80%" } });
+    } finally {
+      popupOpen = false;
+    }
+  }
 
   // Queued messages count as busy: a new turn now would jump ahead of them.
   const idle = () => !!ctx && ctx.isIdle() && !ctx.hasPendingMessages();
 
   function onUpdate(watch: Watch) {
-    if (shuttingDown || !ctx?.hasUI) return;
-    const parts = [`${watch.kind === "prompt" ? "loop" : "watch"} #${watch.id} ${oneLine(watch.description, 40)}`];
-    if (watch.kind === "command") {
-      parts.push(count(watch.checks, "check"));
-      if (watch.last) parts.push(`last ${exit(watch.last)}`);
-    } else parts.push(count(watch.fires, "run"));
-    if (watch.state === "running") parts.push("checking");
-    else if (watch.state === "due") parts.push("due when idle");
-    else if (watch.nextAt) parts.push(`next ${new Date(watch.nextAt).toLocaleTimeString()}`);
-    ctx.ui.setStatus(`watch-${watch.id}`, parts.join(" · "));
+    if (shuttingDown) return;
+    store.sync(watch);
+    syncWidget();
   }
 
   function onFire(watch: Watch, result: RunResult | undefined) {
     if (shuttingDown) return;
+    store.sync(watch);
+    if (watch.kind === "command") {
+      store.note(watch, watch.until === "success" ? "reported: condition met" : `reported: changed${watch.previous ? ` (was ${exit(watch.previous)})` : ""}`, "success");
+    }
     if (watch.kind === "prompt") {
+      store.note(watch, `iteration ${watch.fires} due`, "warning");
       dueLoops.push(watch.id);
       if (idle()) runDueLoop();
       return;
@@ -65,7 +180,8 @@ export default function (pi: ExtensionAPI) {
     const index = dueLoops.indexOf(watch.id);
     if (index >= 0) dueLoops.splice(index, 1);
     if (shuttingDown) return;
-    if (ctx?.hasUI) ctx.ui.setStatus(`watch-${watch.id}`, undefined);
+    store.end(watch, reason, detail);
+    syncWidget();
     // "met" already reported through onFire; "stopped" was asked for.
     if (reason === "met" || reason === "stopped") return;
     const name = watch.kind === "prompt" ? "Loop" : "Watch";
@@ -111,6 +227,7 @@ export default function (pi: ExtensionAPI) {
     if (id === undefined) return;
     const watch = registry.get(id);
     if (!watch) return runDueLoop();
+    store.note(watch, `iteration ${watch.fires} sent`);
     pi.sendMessage({
       customType: "watch-loop",
       display: true,
@@ -134,7 +251,10 @@ export default function (pi: ExtensionAPI) {
   function start(input: WatchInput, context: ExtensionContext): Watch {
     if (shuttingDown) throw new Error("Session is shutting down");
     ctx = context;
-    return registry.start(buildSpec(input, context.cwd));
+    const watch = registry.start(buildSpec(input, context.cwd));
+    store.add(watch);
+    syncWidget();
+    return watch;
   }
 
   /** One line, so it also works as a select row. */
@@ -203,6 +323,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async () => {
     shuttingDown = true;
+    clearTimeout(ticker);
     registry.stopAll();
   });
 
@@ -308,22 +429,17 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("watches", {
-    description: "List active watches and loops; pick one to stop it",
+    description: `Browse watches and loops: status, check log, last output; x stops one (${PANEL_KEY})`,
     async handler(_args, context) {
       if (!context.hasUI) return console.log(listText());
-      const watches = registry.list();
-      if (!watches.length) return context.ui.notify("No active watches", "info");
-      // A dialog, not a notification: Pi overwrites consecutive info lines in
-      // place, so a listing could look identical to the line before it.
-      const labels = watches.map(describe);
-      const picked = await context.ui.select("Active watches (pick one to stop, Esc to close)", labels);
-      if (picked === undefined) return;
-      const watch = watches[labels.indexOf(picked)];
-      if (registry.get(watch.id) !== watch) return context.ui.notify(`Watch #${watch.id} already ended`, "info");
-      if (!(await context.ui.confirm(`Stop watch #${watch.id}?`, `${watch.description}\n${watch.text}`))) return;
-      registry.stop(watch.id);
-      context.ui.notify(`Stopped watch #${watch.id}`, "info");
+      ctx = context;
+      await openPopup(context);
     },
+  });
+
+  pi.registerShortcut(PANEL_KEY, {
+    description: "Browse watches and loops",
+    handler: (context) => openPopup(context),
   });
 
   pi.registerCommand("unwatch", {

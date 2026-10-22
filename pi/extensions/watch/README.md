@@ -33,13 +33,48 @@ Or start one yourself:
 /watch 1m --timeout 30m kubectl rollout status deploy/api -n staging --timeout=50s
 /watch 2m --change --notify gcloud alpha monitoring policies describe POLICY --format='value(enabled)'
 /loop 15m check #incidents in Slack for anything about payments
-/watches            # list; pick one to stop it
+/watches            # browse watches and loops (also ctrl+shift+w)
 /unwatch 2          # stop #2; no id stops all
 ```
 
 Leading options: an interval (`30s`, `5m`), `--timeout DUR`, and for `/watch`
 `--change` and `--wake`/`--steer`/`--notify`. Use `--` before a command that
 starts with one of these.
+
+### Panel
+
+While watches are active, a widget below the input box lists them, one row each
+(up to five, then `+N more`):
+
+```text
+─ Watches · 1 watching · 1 loop ─────────────────────────── ctrl+shift+w ─
+ ◷  #1  watch  CI for PR 123      3 checks  exit 8  next in 25s
+ ●  #2  loop   slack incidents      2 runs          due when idle
+```
+
+`◷` waits for its next check, a spinner means a check is running, and `●` is a
+loop iteration waiting for Pi to go idle.
+
+`ctrl+shift+w` or `/watches` opens a two-pane popup: watches on the left, details
+for the selected one on the right (mode, cwd, interval and time left, counts,
+status, and the command or prompt), with a timestamped event log or the last
+check's output below. Identical consecutive checks collapse into one log line
+(`×12`). Ended watches stay listed for the session (the last 50), with how they
+ended.
+
+| Key | List | Details |
+| --- | --- | --- |
+| `j`/`k`, arrows, `ctrl+d`/`ctrl+u`, `g`/`G` | Select watch | Scroll |
+| `enter`, `tab` | Focus details | Back to list |
+| `a` | Switch activity/output | Same |
+| `x` | Stop selected watch | Same |
+| `esc` | Close | Back to list |
+| `q`, `ctrl+shift+w` | Close | Close |
+
+`ctrl+shift+w` needs a terminal that reports modifier keys (kitty keyboard
+protocol); elsewhere use `/watches`. Without a UI, `/watches` prints the list.
+Rendering and the session record (`panel.ts`) are separate from Pi so they can
+be tested with injected styling.
 
 ### Conditions
 
@@ -127,3 +162,6 @@ How other harnesses do this, and what this extension takes from each:
 ```sh
 node --test pi/extensions/watch/*.test.ts
 ```
+
+`panel.ts` is modeled on `subagent/panel.ts`. The shared helpers are copied
+because each extension is linked on its own.
