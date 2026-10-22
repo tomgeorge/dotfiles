@@ -98,6 +98,8 @@
           flyctl
           fut
           github-cli
+          # Renders markdown in the pi subagent popup (falls back without it).
+          glow
           gnupg
           gnutls
           golangci-lint

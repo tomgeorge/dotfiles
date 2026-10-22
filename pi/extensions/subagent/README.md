@@ -15,7 +15,9 @@ ln -s "$PWD/pi/extensions/subagent" ~/.pi/agent/extensions/subagent
 ```
 
 Run `/reload` in Pi afterward. Requires `pi` on PATH (the same version as the parent).
-No additional dependencies.
+Optional: [`glow`](https://github.com/charmbracelet/glow) on PATH renders tasks and
+results in the popup; without it, Pi's built-in markdown renderer is used.
+`PI_SUBAGENT_GLOW_STYLE` picks the glow style (default `dark`).
 
 ## Use
 
@@ -55,14 +57,16 @@ then `+N more`):
 
 `ctrl+shift+s` or `/subagents` opens a two-pane popup: jobs on the left, details for
 the selected one on the right (cwd, git branch and whether it is a linked worktree,
-tools, spend and tokens, task, and a timestamped tool-call log or the result).
-Finished jobs stay listed for the session.
+tools, spend and tokens, a task preview, and a timestamped tool-call log or the result).
+`t` shows the full task, scrollable like the other views. Tasks and results render
+as markdown. Finished jobs stay listed for the session.
 
 | Key | List | Details |
 | --- | --- | --- |
 | `j`/`k`, arrows, `ctrl+d`/`ctrl+u`, `g`/`G` | Select job | Scroll |
 | `enter`, `tab` | Focus details | Back to list |
 | `a` | Switch activity/result | Same |
+| `t` | Show full task (again: back) | Same |
 | `x` | Cancel selected job | Same |
 | `esc` | Close | Back to list |
 | `q`, `ctrl+shift+s` | Close | Close |

@@ -2,10 +2,11 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
-import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
+import { Markdown, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { JobStore, readGitInfo } from "./jobs.ts";
+import { glowRenderer } from "./markdown.ts";
 import {
   doing, duration, initialPopup, money, popupKey, popupLines, widgetLines,
   type PopupKey, type PopupState, type Style,
@@ -20,6 +21,9 @@ const PANEL_KEY = "ctrl+shift+s";
 const WIDGET_KEY = "subagents";
 const SPINNER_MS = 120;
 
+// glow when installed; otherwise Pi's own markdown component.
+const renderMarkdown = glowRenderer((text, width) => new Markdown(text, 0, 0, getMarkdownTheme()).render(width));
+
 function makeStyle(theme: Theme): Style {
   return {
     fg: (tone, text) => theme.fg(tone, text),
@@ -28,6 +32,7 @@ function makeStyle(theme: Theme): Style {
     width: visibleWidth,
     truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
     wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
+    markdown: (text, width) => renderMarkdown(text, Math.max(1, width)),
   };
 }
 
@@ -42,6 +47,7 @@ const POPUP_KEYS: [KeyId[], PopupKey][] = [
   [["enter", "tab", "l", "right"], "enter"],
   [["escape", "h", "left"], "back"],
   [["a"], "toggle"],
+  [["t"], "task"],
   [["x"], "cancel"],
   [["q", "ctrl+c", PANEL_KEY], "close"],
 ];

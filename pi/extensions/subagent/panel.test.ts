@@ -29,6 +29,9 @@ const plain: Style = {
       return out;
     });
   },
+  markdown(text, width) {
+    return plain.wrap(`md:${text}`, width);
+  },
 };
 
 const progress = (over: Partial<Progress> = {}): Progress => ({
@@ -162,6 +165,30 @@ test("popup toggles between activity and result", () => {
   popupKey(state, jobs, "toggle", 5);
   assert.match(screen(), /01:01 grep needle/);
   assert.doesNotMatch(screen(), /the answer/);
+});
+
+test("popup shows the full task as markdown and scrolls it", () => {
+  const store = storeWith(0);
+  const task = Array.from({ length: 40 }, (_, i) => `step ${i}`).join("\n");
+  store.add({ id: 1, provider: "p", model: "m", task, cwd: "/tmp", tools: ["read"], started: 0, progress: progress() });
+  store.finish(1, "ok", { result: "**done**" }, 0);
+  const jobs = store.list();
+  const state = initialPopup(jobs);
+  const screen = () => popupLines(jobs, state, 0, 100, 20, plain, 0).lines.join("\n");
+  assert.match(screen(), /md:\*\*done\*\*/);
+  assert.match(screen(), /… 37 more lines · t to read/);
+  popupKey(state, jobs, "task", 5);
+  assert.equal(state.view, "task");
+  assert.match(screen(), /─ task ─+ a: activity · t: back ─/);
+  assert.match(screen(), /md:step 0/);
+  popupKey(state, jobs, "enter", 5);
+  popupKey(state, jobs, "bottom", 5);
+  assert.match(screen(), /step 39/);
+  assert.doesNotMatch(screen(), /md:step 0/);
+  popupKey(state, jobs, "task", 5);
+  assert.equal(state.view, undefined);
+  assert.equal(state.scroll, 0);
+  assert.match(screen(), /md:\*\*done\*\*/);
 });
 
 test("popup renders exactly width × height with details", () => {
