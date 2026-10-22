@@ -3,7 +3,7 @@
 // Reads pi/extensions/<extension>/mutants.json: [{ "name", "file", "from", "to" }], where
 // `from` must occur exactly once in `file`. Each mutant is applied to a temporary copy (the
 // checkout is never touched), and the extension's tests must fail. Exit 0 when every mutant
-// is killed; exit 1 lists the survivors. MUTATE_TIMEOUT_MS bounds each test run (default 5 min).
+// is killed; exit 1 lists the survivors; exit 2 on a usage error or malformed mutants.json. MUTATE_TIMEOUT_MS bounds each test run (default 5 min).
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,8 +20,20 @@ if (!extension) {
   process.exit(2);
 }
 const source = join(extensions, extension);
-const mutants: Mutant[] = JSON.parse(readFileSync(join(source, "mutants.json"), "utf8"))
-  .filter((m: Mutant) => !only.length || only.includes(m.name));
+const all: unknown = JSON.parse(readFileSync(join(source, "mutants.json"), "utf8"));
+const isMutant = (m: unknown): m is Mutant =>
+  typeof m === "object" && m !== null && ["name", "file", "from", "to"].every((k) => typeof (m as Record<string, unknown>)[k] === "string");
+if (!Array.isArray(all) || !all.every(isMutant)) {
+  console.error(`${extension}/mutants.json: expected an array of { name, file, from, to } strings`);
+  process.exit(2);
+}
+// A misspelt name would otherwise select nothing and report "all 0 mutants killed".
+const unknown = only.filter((name) => !all.some((m) => m.name === name));
+if (unknown.length) {
+  console.error(`unknown mutant: ${unknown.join("; ")}`);
+  process.exit(2);
+}
+const mutants = all.filter((m) => !only.length || only.includes(m.name));
 
 const work = mkdtempSync(join(tmpdir(), `mutate-${extension}-`));
 const copy = join(work, extension);
@@ -36,7 +48,7 @@ type Outcome = "pass" | "fail" | "error";
 function runTests(): { outcome: Outcome; summary: string } {
   const r = spawnSync(process.execPath, ["--test", ...tests], { cwd: copy, encoding: "utf8", timeout: Number(process.env.MUTATE_TIMEOUT_MS ?? 300_000) });
   const out = `${r.stdout}${r.stderr}`;
-  const summary = out.split("\n").filter((l) => /^ℹ (pass|fail|cancelled) [1-9]|^ℹ pass/.test(l)).join(", ") || `exit ${r.status} ${r.signal ?? ""}`;
+  const summary = out.split("\n").filter((l) => /^ℹ pass|^ℹ (fail|cancelled) [1-9]/.test(l)).join(", ") || `exit ${r.status} ${r.signal ?? ""}`;
   if (r.signal || r.error) return { outcome: "error", summary: `${summary} (${r.signal ?? r.error?.message})` };
   if (/SyntaxError|ERR_MODULE_NOT_FOUND|ERR_INVALID_TYPESCRIPT_SYNTAX/.test(out)) return { outcome: "error", summary: `${summary} (load error)` };
   // node:test reports a test that hit its own timeout as cancelled; that's a detection too.
