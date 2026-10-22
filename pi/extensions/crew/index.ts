@@ -427,7 +427,9 @@ export default function (pi: ExtensionAPI) {
         };
         persist();
         activate();
-        tell("crew-start", `Crew started. Integration branch: ${integrationBranch} (worktree ${integrationPath}). Workers: ${ref(workerModel)}; reviewer: ${ref(reviewerModel)}; up to ${concurrency} at once; budget $${budgetUsd}.\n\nGoal:\n${goal}\n\nExplore just enough to plan, then dispatch the first independent tasks.`, true);
+        // The planner prompt rides in the message: Pi doesn't emit before_agent_start for
+        // runs that sendMessage({ triggerTurn }) starts, and every planner run starts that way.
+        tell("crew-start", `${plannerPrompt(crew.config)}\n\nCrew started. Integration branch: ${integrationBranch} (worktree ${integrationPath}). Workers: ${ref(workerModel)}; reviewer: ${ref(reviewerModel)}; up to ${concurrency} at once; budget $${budgetUsd}.\n\nGoal:\n${goal}\n\nExplore just enough to plan, then dispatch the first independent tasks.`, true);
       } catch (error) {
         ctx.ui.notify((error as Error).message, "error");
       }
@@ -475,7 +477,7 @@ export default function (pi: ExtensionAPI) {
         crew = state;
         persist();
         activate();
-        tell("crew-resume", `Crew resumed. Goal:\n${state.config.goal}\n\n${formatStatus(state)}\n\nInterrupted tasks kept their worktrees and branches; integrate them only if their commits are complete, otherwise re-dispatch.`, true);
+        tell("crew-resume", `${plannerPrompt(state.config)}\n\nCrew resumed. ${formatStatus(state)}\n\nInterrupted tasks kept their worktrees and branches; integrate them only if their commits are complete, otherwise re-dispatch.`, true);
       } catch (error) {
         ctx.ui.notify((error as Error).message, "error");
       }
@@ -508,11 +510,6 @@ export default function (pi: ExtensionAPI) {
     ui = ctx;
     // Registered tools start active; crew tools exist only in planner mode.
     if (!isActive()) pi.setActiveTools(pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));
-  });
-
-  pi.on("before_agent_start", (event) => {
-    if (crew && isActive()) event.systemPromptOptions.sections.crew_planner = plannerPrompt(crew.config);
-    else delete event.systemPromptOptions.sections.crew_planner;
   });
 
   pi.on("session_shutdown", async () => {
