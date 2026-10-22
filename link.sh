@@ -46,6 +46,7 @@ link pi/prompts ~/.pi/agent/prompts
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
 link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
 link pi/extensions/crew ~/.pi/agent/extensions/crew
+link pi/extensions/goal ~/.pi/agent/extensions/goal
 link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
 link pi/extensions/mcp-confirm ~/.pi/agent/extensions/mcp-confirm
 link pi/extensions/watch ~/.pi/agent/extensions/watch
