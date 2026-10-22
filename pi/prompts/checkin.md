@@ -2,7 +2,7 @@
 description: Quiet check-in across HEY, Todoist, and Fantastical. Reports only what needs attention now, otherwise NO_REPLY
 argument-hint: "[extra focus]"
 ---
-Do a quick, read-only check-in on my mail, tasks, and calendar. ${@}
+Do a quick, read-only check-in on my mail, tasks, and calendar. $@
 
 The point is to fight list numbness: surface the **few** things that need me in the next day, not the whole list. Silence is the best outcome.
 

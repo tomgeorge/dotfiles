@@ -31,7 +31,7 @@ fi
 new_state=$(printf '%s\n' "$out" | sed -n 's/^STATE: //p' | tail -1)
 out=$(printf '%s\n' "$out" | { grep -v '^STATE: ' || true; } | sed -e 's/[[:space:]]*$//' | sed -e '/./,$!d')
 if [ -n "$new_state" ]; then
-  if printf '%s' "$new_state" | jq -e 'type == "object" and has("reported")' >/dev/null 2>&1; then
+  if printf '%s' "$new_state" | jq -es 'length == 1 and (.[0] | (.lastRun | type == "string") and (.reported | type == "object" and all(.[]; type == "string")))' >/dev/null 2>&1; then
     printf '%s\n' "$new_state" >"$state/reported.json"
   else
     echo "$(date -Iseconds) ignored malformed STATE line" >>"$log"
