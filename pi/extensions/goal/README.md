@@ -22,8 +22,11 @@ After every agent run settles, the harness runs the check in the session's cwd
 - **blocked on you:** the model calls `goal_park` with what it needs; `/goal resume`
   continues it.
 
-While a goal is active, a system prompt section carries the objective, the check,
-and the budget, and forbids weakening the check. The goal state is stored in the session,
-so `/resume` and forks keep their own goal. `goal_park` is declared only while a goal is active.
+`goal_park` is declared only while a goal is active, and its prompt guidelines carry
+the rules (the check decides, never weaken it, park when blocked) into every run. The
+goal's own messages carry the objective, the check, and the budget. A
+`before_agent_start` section wouldn't work: Pi doesn't emit that event for the runs
+the goal starts itself. The goal state is stored in the session, so `/resume`, forks,
+and `/tree` keep their own goal.
 
 Checks: `node --test pi/extensions/goal/*.test.ts`

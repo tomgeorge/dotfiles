@@ -83,19 +83,28 @@ export function decide(goal: Goal, run: { checkPassed: boolean; toolCalls: numbe
   return { action: "continue" };
 }
 
-export function goalPrompt(goal: Goal): string {
-  return `An active GOAL is attached to this session:
+// These ride on goal_park's promptGuidelines, which Pi includes whenever the tool is active.
+// A before_agent_start section would miss the runs the goal itself starts: Pi doesn't emit
+// before_agent_start for sendMessage({ triggerTurn }).
+export const GOAL_GUIDELINES = [
+  "An active goal is attached to this session. Its objective and check arrive in goal messages. It is done only when the harness runs the check and it exits 0.",
+  "Work toward making the goal's check pass legitimately. Never weaken, skip, or edit the check or the tests it runs to make them pass.",
+  "You don't decide when the goal is done. The harness runs the check after each of your runs and continues you automatically if it fails.",
+  "Each run toward the goal should make concrete progress: change code, run commands, or test a hypothesis. A run with no tool calls stops the goal.",
+  "If you're blocked on something only the user can provide (a decision, credentials, scope), call goal_park with what you need instead of guessing.",
+];
 
-${goal.objective}
+/**
+ * The message that starts (or restarts) work on a goal. It repeats the rules, because Pi
+ * applies the newly active goal_park's guidelines only from the run's second request.
+ */
+export function startMessage(goal: Goal, verb: "set" | "resumed"): string {
+  return `Goal ${verb}: ${goal.objective}
+Done when \`${goal.check}\` exits 0, run by the harness in the session's working directory. Budget: ${goal.continuations}/${goal.maxContinuations} automatic continuations used.
 
-It is done only when this check exits 0, run by the harness in the session's working directory:
-    ${goal.check}
+${GOAL_GUIDELINES.slice(1).map((g) => `- ${g}`).join("\n")}
 
-- Work toward making the check pass legitimately. Never weaken, skip, or edit the check or the tests it runs to make them pass.
-- You don't decide when the goal is done. The harness runs the check after each of your runs, and continues you automatically if it fails. Its output arrives as a message.
-- Each run should make concrete progress: change code, run commands, or test a hypothesis. A run with no tool calls stops the goal.
-- If you're blocked on something only the user can provide (a decision, credentials, scope), call goal_park with what you need, instead of guessing.
-- Budget: ${goal.continuations}/${goal.maxContinuations} automatic continuations used.`;
+Start working.`;
 }
 
 export function continuationMessage(goal: Goal): string {
@@ -121,18 +130,31 @@ export function runCheck(cwd: string, command: string, timeoutMs: number): Promi
     const child = spawn("sh", ["-c", command], { cwd, stdio: ["ignore", "pipe", "pipe"], detached: true });
     let out = "";
     let timedOut = false;
+    let done = false;
+    let drain: NodeJS.Timeout | undefined;
     const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-16_384); };
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try { process.kill(-child.pid!, "SIGKILL"); } catch { /* gone */ }
-    }, timeoutMs);
+    const killGroup = () => { try { process.kill(-child.pid!, "SIGKILL"); } catch { /* gone */ } };
     const finish = (exit: number | null) => {
+      if (done) return;
+      done = true;
       clearTimeout(timer);
+      clearTimeout(drain);
+      // Background jobs the check left behind would pile up across runs.
+      killGroup();
+      // A daemon that left the process group can hold the pipes open forever; stop reading.
+      child.stdout.destroy();
+      child.stderr.destroy();
       resolve({ exit, tail: out.split("\n").slice(-40).join("\n"), timedOut, at: Date.now() });
     };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      finish(null);
+    }, timeoutMs);
     child.on("error", (error) => { out += error.message; finish(null); });
+    // "close" waits for every pipe holder; after the shell exits, give output a moment to drain.
+    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), 500); });
     child.on("close", (code) => finish(code));
   });
 }

@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  continuationMessage, decide, goalPrompt, newGoal, parseGoalArgs, runCheck, statusLine, type Goal,
+  continuationMessage, decide, GOAL_GUIDELINES, newGoal, parseGoalArgs, runCheck, startMessage, statusLine, type Goal,
 } from "./goal.ts";
 
 const CHECK_TIMEOUT_MS = 10 * 60_000;
@@ -16,7 +16,8 @@ export default function (pi: ExtensionAPI) {
   let checking = false;
 
   function save() {
-    if (goal) pi.appendEntry(ENTRY, goal);
+    // A snapshot: Pi keeps entry data by reference, and goal keeps changing.
+    if (goal) pi.appendEntry(ENTRY, structuredClone(goal));
     render();
   }
 
@@ -42,6 +43,7 @@ export default function (pi: ExtensionAPI) {
     name: "goal_park",
     label: "Park goal",
     description: "Stop pursuing the active goal because you're blocked on something only the user can provide. Progress is kept; the user resumes with /goal resume.",
+    promptGuidelines: GOAL_GUIDELINES,
     parameters: Type.Object({
       reason: Type.String({ minLength: 1, description: "What blocks progress" }),
       needed: Type.String({ minLength: 1, description: "Exactly what the user must provide or decide" }),
@@ -79,7 +81,7 @@ export default function (pi: ExtensionAPI) {
           // Resuming after a budget stop grants a fresh budget of the same size.
           if (goal.continuations >= goal.maxContinuations) goal.continuations = 0;
           save();
-          return say(`Goal resumed: ${goal.objective}\nCheck: \`${goal.check}\``, true);
+          return say(startMessage(goal, "resumed"), true);
         }
         let check = cmd.check;
         if (!check && ctx.hasUI) check = (await ctx.ui.input("Check command (exit 0 = goal met)", "npm test"))?.trim();
@@ -87,7 +89,7 @@ export default function (pi: ExtensionAPI) {
         const objective = cmd.objective || (ctx.hasUI ? (await ctx.ui.editor("Goal objective"))?.trim() ?? "" : "");
         goal = newGoal(objective, check, cmd.max);
         save();
-        say(`Goal set: ${goal.objective}\nDone when \`${goal.check}\` exits 0 (up to ${goal.maxContinuations} automatic continuations). Start working.`, true);
+        say(startMessage(goal, "set"), true);
       } catch (error) {
         notify((error as Error).message, "error");
       }
@@ -100,9 +102,12 @@ export default function (pi: ExtensionAPI) {
     errored = false;
   });
   pi.on("tool_execution_start", () => { toolCalls++; });
-  pi.on("agent_before_settle", (event) => {
-    if (event.outcome === "aborted") aborted = true;
-    if (event.outcome === "error") errored = true;
+  // Pi skips agent_before_settle when the user aborts, so read the outcome from each
+  // assistant message instead. The last one wins for errors, so a retried error clears.
+  pi.on("message_end", (event, ctx) => {
+    if (event.message.role !== "assistant") return;
+    if (event.message.stopReason === "aborted" || ctx.signal?.aborted) aborted = true;
+    errored = event.message.stopReason === "error";
   });
 
   pi.on("agent_settled", async (_event, ctx) => {
@@ -138,18 +143,16 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("before_agent_start", (event) => {
-    if (goal?.status === "active") event.systemPromptOptions.sections.goal = goalPrompt(goal);
-    else delete event.systemPromptOptions.sections.goal;
-  });
-
-  pi.on("session_start", (_event, ctx) => {
+  // The branch's latest goal entry wins, so forks, resumes, and /tree keep their own goal.
+  function load(ctx: ExtensionContext) {
     ui = ctx;
     goal = undefined;
-    // The branch's latest goal entry wins, so forks and resumes keep their own goal.
     for (const entry of ctx.sessionManager.getBranch()) {
-      if (entry.type === "custom" && entry.customType === ENTRY) goal = entry.data as Goal;
+      // Copy, so mutating the live goal never rewrites an earlier entry.
+      if (entry.type === "custom" && entry.customType === ENTRY) goal = structuredClone(entry.data as Goal);
     }
     render();
-  });
+  }
+  pi.on("session_start", (_event, ctx) => load(ctx));
+  pi.on("session_tree", (_event, ctx) => load(ctx));
 }
