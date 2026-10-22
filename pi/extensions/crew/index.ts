@@ -30,7 +30,9 @@ const DEFAULTS = { maxConcurrent: 3, budgetUsd: 10, taskTimeoutMin: 45, stallMin
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
 const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 
-export default function (pi: ExtensionAPI) {
+// Tests inject a fake runWorker; Pi calls the factory with the API only.
+export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker } = {}) {
+  const startWorker = deps.runWorker ?? runWorker;
   let crew: CrewState | undefined;
   let ui: ExtensionContext | undefined;
   let toolsBefore: string[] | undefined;
@@ -179,7 +181,7 @@ export default function (pi: ExtensionAPI) {
     const controller = new AbortController();
     controllers.set(task.id, controller);
     const run = (async () => {
-      const result = await runWorker(job, {
+      const result = await startWorker(job, {
         signal: controller.signal, timeoutMs,
         onProgress: (p) => {
           task.toolCalls = p.toolCalls;

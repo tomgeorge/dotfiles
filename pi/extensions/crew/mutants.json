@@ -1,0 +1,176 @@
+[
+  {
+    "name": "tell wakes an inactive crew",
+    "file": "index.ts",
+    "from": "triggerTurn: wake && isActive()",
+    "to": "triggerTurn: wake"
+  },
+  {
+    "name": "crew_cancel's handoff wakes the planner",
+    "file": "index.ts",
+    "from": "tell(\"crew-handoff\", formatReport(report), !quietCancels.delete(task.id));",
+    "to": "tell(\"crew-handoff\", formatReport(report), true);"
+  },
+  {
+    "name": "dispatch ignores the concurrency limit",
+    "file": "index.ts",
+    "from": "if (runningTasks(state).length >= c.maxConcurrent) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "dispatch ignores the budget",
+    "file": "index.ts",
+    "from": "if (spent(state) >= c.budgetUsd) throw",
+    "to": "if (false) throw"
+  },
+  {
+    "name": "review of an unfinished task allowed",
+    "file": "index.ts",
+    "from": "|| target.status === \"running\")) {",
+    "to": ")) {"
+  },
+  {
+    "name": "worker runs outside its worktree",
+    "file": "index.ts",
+    "from": "provider: model.provider, model: model.model, cwd: task.worktree!, prompt,",
+    "to": "provider: model.provider, model: model.model, cwd: c.repoRoot, prompt,"
+  },
+  {
+    "name": "worker loads no guard",
+    "file": "index.ts",
+    "from": "extensions: [...CHILD_EXTENSIONS, GUARD],",
+    "to": "extensions: [...CHILD_EXTENSIONS],"
+  },
+  {
+    "name": "worker's uncommitted work not committed",
+    "file": "index.ts",
+    "from": "report.autoCommitted = await commitAll(task.worktree, `crew: uncommitted changes left by task #${task.id}`);",
+    "to": ""
+  },
+  {
+    "name": "task checks not run",
+    "file": "index.ts",
+    "from": "report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS, signal));",
+    "to": ""
+  },
+  {
+    "name": "dirty task worktree not reported",
+    "file": "index.ts",
+    "from": "report.dirtyAfterChecks = await dirtyFiles(task.worktree);",
+    "to": ""
+  },
+  {
+    "name": "out-of-scope files not reported",
+    "file": "index.ts",
+    "from": "report.outOfScope = outsidePaths(facts.files, task.paths);",
+    "to": ""
+  },
+  {
+    "name": "cancel during checks still reads as submitted",
+    "file": "index.ts",
+    "from": "        report.outcome = \"cancelled\";\n",
+    "to": ""
+  },
+  {
+    "name": "integrate trusts the report, not the branch",
+    "file": "index.ts",
+    "from": "if (!(await branchCommits(state.config.repoRoot, task.base, task.branch)).length)",
+    "to": "if (!task.report?.commits.length)"
+  },
+  {
+    "name": "conflict not recorded",
+    "file": "index.ts",
+    "from": "        task.status = \"conflict\";\n",
+    "to": ""
+  },
+  {
+    "name": "integration worktree left dirty after post-merge checks",
+    "file": "index.ts",
+    "from": "      const dirty = await discardChanges(state.config.integrationPath);\n      const failed = checks.filter((c) => c.exit !== 0);",
+    "to": "      const dirty: string[] = [];\n      const failed = checks.filter((c) => c.exit !== 0);"
+  },
+  {
+    "name": "finish ignores running workers",
+    "file": "index.ts",
+    "from": "if (runningTasks(state).length) throw new Error(\"Workers are still running",
+    "to": "if (false) throw new Error(\"Workers are still running"
+  },
+  {
+    "name": "finish passes with failing checks",
+    "file": "index.ts",
+    "from": "const failed = results.filter((c) => c.exit !== 0);",
+    "to": "const failed = results.filter(() => false);"
+  },
+  {
+    "name": "finish passes when checks dirtied the worktree",
+    "file": "index.ts",
+    "from": "if (dirty.length) problems.push(",
+    "to": "if (false) problems.push("
+  },
+  {
+    "name": "finish completes after /crew-stop",
+    "file": "index.ts",
+    "from": "if (crewSignal.aborted || crew !== state || !isActive()) return text(",
+    "to": "if (false) return text("
+  },
+  {
+    "name": "stop doesn't abort planner checks",
+    "file": "index.ts",
+    "from": "  function deactivate() {\n    crewAbort.abort();",
+    "to": "  function deactivate() {"
+  },
+  {
+    "name": "stop doesn't cancel workers",
+    "file": "index.ts",
+    "from": "for (const [id, controller] of controllers) { quietCancels.add(id); controller.abort(); }",
+    "to": ""
+  },
+  {
+    "name": "resume keeps dead tasks running",
+    "file": "index.ts",
+    "from": "for (const t of runningTasks(state)) { t.status = \"interrupted\"; t.endedAt = Date.now(); }",
+    "to": ""
+  },
+  {
+    "name": "planner prompt missing from the start message",
+    "file": "index.ts",
+    "from": "tell(\"crew-start\", `${plannerPrompt(crew.config)}\\n\\nCrew started.",
+    "to": "tell(\"crew-start\", `Crew started."
+  },
+  {
+    "name": "planner prompt missing from the resume message",
+    "file": "index.ts",
+    "from": "tell(\"crew-resume\", `${plannerPrompt(state.config)}\\n\\nCrew resumed.",
+    "to": "tell(\"crew-resume\", `Crew resumed."
+  },
+  {
+    "name": "planner keeps write tools",
+    "file": "index.ts",
+    "from": "pi.setActiveTools([...READ_TOOLS, ...CREW_TOOLS]);",
+    "to": "pi.setActiveTools([...pi.getActiveTools(), ...CREW_TOOLS]);"
+  },
+  {
+    "name": "crew tools visible outside crew mode",
+    "file": "index.ts",
+    "from": "if (!isActive()) pi.setActiveTools(pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));",
+    "to": ""
+  },
+  {
+    "name": "tools not restored after the crew",
+    "file": "index.ts",
+    "from": "pi.setActiveTools(toolsBefore ?? pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));",
+    "to": ""
+  },
+  {
+    "name": "shutdown doesn't mark tasks interrupted",
+    "file": "index.ts",
+    "from": "task.status = shuttingDown ? \"interrupted\"",
+    "to": "task.status = false ? \"interrupted\""
+  },
+  {
+    "name": "shutdown doesn't wait for workers",
+    "file": "index.ts",
+    "from": "await Promise.all([...pending]);",
+    "to": ""
+  }
+]
