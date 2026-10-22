@@ -302,12 +302,12 @@ crewTest("/crew-stop cancels running workers without waking the planner", async 
   assert.match(e.f.notes.at(-1)!, /stopped/);
 });
 
-crewTest("a worker dispatched as the crew stops never wakes a stopped crew", async (e) => {
-  const pending = e.dispatch();
+crewTest("a dispatch racing /crew-stop is refused rather than started for a stopped crew", async (e) => {
+  const pending = e.dispatch().then(() => "started", (error: Error) => error.message);
   await e.f.command("crew-stop", "", e.ctx);
-  await pending;
-  await finishOk(e, 1);
-  assert.notEqual(e.handoffs()[0].options?.triggerTurn, true);
+  assert.match(await pending, /stopped while #1 was being set up/);
+  assert.equal(e.w.list.length, 0);
+  assert.equal(e.state().tasks[0].status, "cancelled");
 });
 
 test("resuming after a crash marks dead tasks interrupted, re-sends the planner prompt, and integrates their commits", async () => {
@@ -342,4 +342,55 @@ crewTest("shutdown marks running tasks interrupted, waits for them, and stays qu
   assert.equal(e.w.list[0].opts.signal.aborted, true);
   assert.equal(e.state().tasks[0].status, "interrupted");
   assert.equal(e.handoffs().length, 0);
+});
+
+// ---- stop then resume in one session (open issue 2) -------------------------------
+
+crewTest("resume waits for stopped workers, so their reports reach the resumed ledger", async (e) => {
+  await e.dispatch();
+  await e.f.command("crew-stop", "", e.ctx);
+  // The worker ignores the abort for a while, as a real child flushing its output would.
+  let resumed = false;
+  const resume = e.f.command("crew-resume", "", e.ctx).then(() => { resumed = true; });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(resumed, false, "resume waits for the stopping worker");
+  commitIn(e.w.list[0].job.cwd, "b.txt", "b\n");
+  e.w.list[0].finish(result());
+  await resume;
+  const task = e.state().tasks[0];
+  assert.equal(e.state().status, "active");
+  assert.ok(task.report, "the stopped worker's report survived the resume");
+  assert.equal(task.report.commits.length, 1);
+  assert.notEqual(task.status, "interrupted");
+}, { ignoreAbort: true });
+
+crewTest("resume waits for an in-flight crew_finish, so its cleanup can't touch the resumed crew", async (e) => {
+  let finished = false;
+  const finish = e.f.tool("crew_finish", { summary: "s", checks: ["sleep 0.3"] }).then(() => { finished = true; });
+  await new Promise((r) => setTimeout(r, 50));
+  await e.f.command("crew-stop", "", e.ctx);
+  await e.f.command("crew-resume", "", e.ctx);
+  assert.equal(finished, true, "crew_finish settled before the crew was resumed");
+  await finish;
+  assert.equal(e.state().status, "active");
+});
+
+crewTest("two resumes at once activate the crew once", async (e) => {
+  await e.f.command("crew-stop", "", e.ctx);
+  const sentBefore = e.f.sent.length;
+  await Promise.all([e.f.command("crew-resume", "", e.ctx), e.f.command("crew-resume", "", e.ctx)]);
+  assert.equal(e.f.sent.length - sentBefore, 1, "one resume message");
+  assert.ok(e.f.notes.some((n) => /already|in progress/.test(n)), e.f.notes.join("; "));
+});
+
+crewTest("a dispatch still setting up when the crew stops never launches its worker", async (e) => {
+  // `git worktree add` runs post-checkout; a slow hook holds the dispatch mid-setup.
+  writeFileSync(join(e.root, ".git", "hooks", "post-checkout"), "#!/bin/sh\nsleep 0.5\n", { mode: 0o755 });
+  const dispatch = e.dispatch().then((text) => text, (error: Error) => error.message);
+  await new Promise((r) => setTimeout(r, 100));
+  await e.f.command("crew-stop", "", e.ctx);
+  await e.f.command("crew-resume", "", e.ctx);
+  assert.match(await dispatch, /stopped/);
+  assert.equal(e.w.list.length, 0, "no worker started for a stopped crew");
+  assert.doesNotMatch(await e.ledger(), /\[running\]/);
 });

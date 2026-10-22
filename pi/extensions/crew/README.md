@@ -98,6 +98,12 @@ and branches.
   but not through `eval`, variables, or scripts written to disk. Beyond that, workers run arbitrary
   shell commands as you, with your network and credentials. Only use `/crew` on code and
   commands you'd let an agent run unattended.
+
+  The write check is check-then-write: a worker that swaps a symlink between the guard's check
+  and the write (say, from a background process) can write outside its worktree. So can any
+  bash command. The guard catches mistakes, not a worker set on escaping. Closing that takes an
+  OS sandbox around each worker, which also has to cover the shared `.git` directory and the
+  network; that's future work.
 - **Some state is shared.** Worktrees share the git object store, global caches, and fixed ports.
   Projects that need per-checkout setup, such as `node_modules` or `.env`, need workers to do
   that setup themselves; say so in the spec or add it to the check commands.

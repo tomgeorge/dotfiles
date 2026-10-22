@@ -1,11 +1,5 @@
 [
   {
-    "name": "tell wakes an inactive crew",
-    "file": "index.ts",
-    "from": "triggerTurn: wake && isActive()",
-    "to": "triggerTurn: wake"
-  },
-  {
     "name": "crew_cancel's handoff wakes the planner",
     "file": "index.ts",
     "from": "tell(\"crew-handoff\", formatReport(report), !quietCancels.delete(task.id));",
@@ -172,5 +166,29 @@
     "file": "index.ts",
     "from": "await Promise.all([...pending]);",
     "to": ""
+  },
+  {
+    "name": "resume doesn't wait for stopped work",
+    "file": "index.ts",
+    "from": "      if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active`);\n      await drain(ctx);",
+    "to": "      if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active`);"
+  },
+  {
+    "name": "crew_finish not tracked as in-flight",
+    "file": "index.ts",
+    "from": "    execute: (_id, params, toolSignal) => track((async () => {\n      const state = requireCrew();\n      if (runningTasks(state).length)",
+    "to": "    execute: (_id, params, toolSignal) => ((async () => {\n      const state = requireCrew();\n      if (runningTasks(state).length)"
+  },
+  {
+    "name": "concurrent starts or resumes not serialized",
+    "file": "index.ts",
+    "from": "if (switching) throw new Error(",
+    "to": "if (false) throw new Error("
+  },
+  {
+    "name": "dispatch launches for a crew stopped during setup",
+    "file": "index.ts",
+    "from": "if (crew !== state || !isActive()) {\n        task.status = \"cancelled\";",
+    "to": "if (false) {\n        task.status = \"cancelled\";"
   }
 ]

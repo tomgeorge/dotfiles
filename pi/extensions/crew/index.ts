@@ -43,6 +43,10 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
   const quietCancels = new Set<number>();
   const wakeTimers = new Set<ReturnType<typeof setTimeout>>();
   const pending = new Set<Promise<void>>();
+  // In-flight crew_integrate and crew_finish: their worktree cleanup runs even after an abort.
+  const planning = new Set<Promise<unknown>>();
+  // /crew and /crew-resume replace `crew`; only one may do so at a time.
+  let switching = false;
   // Planner-tool checks (post-merge, crew_finish) stop with the crew; workers have their own controllers.
   let crewAbort = new AbortController();
 
@@ -128,6 +132,33 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     render();
   }
 
+  function track<T>(work: Promise<T>): Promise<T> {
+    planning.add(work);
+    work.finally(() => planning.delete(work)).catch(() => {});
+    return work;
+  }
+
+  /** Let a stopped crew's workers and tools finish, so they save into its state, not the next one's. */
+  async function drain(ctx: ExtensionContext) {
+    if (pending.size || planning.size) ctx.ui.notify("crew: waiting for the stopped crew's workers to finish…", "info");
+    while (pending.size || planning.size) await Promise.allSettled([...pending, ...planning]);
+  }
+
+  /** Run a crew start or resume, refusing a second one while it's in progress. */
+  async function switchCrew(ctx: ExtensionContext, body: () => Promise<void>) {
+    try {
+      if (switching) throw new Error("A crew start or resume is already in progress");
+      switching = true;
+      try {
+        await body();
+      } finally {
+        switching = false;
+      }
+    } catch (error) {
+      ctx.ui.notify((error as Error).message, "error");
+    }
+  }
+
   function requireCrew(): CrewState {
     if (!crew || !isActive()) throw new Error("No active crew. The human starts one with /crew <goal>.");
     return crew;
@@ -204,7 +235,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
           durationMs: Date.now() - task.startedAt, error: (error as Error).message,
         };
       }
-      controllers.delete(task.id);
+      // A later crew may reuse this id after a stop.
+      if (controllers.get(task.id) === controller) controllers.delete(task.id);
       task.report = report;
       task.endedAt = Date.now();
       task.status = shuttingDown ? "interrupted"
@@ -237,7 +269,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     }),
     // Worktree creation and HEAD reads touch shared git state; dispatch returns fast anyway.
     executionMode: "sequential",
-    async execute(_id, params) {
+    execute: (_id, params) => track((async () => {
       const state = requireCrew();
       const c = state.config;
       if (spent(state) >= c.budgetUsd) throw new Error(`Budget exhausted ($${spent(state).toFixed(2)} of $${c.budgetUsd}). Escalate to the human.`);
@@ -280,6 +312,13 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
         persist();
         throw error;
       }
+      // /crew-stop (and maybe a resume) while the worktree was set up: no controller existed to abort.
+      if (crew !== state || !isActive()) {
+        task.status = "cancelled";
+        task.endedAt = Date.now();
+        saveState(state);
+        throw new Error(`Crew was stopped while #${task.id} was being set up; it was not started (worktree ${task.worktree} kept).`);
+      }
       persist();
       render();
       launch(task, {
@@ -288,7 +327,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
         env: { ...GIT_ENV, PI_CREW_ROOT: task.worktree! },
       }, (params.timeoutMinutes ?? c.taskTimeoutMin) * 60_000);
       return text(`Dispatched #${task.id} (${task.kind}) "${task.title}" to ${task.model}${review ? ` reviewing #${task.reviewOf}` : ` on ${task.branch}`}. Its handoff will arrive as a message. Don't poll: dispatch other independent work or end your turn.`);
-    },
+    })()),
   });
 
   pi.registerTool({
@@ -298,7 +337,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }),
     // Two merges in one worktree at once collide on index.lock, which would be misread as a conflict.
     executionMode: "sequential",
-    async execute(_id, params, toolSignal) {
+    execute: (_id, params, toolSignal) => track((async () => {
       const state = requireCrew();
       const crewSignal = crewAbort.signal;
       const task = state.tasks.find((t) => t.id === params.taskId);
@@ -334,7 +373,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
         : `Post-merge checks passed on the integration branch: ${task.checks.join("; ")}`;
       const note = dirty.length ? `\nThe checks modified files in the integration worktree; the harness reverted them: ${dirty.join(", ")}. If a check needs them (lockfile, generated code), dispatch a task to commit them.` : "";
       return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${summary}${note}`);
-    },
+    })()),
   });
 
   pi.registerTool({
@@ -389,7 +428,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       summary: Type.String({ minLength: 1 }),
       checks: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "Full verification commands (tests, lint, typecheck) to run on the integration branch" }),
     }),
-    async execute(_id, params, toolSignal) {
+    execute: (_id, params, toolSignal) => track((async () => {
       const state = requireCrew();
       if (runningTasks(state).length) throw new Error("Workers are still running; wait for their handoffs or crew_cancel them");
       const crewSignal = crewAbort.signal;
@@ -415,7 +454,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       deactivate();
       const c = state.config;
       return text(`Crew finished. Final checks passed on ${c.integrationBranch}: ${params.checks.join("; ")}. The human reviews ${c.integrationBranch} (worktree ${c.integrationPath}) and merges it. Tell them they can run \`/review-loop crew ${c.slug}\` for a multi-reviewer review-and-fix pass first. Summarize for them:\n${params.summary}`);
-    },
+    })()),
   });
 
   // ---- commands ----------------------------------------------------------
@@ -430,45 +469,42 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
 
   pi.registerCommand("crew", {
     description: "Start a crew: a planner (this session) delegating to worktree workers. /crew <goal>",
-    async handler(args, ctx) {
-      try {
-        if (!ctx.hasUI) throw new Error("/crew needs an interactive UI to confirm models and budget");
-        if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active. /crew-stop it first.`);
-        const goal = args.trim() || (await ctx.ui.editor("Crew goal"))?.trim();
-        if (!goal) return;
-        const info = await repoInfo(ctx.cwd);
-        if (info.dirty && !(await ctx.ui.confirm("Uncommitted changes", "Workers branch from HEAD; your uncommitted changes won't be included. Continue?"))) return;
-        const workerModel = await pickModel(ctx, "Worker model (implements tasks)");
-        if (!workerModel) return;
-        const reviewerModel = (await pickModel(ctx, "Reviewer model (clean-context reviews)", `same as worker (${ref(workerModel)})`)) ?? workerModel;
-        const concurrency = await ctx.ui.select("Max concurrent workers", ["3", "2", "1", "4", "5"]);
-        if (!concurrency) return;
-        const budgetRaw = await ctx.ui.input("Worker budget in USD", String(DEFAULTS.budgetUsd));
-        if (budgetRaw === undefined) return;
-        const budgetUsd = budgetRaw.trim() ? Number(budgetRaw) : DEFAULTS.budgetUsd;
-        if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) throw new Error(`Invalid budget: ${budgetRaw}`);
-        const slug = slugify(goal);
-        const integrationBranch = `crew/${slug}`;
-        const integrationPath = worktreePath(info.name, integrationBranch);
-        await addWorktree(info.root, integrationPath, integrationBranch, info.head);
-        crew = {
-          version: 1, status: "active", tasks: [], nextId: 1,
-          config: {
-            slug, goal, repoRoot: info.root, repoName: info.name, commonDir: info.commonDir,
-            integrationBranch, integrationPath, baseSha: info.head, workerModel, reviewerModel,
-            maxConcurrent: Number(concurrency), budgetUsd, taskTimeoutMin: DEFAULTS.taskTimeoutMin,
-            stallMin: DEFAULTS.stallMin, createdAt: Date.now(),
-          },
-        };
-        persist();
-        activate();
-        // The planner prompt rides in the message: Pi doesn't emit before_agent_start for
-        // runs that sendMessage({ triggerTurn }) starts, and every planner run starts that way.
-        tell("crew-start", `${plannerPrompt(crew.config)}\n\nCrew started. Integration branch: ${integrationBranch} (worktree ${integrationPath}). Workers: ${ref(workerModel)}; reviewer: ${ref(reviewerModel)}; up to ${concurrency} at once; budget $${budgetUsd}.\n\nGoal:\n${goal}\n\nExplore just enough to plan, then dispatch the first independent tasks.`, true);
-      } catch (error) {
-        ctx.ui.notify((error as Error).message, "error");
-      }
-    },
+    handler: (args, ctx) => switchCrew(ctx, async () => {
+      if (!ctx.hasUI) throw new Error("/crew needs an interactive UI to confirm models and budget");
+      if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active. /crew-stop it first.`);
+      await drain(ctx);
+      const goal = args.trim() || (await ctx.ui.editor("Crew goal"))?.trim();
+      if (!goal) return;
+      const info = await repoInfo(ctx.cwd);
+      if (info.dirty && !(await ctx.ui.confirm("Uncommitted changes", "Workers branch from HEAD; your uncommitted changes won't be included. Continue?"))) return;
+      const workerModel = await pickModel(ctx, "Worker model (implements tasks)");
+      if (!workerModel) return;
+      const reviewerModel = (await pickModel(ctx, "Reviewer model (clean-context reviews)", `same as worker (${ref(workerModel)})`)) ?? workerModel;
+      const concurrency = await ctx.ui.select("Max concurrent workers", ["3", "2", "1", "4", "5"]);
+      if (!concurrency) return;
+      const budgetRaw = await ctx.ui.input("Worker budget in USD", String(DEFAULTS.budgetUsd));
+      if (budgetRaw === undefined) return;
+      const budgetUsd = budgetRaw.trim() ? Number(budgetRaw) : DEFAULTS.budgetUsd;
+      if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) throw new Error(`Invalid budget: ${budgetRaw}`);
+      const slug = slugify(goal);
+      const integrationBranch = `crew/${slug}`;
+      const integrationPath = worktreePath(info.name, integrationBranch);
+      await addWorktree(info.root, integrationPath, integrationBranch, info.head);
+      crew = {
+        version: 1, status: "active", tasks: [], nextId: 1,
+        config: {
+          slug, goal, repoRoot: info.root, repoName: info.name, commonDir: info.commonDir,
+          integrationBranch, integrationPath, baseSha: info.head, workerModel, reviewerModel,
+          maxConcurrent: Number(concurrency), budgetUsd, taskTimeoutMin: DEFAULTS.taskTimeoutMin,
+          stallMin: DEFAULTS.stallMin, createdAt: Date.now(),
+        },
+      };
+      persist();
+      activate();
+      // The planner prompt rides in the message: Pi doesn't emit before_agent_start for
+      // runs that sendMessage({ triggerTurn }) starts, and every planner run starts that way.
+      tell("crew-start", `${plannerPrompt(crew.config)}\n\nCrew started. Integration branch: ${integrationBranch} (worktree ${integrationPath}). Workers: ${ref(workerModel)}; reviewer: ${ref(reviewerModel)}; up to ${concurrency} at once; budget $${budgetUsd}.\n\nGoal:\n${goal}\n\nExplore just enough to plan, then dispatch the first independent tasks.`, true);
+    }),
   });
 
   pi.registerCommand("crew-status", {
@@ -500,23 +536,20 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
 
   pi.registerCommand("crew-resume", {
     description: "Resume the latest (or named) stopped crew in this repo: /crew-resume [slug]",
-    async handler(args, ctx) {
-      try {
-        if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active`);
-        const crews = listCrews(await commonDirOf(ctx.cwd)).filter((s) => s.status !== "finished");
-        const state = args.trim() ? crews.find((s) => s.config.slug === args.trim()) : crews[0];
-        if (!state) throw new Error("No resumable crew in this repository");
-        // Processes from a previous session are gone; keep their worktrees as evidence.
-        for (const t of runningTasks(state)) { t.status = "interrupted"; t.endedAt = Date.now(); }
-        state.status = "active";
-        crew = state;
-        persist();
-        activate();
-        tell("crew-resume", `${plannerPrompt(state.config)}\n\nCrew resumed. ${formatStatus(state)}\n\nInterrupted tasks kept their worktrees and branches; integrate them only if their commits are complete, otherwise re-dispatch.`, true);
-      } catch (error) {
-        ctx.ui.notify((error as Error).message, "error");
-      }
-    },
+    handler: (args, ctx) => switchCrew(ctx, async () => {
+      if (isActive()) throw new Error(`Crew ${crew!.config.slug} is already active`);
+      await drain(ctx);
+      const crews = listCrews(await commonDirOf(ctx.cwd)).filter((s) => s.status !== "finished");
+      const state = args.trim() ? crews.find((s) => s.config.slug === args.trim()) : crews[0];
+      if (!state) throw new Error("No resumable crew in this repository");
+      // Processes from a previous session are gone; keep their worktrees as evidence.
+      for (const t of runningTasks(state)) { t.status = "interrupted"; t.endedAt = Date.now(); }
+      state.status = "active";
+      crew = state;
+      persist();
+      activate();
+      tell("crew-resume", `${plannerPrompt(state.config)}\n\nCrew resumed. ${formatStatus(state)}\n\nInterrupted tasks kept their worktrees and branches; integrate them only if their commits are complete, otherwise re-dispatch.`, true);
+    }),
   });
 
   pi.registerCommand("crew-clean", {
