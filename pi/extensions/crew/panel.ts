@@ -1,6 +1,6 @@
 import { git as runGit, type GitResult } from "./git.ts";
 import type { CheckResult, TaskReport } from "./handoff.ts";
-import { runningTasks, spent, type CrewState, type ModelRef, type TaskRecord, type TaskStatus } from "./state.ts";
+import { money, ref, runningTasks, spent, type CrewState, type TaskRecord, type TaskStatus } from "./state.ts";
 
 // The /crew panel: a lazygit-style view of one crew. Styling and terminal-width handling are
 // injected (Pi's theme and pi-tui in production), as in the subagent and watch panels, so
@@ -40,8 +40,6 @@ export function duration(ms: number): string {
   return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m`;
 }
 
-const money = (usd: number) => `$${usd.toFixed(2)}`;
-const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 const home = process.env.HOME ?? "";
 const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
 

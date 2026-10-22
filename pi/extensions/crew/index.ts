@@ -11,7 +11,7 @@ import { formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
 import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
-  formatStatus, listCrews, loadState, runningTasks, saveState, slugify, spent,
+  formatStatus, formatWidget, listCrews, loadState, money, ref, runningTasks, saveState, slugify, spent,
   type CrewState, type ModelRef, type TaskRecord,
 } from "./state.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
@@ -72,7 +72,6 @@ function panelEvent(data: string): PanelInput | undefined {
 }
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
-const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 
 // Tests inject a fake runWorker; Pi calls the factory with the API only.
 export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker } = {}) {
@@ -124,16 +123,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
       ui.ui.setStatus("crew", undefined);
       return;
     }
-    const now = Date.now();
-    const running = runningTasks(crew);
-    const lines = [`crew ${crew.config.slug} · ${running.length}/${crew.config.maxConcurrent} running · $${spent(crew).toFixed(2)}/$${crew.config.budgetUsd.toFixed(2)} · ${PANEL_KEY} or /crew`];
-    for (const t of running) {
-      const secs = Math.round((now - t.startedAt) / 1000);
-      const quiet = Math.round((now - t.lastEventAt) / 1000);
-      lines.push(` #${t.id} ${t.kind.padEnd(9)} ${String(Math.floor(secs / 60)).padStart(3)}m${String(secs % 60).padStart(2, "0")}s  ${String(t.toolCalls).padStart(3)} tools  $${t.cost.toFixed(2)}  ${quiet > 60 ? `(quiet ${quiet}s) ` : ""}${t.activity}`.slice(0, 160));
-    }
-    ui.ui.setWidget("crew", lines, { placement: "belowEditor" });
-    ui.ui.setStatus("crew", `crew: ${running.length} running`);
+    ui.ui.setWidget("crew", formatWidget(crew, `${PANEL_KEY} or /crew`), { placement: "belowEditor" });
+    ui.ui.setStatus("crew", `crew: ${runningTasks(crew).length} running`);
   }
 
   function sweep() {
@@ -148,7 +139,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     }
     if (!crew.budgetReported && spent(crew) >= crew.config.budgetUsd) {
       crew.budgetReported = true;
-      tell("crew-budget", `Budget reached: $${spent(crew).toFixed(2)} of $${crew.config.budgetUsd.toFixed(2)}. New dispatches are refused; running workers continue. Finish with what's integrated or escalate for more budget.`, true);
+      tell("crew-budget", `Budget reached: ${money(spent(crew))} of ${money(crew.config.budgetUsd)}. New dispatches are refused; running workers continue. Finish with what's integrated or escalate for more budget.`, true);
     }
     persist();
   }
@@ -318,7 +309,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker 
     execute: (_id, params) => track((async () => {
       const state = requireCrew();
       const c = state.config;
-      if (spent(state) >= c.budgetUsd) throw new Error(`Budget exhausted ($${spent(state).toFixed(2)} of $${c.budgetUsd}). Escalate to the human.`);
+      if (spent(state) >= c.budgetUsd) throw new Error(`Budget exhausted (${money(spent(state))} of $${c.budgetUsd}). Escalate to the human.`);
       if (runningTasks(state).length >= c.maxConcurrent) {
         throw new Error(`${c.maxConcurrent} workers already running. End your turn; the next handoff will wake you.`);
       }

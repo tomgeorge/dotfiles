@@ -83,6 +83,7 @@ export function listCrews(commonDir: string): CrewState[] {
   const dir = crewDir(commonDir);
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((f) => f.endsWith(".json"))
+    // A corrupt or newer-version ledger must not hide the other crews.
     .map((f) => { try { return loadState(commonDir, f.slice(0, -5)); } catch { return undefined; } })
     .filter((s): s is CrewState => !!s)
     .sort((a, b) => b.config.createdAt - a.config.createdAt);
@@ -90,6 +91,8 @@ export function listCrews(commonDir: string): CrewState[] {
 
 export const spent = (state: CrewState) => state.tasks.reduce((sum, t) => sum + t.cost, 0);
 export const runningTasks = (state: CrewState) => state.tasks.filter((t) => t.status === "running");
+export const money = (usd: number) => `$${usd.toFixed(2)}`;
+export const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 
 export function slugify(text: string): string {
   const base = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32).replace(/-+$/, "");
@@ -106,14 +109,27 @@ export function formatStatus(state: CrewState, now = Date.now()): string {
   const c = state.config;
   const lines = [
     `Crew ${c.slug} (${state.status}) · integration branch ${c.integrationBranch} at ${c.integrationPath}`,
-    `spent $${spent(state).toFixed(2)} of $${c.budgetUsd.toFixed(2)} · ${runningTasks(state).length}/${c.maxConcurrent} running`,
+    `spent ${money(spent(state))} of ${money(c.budgetUsd)} · ${runningTasks(state).length}/${c.maxConcurrent} running`,
   ];
   if (!state.tasks.length) lines.push("No tasks yet.");
   for (const t of state.tasks) {
     const time = t.status === "running" ? `${ago(now - t.startedAt)}, last event ${ago(now - t.lastEventAt)} ago` : ago((t.endedAt ?? now) - t.startedAt);
     const extra = t.status === "running" ? ` · ${t.toolCalls} tools · ${t.activity}` : "";
     const review = t.reviewOf ? ` of #${t.reviewOf}` : "";
-    lines.push(`#${t.id} ${t.kind}${review} [${t.status}] "${t.title}" · ${t.model} · ${time} · $${t.cost.toFixed(2)}${extra}`);
+    lines.push(`#${t.id} ${t.kind}${review} [${t.status}] "${t.title}" · ${t.model} · ${time} · ${money(t.cost)}${extra}`);
   }
   return lines.join("\n");
+}
+
+/** The widget below the editor while a crew runs. `hint` says how to open the panel. */
+export function formatWidget(state: CrewState, hint: string, now = Date.now()): string[] {
+  const c = state.config;
+  const running = runningTasks(state);
+  const lines = [`crew ${c.slug} · ${running.length}/${c.maxConcurrent} running · ${money(spent(state))}/${money(c.budgetUsd)} · ${hint}`];
+  for (const t of running) {
+    const secs = Math.round((now - t.startedAt) / 1000);
+    const quiet = Math.round((now - t.lastEventAt) / 1000);
+    lines.push(` #${t.id} ${t.kind.padEnd(9)} ${String(Math.floor(secs / 60)).padStart(3)}m${String(secs % 60).padStart(2, "0")}s  ${String(t.toolCalls).padStart(3)} tools  ${money(t.cost)}  ${quiet > 60 ? `(quiet ${quiet}s) ` : ""}${t.activity}`.slice(0, 160));
+  }
+  return lines;
 }
