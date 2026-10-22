@@ -41,6 +41,9 @@ Use `ketch` for external research — web pages, OSS code, library docs.
 - `ketch docs "query" --library /org/repo` for version-aware library docs
 - All commands support `--json`. `ketch config` reports active backends.
 
+## Long work
+For work likely to take more than one session, such as a large feature, a migration, or a multi-hour investigation, suggest `/execplan` before starting. Its plan file under `.agent/plans/` is the source of truth, and the work can resume from it after `/handoff`.
+
 ## Review loop
 When I say "review this well", "review it well", "do a proper review", or something similar, run the review-fix loop:
 - Read `~/.pi/agent/prompts/review-loop.md` and follow it exactly.
