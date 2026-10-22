@@ -163,6 +163,9 @@ export function popupKey(state: PopupState, jobs: JobRecord[], key: PopupKey, pa
   }
   if (key === "expand" && job) {
     state.expandTask = !state.expandTask;
+    // Start an expanded task from its first line; collapsing restores the view's usual position.
+    if (state.expandTask) state.scroll = 0;
+    else resetScroll(state, job);
     return { type: "none" };
   }
   if (state.focus === "list") {
@@ -231,27 +234,29 @@ function detail(job: JobRecord, state: PopupState, now: number, width: number, h
   const u = job.progress.usage;
   const taskLines = s.wrap(job.task, width - 7);
   const taskExpanded = state.expandTask ?? false;
-  const taskToShow = taskExpanded ? taskLines : taskLines.slice(0, 3);
+  const taskRows = (taskExpanded ? taskLines : taskLines.slice(0, 3)).map((line, i) => `${label(i ? "" : "task")} ${line}`);
   const head = [
     `${label("cwd")} ${tildify(job.cwd)}`,
     `${label("git")} ${git}`,
     `${label("tools")} ${job.tools.join(" ")}`,
     `${label("spend")} ${money(u.cost)} ${s.fg("dim", `· ${tokens(u.input)} in / ${tokens(u.output)} out`)}`,
     `${label("calls")} ${job.progress.toolCalls} ${s.fg("dim", `· ${doing(job)}`)}`,
-    ...taskToShow.map((line, i) => `${label(i ? "" : "task")} ${line}`),
+    // Expanded, the task can be taller than the pane, so it scrolls with the body instead.
+    ...(taskExpanded ? [] : taskRows),
     ...(taskLines.length > 3 && !taskExpanded ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines · ctrl+o to expand`)}`] : []),
   ];
   const view = bodyView(state, job);
   const other = view === "activity" ? "result" : "activity";
   const divider = rule(s.fg("accent", view), `a: ${other} · t: ${view === "task" ? "back" : "task"}`, width, s);
-  const room = Math.max(1, height - head.length - 1);
-  const body = bodyLines(job, view, width, s);
+  const room = Math.max(1, height - head.length - (taskExpanded ? 0 : 1));
+  const viewLines = bodyLines(job, view, width, s);
+  const body = taskExpanded ? [...taskRows, divider, ...viewLines] : viewLines;
   const maxScroll = Math.max(0, body.length - room);
   const scroll = state.scroll === "end" ? maxScroll : Math.min(state.scroll, maxScroll);
   // Write back so later key presses scroll from what's on screen.
   if (state.scroll !== "end") state.scroll = scroll;
   const shown = body.slice(scroll, scroll + room);
-  return { lines: [...head, divider, ...shown], room };
+  return { lines: taskExpanded ? [...head, ...shown] : [...head, divider, ...shown], room };
 }
 
 export interface PopupRender {

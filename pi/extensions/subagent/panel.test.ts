@@ -212,6 +212,13 @@ test("popup expands the task prompt with ctrl+o", () => {
   // Count lines containing "step" (task content lines)
   const taskLineCount = (screenText.match(/step \d+/g) || []).length;
   assert.ok(taskLineCount > 3, `Expected more than 3 task lines, got ${taskLineCount}`);
+  // A prompt taller than the pane must still be readable to its end by scrolling,
+  // and the result must remain reachable below it.
+  popupKey(state, jobs, "enter", 5);
+  popupKey(state, jobs, "bottom", 5);
+  assert.match(screen(), /step 39/);
+  assert.match(screen(), /md:\*\*done\*\*/);
+  popupKey(state, jobs, "back", 5);
   // Toggle expand off
   popupKey(state, jobs, "expand", 5);
   assert.equal(state.expandTask, false);
