@@ -120,7 +120,7 @@ Constraints:
 - [x] (2026-10-22) Research, build, first review loop (3 rounds), 11 logical commits, pushed to master.
 - [x] (2026-10-22) M1 baseline: full suite `ℹ pass 95 / ℹ fail 0` on 3 of 3 runs; all 5 extensions load; `bash -n` clean. No flakes (the watch suite isn't in the command).
 - [x] (2026-10-22) M1 retro: `collect.ts --days 7` reran on the same day as the 2026-10-22 digest and found the same signals, nothing new. Proposals 2 (Todoist limit) and 3 (`node --test` format) are still unapplied.
-- [ ] M1 remaining: Tom to decide on retro proposals 2 and 3 (asked at the end of the 2026-10-22 session). The 30-day collector run backs up proposal 2: the `limit: must be <= 100` error recurs in 3 sessions.
+- [x] (2026-10-23) M1 remaining: Tom approved retro proposals 2 and 3; applied in `2945fe6`.
 - [x] (2026-10-22) M2 goal round 1: 3 reviewers, 6 findings raised, 5 accepted (see the table). Two were reproduced with an RPC e2e probe (/tmp/goal-e2e) and one with a red unit test; all fixed, uncommitted.
 - [x] (2026-10-22) M2 goal rounds 2–3: round 2 accepted 1 medium (the first request still lacked the rules, reproduced via a `before_provider_request` probe) and 1 low (background jobs leaked). Round 3 accepted 1 low (a timeout during the drain overrode a real exit code). All fixed red/green. Suite at `ℹ pass 98 / ℹ fail 0`, goal loads. Stopped at the 3-round cap, with nothing above low open. Changes are uncommitted.
 - [x] (2026-10-22) M2 advisor: round 1 raised 2 medium (Opus: /tree re-enables the tool against advisor.json; GPT: Pi's `serializeConversation` cuts each tool result to 2,000 characters). Both accepted and fixed; round 2 came back "No findings" from both reviewers. Uncommitted.
@@ -138,19 +138,7 @@ Constraints:
   - index.ts wiring has no unit seam (open issue 4, Milestone 3). Verified items 1 and 4 with an e2e instead (`/tmp/goal-e2e/crew-dirty.json`, haiku worker, ~$0.08): `crew_finish` with `date > stamp.txt` refused, listing `stamp.txt`; the integration worktree was clean afterwards; `paths ["*.txt"]` didn't flag `hello.txt`. Items 2 and 3 are unverified beyond loading and reasoning.
 - [x] (2026-10-23) M2 crew round 2 (Opus, GPT on `git diff -- pi/extensions/crew`): fixes 2–7 held up. Accepted 1 high and 2 medium, all regressions or gaps in *my round-1 guard fix*: global options with separate or quoted values (`git --work-tree . push`, `git -C "my dir" push`) [GPT H, Opus M]; bare `git checkout main --` switches branch [both M]; `git clean -fd` skips a nested repo a check created [GPT M]. Opus lows also accepted: `$(git push)` nested in args, inline `-c alias.p=push p`. Fixed red then green (regex extended; `clean -ffd` plus a post-clean verify that throws).
 - [x] (2026-10-23) M2 crew round 3 (the cap; Opus, GPT on the round-2 changes): 9 findings, **all reproduced** with `/tmp/chk.ts`: an exponential ReDoS in my extended regex (`"git" + " --git-dir=x".repeat(24)` took 492 ms, doubling per 2 more), `$(...)`/backtick values after `-C` hiding the call, flags after a substitution unread, attached `-C.`/`-calias…`, quoted `"$(git push)"` swallowed, redirections counted as paths, and two false positives (`checkout -- $(…)`, `-m 'Document --amend'`). Asked the advisor (see the Decision Log), then replaced the regex with a bounded shell-word lexer in `guard-policy.ts`. Red tests first: all 9 reproducers plus extras, and a subprocess test with a 5 s timeout for pathological input. Crew suite `ℹ pass 29`, full suite `ℹ pass 119 / ℹ fail 0`, all extensions load. README updated (guard scope; `crew_finish` dirty refusal). **The lexer itself hasn't been independently reviewed.** The loop stopped at the cap, so this result isn't "clean".
-- [ ] Commit question for Tom: everything is uncommitted. Suggested logical commits:
-  1. goal fixes;
-  2. advisor fixes;
-  3. retro fixes;
-  4. checkin fixes;
-  5. crew planner prompt;
-  6. crew guard (the lexer) and runCheck;
-  7. crew harness fixes (dirty worktrees, cancellable checks, interrupted integrate, glob scopes, README);
-  8. test-support (fake-pi, mutate.ts) with goal's `index.test.ts` and `mutants.json`;
-  9. crew `index.test.ts`, `mutants.json`, and the `runWorker` seam;
-  10. crew stop and resume drain (issue 2), with the TOCTOU README note;
-  11. `pi/WORKFLOW.md`;
-  12. the plan file itself, if wanted.
+- [x] (2026-10-23) Committed and pushed; see Tom's decisions below.
 - [x] (2026-10-23) M3 goal (open issue 3): `pi/extensions/test-support/fake-pi.ts` is a fake `ExtensionAPI`. It stubs `typebox` and `pi-ai` with `module.registerHooks`, so tests must `await import("./index.ts")` after importing it. No `index.ts` lives there, so Pi won't load it. `pi/extensions/goal/index.test.ts` has 7 wiring tests. A mutation gate, `node pi/extensions/test-support/mutate.ts <ext>`, applies `<ext>/mutants.json` to a temp copy and fails while any mutant survives: goal `all 10 mutants killed`. The first manual pass left 2 survivors (the changed-during-check guard, which `decide()` already covers for clear but not for replace; and entry snapshots); both tests were tightened.
 - [x] (2026-10-23) M3 crew (open issue 4). The seam is an optional 2nd factory arg `{ runWorker }`; Pi calls `factory(api)` (`loader.js:514`). `crew/mutants.json` has 29 wiring mutants. `/goal` ran headless with Sonnet (`/tmp/goal-e2e/driver2.mjs`, log `/tmp/goal-e2e/m3.log`) against the check `node pi/extensions/test-support/mutate.ts crew`, and completed **in its first run (0 continuations), 13 min**. It wrote `crew/index.test.ts`: 20 tests, 344 lines. They use real temp git repos under a temp `$HOME` and a controllable fake worker, and assert what the planner sees. Checksums of `mutants.json`, `index.ts`, and `mutate.ts` were unchanged (no gaming), and `fake-pi.ts` was untouched. Re-verified myself: `all 29 mutants killed` (2 min). Full suite `ℹ pass 146 / ℹ fail 0` on 3 of 3 runs. No leaked worktrees.
 - [x] (2026-10-23) M4. The advisor was consulted on both issues; see the Decision Log.
@@ -169,10 +157,10 @@ Constraints:
   - `pi/WORKFLOW.md` gained a row for the mutation-gate `/goal`, a review note (bugs live in the fixes), a "What dogfooding taught" section, and the test-support location.
   - Retro: `collect.ts --days 2` and the digest in `~/.local/state/pi-retro/2026-10-23.md`. 2 proposals: (1) test commits must disable signing, plus fixing the subagent helpers; (2) the mutation gate, already recorded. Proposals 2 and 3 from 10-22 are still pending.
   - Outcomes filled in.
-- [ ] Waiting on Tom:
-  - (a) retro proposals 2 and 3 from 2026-10-22, plus the new proposal 1 from 2026-10-23 (it touches `subagent/*`, his area);
-  - (b) commit permission;
-  - (c) open issue 6 (fut sort order), unchanged.
+- [x] (2026-10-23) Tom's decisions:
+  - He approved all three retro proposals; they're applied in `2945fe6`.
+  - He approved committing: 13 logical commits, `04d308a..2945fe6`, pushed to master. That's the 12 proposed plus one for the retro proposals. Each commit was verified green in a detached worktree (`ℹ fail 0`), and the final one also without the signing override.
+  - fut notification ordering (open issue 6) is tabled for now.
 
 ## Surprises & Discoveries
 
