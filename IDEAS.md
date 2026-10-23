@@ -16,6 +16,8 @@ Not committed to yet; promote to TODO.md once one is worth doing.
   back to the newest ledger crew, which can be one still active elsewhere
   (resume would mark its running tasks interrupted). At minimum, skip `active`
   crews in those fallbacks; ideally, run and switch between crews in one session.
+  The panel side is ready: `crewSource(getCrew, deps)` draws one crew, so
+  showing several is one source per crew (switched, or merged with prefixed ids).
 - **Suspend the crew when it goes over budget, and say by how much.** Today the
   budget only refuses new dispatches: running workers finish, the planner is
   told once, and the crew stays active, often ending above the budget. Suspend
@@ -39,6 +41,19 @@ Not committed to yet; promote to TODO.md once one is worth doing.
   shared; extensions would announce their sources over `pi.events` in answer to
   a discover event (so load order doesn't matter), and one extension owns the
   command. Only worth it once several kinds of work often run at once.
+- **Draw the widgets from the panel sources.** The strips below the editor
+  (subagent, watch, crew) still render their own rows; they could reuse each
+  source's items, glyphs, and columns, as the panel does.
+- **Panel: mark several items and act on all of them** (mini.pick's
+  `choose_marked`), e.g. cancel three workers or stop every watch.
+- **Panel: refine** (mini.pick): make the current matches the new item set,
+  then filter within them.
+- **Panel: query syntax** in the filter: `'exact`, `^prefix`, `suffix$`, as
+  telescope and fzf do. Today every token is a fuzzy match.
+- **Panel: user key maps.** Actions are named, so a settings file could remap
+  their keys without touching a source (telescope's `actions.*:replace`).
+- **Panel: resume** (mini.pick's `resume()`): reopen the last panel with its
+  selection, tab, filter, and scroll as they were.
 - **Doom-style leader key, from [doompi](https://github.com/AgiFlow/doompi).**
   `SPC` on an empty prompt (and `ctrl+space` anywhere) opens a which-key map of
   commands: `SPC c l` lists crews, `SPC c s` crew status, `SPC a l` subagents,
