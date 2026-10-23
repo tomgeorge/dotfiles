@@ -554,11 +554,18 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   async function panelCrew(ctx: ExtensionContext, unfinished = false): Promise<CrewState | undefined> {
     const open = (s: CrewState) => !unfinished || s.status !== "finished";
     if (crew && open(crew)) return crew;
+    return (await repoCrews(ctx.cwd)).find(open);
+  }
+
+  /** Every crew in the ledger of cwd's repo; none outside a git repository. */
+  async function repoCrews(cwd: string): Promise<CrewState[]> {
+    let commonDir: string;
     try {
-      return listCrews(await commonDirOf(ctx.cwd)).find(open);
+      commonDir = await commonDirOf(cwd);
     } catch {
-      return undefined; // not a git repository
+      return []; // not a git repository
     }
+    return listCrews(commonDir);
   }
 
   async function copyPath(path: string): Promise<string> {
@@ -689,7 +696,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   pi.registerCommand("crews", {
     description: "Pick any crew in this repository and open its panel; lists them without a UI",
     async handler(_args, ctx) {
-      const crews = listCrews(await commonDirOf(ctx.cwd));
+      const crews = await repoCrews(ctx.cwd);
       if (!ctx.hasUI) {
         console.log(crews.length ? crews.map(crewLabel).join("\n") : "No crews in this repository");
         return;

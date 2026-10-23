@@ -648,6 +648,29 @@ test("/crew-status and /crews say so when the repository has no crews", BOUND, a
   }
 });
 
+test("/crew-status and /crews report no crews outside a git repository", BOUND, async (t) => {
+  const e = boot(realpathSync(mkdtempSync(join(tmpdir(), "crew-nogit-"))));
+  onCancel(t, e.shutdown);
+  try {
+    await e.f.command("crew-status", "", e.ctx);
+    await e.f.command("crews", "", e.ctx);
+    assert.deepEqual(e.f.notes, ["No crews in this repository", "No crews in this repository"]);
+
+    const logged: string[] = [];
+    const log = console.log;
+    console.log = (text: string) => { logged.push(text); };
+    try {
+      await e.f.command("crew-status", "", { ...e.ctx, hasUI: false });
+      await e.f.command("crews", "", { ...e.ctx, hasUI: false });
+    } finally {
+      console.log = log;
+    }
+    assert.deepEqual(logged, ["No crews in this repository", "No crews in this repository"]);
+  } finally {
+    await e.shutdown();
+  }
+});
+
 test("/crews picks any crew from the ledger and opens it; without a UI it lists them", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root);
