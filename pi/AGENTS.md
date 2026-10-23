@@ -42,7 +42,6 @@ When writing or editing tickets (Linear, GitHub issues), the tickets in a projec
 ## Shell
 - Prefer non-interactive commands. Avoid commands that hang (pagers, editors, watchers).
 - Use `rg` and `fd` when available.
-- `sed` here is GNU sed (nix): use `sed -i 's/a/b/' file`, never the BSD form `sed -i '' ...`.
 - Don't use `sudo` or modify files outside the project without asking.
 
 ## Research
