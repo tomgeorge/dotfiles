@@ -3,7 +3,7 @@ font-family = DejaVu Sans Mono
 font-size = 14
 background-opacity = 0.9
 # ponytail: closest macOS gets to wezterm's flat tab bar — bottom tabs are GTK-only
-macos-titlebar-style = tabs
+macos-titlebar-style = hidden
 gtk-tabs-location = bottom
 # absolute path: GUI launches don't inherit the nix PATH
 command = /run/current-system/sw/bin/fish -l
