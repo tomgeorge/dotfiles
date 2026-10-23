@@ -16,6 +16,8 @@
 - Comments explain *why*, not *what*.
 - Don't add dependencies without asking.
 - Handle errors explicitly; don't swallow them.
+- Prefer simple over easy: plain data and functions, values over mutable state, composition over inheritance. Don't braid concerns together, such as I/O with decisions.
+- Parse untrusted input once at the boundary into typed values; no `any`, `!`, or unchecked casts.
 
 ## Verification
 - After changes, run the project's formatter, linter, and tests when available.
