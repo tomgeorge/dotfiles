@@ -7,9 +7,22 @@
 // Keys are single characters, except "<C-r>" for ctrl+r. The parser only
 // parses; editor.ts runs the command.
 
-export type Operator = "d" | "c" | "y";
-export type MotionSpec = { key: string; arg?: string };
-export type ObjectSpec = { key: string; inner: boolean };
+const MOTIONS = ["h", "l", "j", "k", "0", "^", "$", "w", "b", "e", "W", "B", "E", "G", ";", ",", "%", "{", "}"] as const;
+const G_MOTIONS = ["g", "e", "E"] as const; // gg ge gE
+const CHAR_MOTIONS = ["f", "F", "t", "T"] as const;
+const OPERATORS = ["d", "c", "y"] as const;
+const SIMPLE = ["x", "X", "D", "C", "s", "S", "Y", "p", "P", "J", "~", "u", "<C-r>", "i", "a", "I", "A", "o", "O"] as const;
+const OBJECTS = ["w", "W", "(", ")", "b", "{", "}", "B", "[", "]", "<", ">", '"', "'", "`", "p"] as const;
+
+export type Operator = (typeof OPERATORS)[number];
+export type CharMotionKey = (typeof CHAR_MOTIONS)[number];
+export type MotionKey = (typeof MOTIONS)[number] | `g${(typeof G_MOTIONS)[number]}` | CharMotionKey;
+export type SimpleKey = (typeof SIMPLE)[number] | "r"; // r takes a character first
+export type ObjectKey = (typeof OBJECTS)[number];
+
+// arg is the character f/F/t/T search for.
+export type MotionSpec = { key: MotionKey; arg?: string };
+export type ObjectSpec = { key: ObjectKey; inner: boolean };
 
 // What an operator acts on: a motion, a text object, or (dd, cc, yy) lines.
 export type Target = { motion: MotionSpec } | { object: ObjectSpec } | { line: true };
@@ -24,28 +37,25 @@ export type Command =
       register: string | null;
       target: Target;
     }
-  | { type: "simple"; key: string; count: number | null; register: string | null; arg?: string };
+  // arg is the character r replaces with.
+  | { type: "simple"; key: SimpleKey; count: number | null; register: string | null; arg?: string };
 
 type Feed = { done: true; command: Command | null } | { done: false };
 
-const MOTIONS = new Set(["h", "l", "j", "k", "0", "^", "$", "w", "b", "e", "W", "B", "E", "G", ";", ",", "%", "{", "}"]);
-const G_MOTIONS = new Set(["g", "e", "E"]); // gg ge gE
-const CHAR_MOTIONS = new Set(["f", "F", "t", "T"]);
-const OPERATORS = new Set(["d", "c", "y"]);
-const SIMPLE = new Set(["x", "X", "D", "C", "s", "S", "Y", "p", "P", "J", "~", "u", "<C-r>", "i", "a", "I", "A", "o", "O"]);
-const OBJECTS = new Set(["w", "W", "(", ")", "b", "{", "}", "B", "[", "]", "<", ">", '"', "'", "`", "p"]);
+const isIn = <T extends string>(keys: readonly T[], key: string): key is T => (keys as readonly string[]).includes(key);
 
-const isOperator = (key: string): key is Operator => OPERATORS.has(key);
+// A count can't start with 0: that's the line-start motion.
+const isCountDigit = (key: string, digitsSoFar: string): boolean => /[1-9]/.test(key) || (key === "0" && digitsSoFar !== "");
 
 // Each stage carries what it has collected beyond the counts and register.
 type Stage =
   | { type: "start" } // counts and a register may still come
   | { type: "register" } // after "
   | { type: "g" } // after g, before an operator
-  | { type: "char"; key: string } // f/F/t/T/r waiting for its character, before an operator
+  | { type: "char"; key: CharMotionKey | "r" } // f/F/t/T/r waiting for its character, before an operator
   | { type: "operator"; op: Operator } // after d/c/y
   | { type: "op-g"; op: Operator }
-  | { type: "op-char"; op: Operator; key: string }
+  | { type: "op-char"; op: Operator; key: CharMotionKey }
   | { type: "op-object"; op: Operator; inner: boolean }; // after d i / d a
 
 const START: Stage = { type: "start" };
@@ -85,7 +95,7 @@ export class Parser {
         return { done: false };
 
       case "start":
-        if (/[1-9]/.test(key) || (key === "0" && this.count1 !== "")) {
+        if (isCountDigit(key, this.count1)) {
           this.count1 += key;
           return { done: false };
         }
@@ -97,20 +107,20 @@ export class Parser {
           this.stage = { type: "g" };
           return { done: false };
         }
-        if (CHAR_MOTIONS.has(key) || key === "r") {
+        if (isIn(CHAR_MOTIONS, key) || key === "r") {
           this.stage = { type: "char", key };
           return { done: false };
         }
-        if (isOperator(key)) {
+        if (isIn(OPERATORS, key)) {
           this.stage = { type: "operator", op: key };
           return { done: false };
         }
-        if (MOTIONS.has(key)) return this.done({ type: "motion", motion: { key }, count: this.count(this.count1) });
-        if (SIMPLE.has(key)) return this.simple(key);
+        if (isIn(MOTIONS, key)) return this.done({ type: "motion", motion: { key }, count: this.count(this.count1) });
+        if (isIn(SIMPLE, key)) return this.simple(key);
         return this.done(null);
 
       case "g":
-        if (G_MOTIONS.has(key)) return this.done({ type: "motion", motion: { key: "g" + key }, count: this.count(this.count1) });
+        if (isIn(G_MOTIONS, key)) return this.done({ type: "motion", motion: { key: `g${key}` }, count: this.count(this.count1) });
         return this.done(null);
 
       case "char":
@@ -118,7 +128,7 @@ export class Parser {
         return this.done({ type: "motion", motion: { key: stage.key, arg: key }, count: this.count(this.count1) });
 
       case "operator":
-        if (/[1-9]/.test(key) || (key === "0" && this.count2 !== "")) {
+        if (isCountDigit(key, this.count2)) {
           this.count2 += key;
           return { done: false };
         }
@@ -131,22 +141,22 @@ export class Parser {
           this.stage = { type: "op-g", op: stage.op };
           return { done: false };
         }
-        if (CHAR_MOTIONS.has(key)) {
+        if (isIn(CHAR_MOTIONS, key)) {
           this.stage = { type: "op-char", op: stage.op, key };
           return { done: false };
         }
-        if (MOTIONS.has(key)) return this.operator(stage.op, { motion: { key } });
+        if (isIn(MOTIONS, key)) return this.operator(stage.op, { motion: { key } });
         return this.done(null);
 
       case "op-g":
-        if (G_MOTIONS.has(key)) return this.operator(stage.op, { motion: { key: "g" + key } });
+        if (isIn(G_MOTIONS, key)) return this.operator(stage.op, { motion: { key: `g${key}` } });
         return this.done(null);
 
       case "op-char":
         return this.operator(stage.op, { motion: { key: stage.key, arg: key } });
 
       case "op-object":
-        if (OBJECTS.has(key)) return this.operator(stage.op, { object: { key, inner: stage.inner } });
+        if (isIn(OBJECTS, key)) return this.operator(stage.op, { object: { key, inner: stage.inner } });
         return this.done(null);
     }
   }
@@ -159,7 +169,7 @@ export class Parser {
     return { done: true, command };
   }
 
-  private simple(key: string, arg?: string): Feed {
+  private simple(key: SimpleKey, arg?: string): Feed {
     return this.done({ type: "simple", key, count: this.count(this.count1), register: this.register, ...(arg === undefined ? {} : { arg }) });
   }
 

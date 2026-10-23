@@ -125,20 +125,29 @@ export class ViEditor extends CustomEditor {
         this.bridge.setCursor(action.cursor);
         return;
       case "undo":
-        for (let i = 0; i < action.count && this.bridge.undoDepth() > 0; i++) {
-          this.redoStack.push(this.bridge.snapshot());
-          this.bridge.undo();
-        }
-        this.redoText = this.getText();
-        this.clamp();
+        this.undoSteps(action.count);
         return;
       case "redo":
-        if (this.getText() !== this.redoText) this.redoStack = [];
-        for (let i = 0; i < action.count && this.redoStack.length > 0; i++) this.bridge.restore(this.redoStack.pop()!);
-        this.redoText = this.getText();
-        this.clamp();
+        this.redoSteps(action.count);
         return;
     }
+  }
+
+  // Named apart from the base editor's private undo(), which must stay intact.
+  private undoSteps(count: number): void {
+    for (let i = 0; i < count && this.bridge.undoDepth() > 0; i++) {
+      this.redoStack.push(this.bridge.snapshot());
+      this.bridge.undo();
+    }
+    this.redoText = this.getText();
+    this.clamp();
+  }
+
+  private redoSteps(count: number): void {
+    if (this.getText() !== this.redoText) this.redoStack = [];
+    for (let i = 0; i < count && this.redoStack.length > 0; i++) this.bridge.restore(this.redoStack.pop()!);
+    this.redoText = this.getText();
+    this.clamp();
   }
 
   private clamp(): void {
