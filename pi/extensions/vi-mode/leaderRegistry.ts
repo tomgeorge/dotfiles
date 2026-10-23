@@ -155,18 +155,21 @@ export function commandNameError(name: string): string | undefined {
 
 type Report = (message: string) => void;
 
+// Contributions are code, not hand-typed, so text is checked and kept exactly
+// as sent: trimming first would let " c " or "crews\n" through as "c" or "crews".
+const surroundError = (text: string): string | undefined => (text !== text.trim() ? "must not have leading or trailing whitespace" : undefined);
+
 function parseText(value: unknown, field: string, check: (text: string) => string | undefined, report: Report): string | undefined {
   if (typeof value !== "string") {
     report(`${field} must be a string`);
     return undefined;
   }
-  const text = value.trim();
-  const error = check(text);
+  const error = check(value);
   if (error) {
     report(`${field} ${error}`);
     return undefined;
   }
-  return text;
+  return value;
 }
 
 function parseSegment(value: unknown, field: string, report: Report): LeaderSegment | undefined {
@@ -176,8 +179,8 @@ function parseSegment(value: unknown, field: string, report: Report): LeaderSegm
   }
   const key = typeof value.key === "string" ? value.key.toLowerCase() : value.key;
   const parsedKey = parseText(key, `${field}.key`, keyError, report);
-  const label = parseText(value.label, `${field}.label`, labelError, report);
-  const detail = value.detail === undefined ? undefined : parseText(value.detail, `${field}.detail`, detailError, report);
+  const label = parseText(value.label, `${field}.label`, (t) => labelError(t) ?? surroundError(t), report);
+  const detail = value.detail === undefined ? undefined : parseText(value.detail, `${field}.detail`, (t) => detailError(t) ?? surroundError(t), report);
   // An unknown tone is cosmetic, so it's dropped rather than costing the
   // contributor its whole menu (a contributor built against a later contract).
   const tone: LeaderTone | undefined = value.tone === "default" || value.tone === "exit" ? value.tone : undefined;
@@ -202,7 +205,7 @@ function parseBinding(value: unknown, index: number, report: (message: string, i
     report(`${field} must be an object`);
     return undefined;
   }
-  const id = parseText(value.id, `${field}.id`, (t) => (t === "" || length(t) > MAX_ID || hasControlChar(t) ? `must be 1-${MAX_ID} characters with no control characters` : undefined), report);
+  const id = parseText(value.id, `${field}.id`, (t) => (t === "" || length(t) > MAX_ID || hasControlChar(t) ? `must be 1-${MAX_ID} characters with no control characters` : surroundError(t)), report);
   const tagged: Report = (message) => report(message, id);
 
   let path: LeaderPath | undefined;
@@ -230,7 +233,10 @@ type Parsed = { ok: true; source: string; bindings: ParsedBinding[] } | { ok: fa
 function parseContribution(value: unknown): Parsed {
   if (!isRecord(value)) return { ok: false, diagnostics: [diag(UNKNOWN_SOURCE, "contribution must be an object")] };
   const { source } = value;
-  if (typeof source !== "string" || length(source) > MAX_SOURCE || !SAFE_SOURCE.test(source)) {
+  // JS `$` (without the m flag) only matches at the very end, but the explicit
+  // control-character check keeps that from being the only thing between a
+  // trailing newline and the tree.
+  if (typeof source !== "string" || length(source) > MAX_SOURCE || hasControlChar(source) || !SAFE_SOURCE.test(source)) {
     return { ok: false, diagnostics: [diag(UNKNOWN_SOURCE, `source must match ${SAFE_SOURCE} and be at most ${MAX_SOURCE} characters`)] };
   }
   if (source === USER_SOURCE) return { ok: false, diagnostics: [diag(source, `source "${USER_SOURCE}" is reserved for the leader.json keymap`)] };
@@ -320,7 +326,8 @@ function insertBinding(root: Node, binding: Insert): LeaderDiagnostic[] {
   return diagnostics;
 }
 
-// Applies one keymap entry. It always wins, so only a no-op unbind is reported.
+// Applies one keymap entry. A bind always wins, so only a no-op unbind and a
+// label-only entry that would have to destroy a leaf are reported.
 function applyKeymap(root: Node, entry: KeymapEntry): LeaderDiagnostic[] {
   const keys = entry.keys.join(" ");
   const last = entry.keys.at(-1);
@@ -336,6 +343,19 @@ function applyKeymap(root: Node, entry: KeymapEntry): LeaderDiagnostic[] {
       return [diag(USER_SOURCE, `${keys} isn't bound, so there's nothing to unbind`)];
     }
     return [];
+  }
+
+  // A label only names things; it must never cost a command. Checked before
+  // anything is created so a skipped entry leaves no stray groups.
+  if (!entry.command) {
+    let probe: Node | undefined = root;
+    for (const [index, key] of entry.keys.slice(0, -1).entries()) {
+      probe = probe.children.get(key);
+      if (!probe) break;
+      if (probe.target) {
+        return [diag(USER_SOURCE, `${keys} skipped: ${entry.keys.slice(0, index + 1).join(" ")} is a binding, and a label-only entry can't replace it`)];
+      }
+    }
   }
 
   let current = root;

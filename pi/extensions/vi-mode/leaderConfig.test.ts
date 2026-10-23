@@ -31,7 +31,7 @@ test("a valid file parses every entry kind", () => {
   const file = {
     leader: "space",
     keymap: [
-      { keys: "c", label: "crew" },
+      { keys: "c", label: " crew " },
       { keys: "C L", label: "list", command: "crews" },
       { keys: "g s", label: "status", command: "goal  status --verbose ", detail: "show the goal", tone: "exit" },
       { keys: "  q   q ", unbind: true },
@@ -85,6 +85,13 @@ test("each kind of error is reported", () => {
     [{ keymap: [{ keys: "c", label: "" }] }, /label must be 1-32/],
     [{ keymap: [{ keys: "c", label: "x".repeat(33) }] }, /label must be 1-32/],
     [{ keymap: [{ keys: "c", label: "a\u0007" }] }, /label must be 1-32 characters with no control/],
+    // Control characters are checked before trimming, so edges don't hide them.
+    [{ keymap: [{ keys: "c", label: "\ncrew" }] }, /label must be 1-32 characters with no control/],
+    [{ keymap: [{ keys: "c", label: "crew\u001b" }] }, /label must be 1-32 characters with no control/],
+    [{ keymap: [{ keys: "c", label: "x", detail: "\tshow" }] }, /detail must be at most 80 characters with no control/],
+    [{ keymap: [{ keys: "c", label: "x", detail: "show\n" }] }, /detail must be at most 80 characters with no control/],
+    [{ keymap: [{ keys: "c", label: "x", command: "crews\n" }] }, /command must not contain control/],
+    [{ keymap: [{ keys: "\nc", label: "x" }] }, /keys must not contain control/],
     [{ keymap: [{ keys: "c", label: "x", command: "/crews" }] }, /command name must not start with \//],
     [{ keymap: [{ keys: "c", label: "x", command: "" }] }, /command name must not be empty/],
     [{ keymap: [{ keys: "c", label: "x", command: ["crews"] }] }, /command must be a string/],

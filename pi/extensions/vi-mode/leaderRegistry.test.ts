@@ -68,11 +68,35 @@ test("carries tones through, and ignores an unknown tone without rejecting", () 
   assert.equal(option(r, ["c"], "o")?.tone, undefined);
 });
 
-test("lower-cases keys and trims text before checking", () => {
+test("lower-cases keys and otherwise keeps text exactly as sent", () => {
   const r = new LeaderRegistry();
-  const result = r.register({ source: "crew", bindings: [{ id: "list", path: [{ key: "C", label: " crew " }, { key: "L", label: "list" }], command: { name: "crews", args: " all " } }] });
+  const result = r.register({ source: "crew", bindings: [{ id: "list", path: [{ key: "C", label: "crew" }, { key: "L", label: "list" }], command: { name: "crews", args: " all " } }] });
   assert.equal(result.accepted, true);
-  assert.deepEqual(r.bindings(), [{ keys: ["c", "l"], labels: ["crew", "list"], target: { command: { name: "crews", args: "all" } }, source: "crew" }]);
+  assert.deepEqual(r.bindings(), [{ keys: ["c", "l"], labels: ["crew", "list"], target: { command: { name: "crews", args: " all " } }, source: "crew" }]);
+});
+
+test("checks raw text, so trimming can't launder a bad value", () => {
+  const r = new LeaderRegistry();
+  const one = { key: "c", label: "crew" };
+  const cases: [unknown, RegExp][] = [
+    [{ id: "x", path: [{ key: " c ", label: "\ncrew" }], command: { name: "crews\n" } }, /key must be one character[\s\S]*label must be 1-32[\s\S]*name must not contain whitespace/],
+    [{ id: "x", path: [{ key: " c ", label: "crew" }], command: { name: "crews" } }, /key must be one character/],
+    [{ id: "x", path: [{ key: "c", label: "\ncrew" }], command: { name: "crews" } }, /label must be 1-32 characters with no control/],
+    [{ id: "x", path: [{ key: "c", label: " crew" }], command: { name: "crews" } }, /label must not have leading or trailing whitespace/],
+    [{ id: "x", path: [{ key: "c", label: "crew", detail: "list\u001b" }], command: { name: "crews" } }, /detail must be at most 80 characters with no control/],
+    [{ id: "x", path: [{ key: "c", label: "crew", detail: "list " }], command: { name: "crews" } }, /detail must not have leading/],
+    [{ id: "x", path: [one], command: { name: "crews\n" } }, /name must not contain whitespace/],
+    [{ id: "x", path: [one], command: { name: " crews" } }, /name must not contain whitespace/],
+    [{ id: "x", path: [one], command: { name: "crews", args: "all\n" } }, /args must not contain control/],
+    [{ id: "x\n", path: [one], command: { name: "crews" } }, /id must be 1-128 characters with no control/],
+    [{ id: " x", path: [one], command: { name: "crews" } }, /id must not have leading/],
+  ];
+  for (const [binding, pattern] of cases) {
+    const result = r.register({ source: "crew", bindings: [binding] });
+    assert.equal(result.accepted, false, `${JSON.stringify(binding)} accepted`);
+    assert.match(messages(result.diagnostics).join("\n"), pattern, JSON.stringify(binding));
+  }
+  assert.deepEqual(r.bindings(), []);
 });
 
 test("rejects a malformed contribution whole, keeping the previous one", () => {
@@ -116,6 +140,10 @@ test("rejects a bad source, a reserved source, and a non-array", () => {
   assert.equal(r.register({ source: "bad source", bindings: [] }).accepted, false);
   assert.equal(r.register({ source: "-crew", bindings: [] }).accepted, false);
   assert.equal(r.register({ source: "a".repeat(129), bindings: [] }).accepted, false);
+  for (const source of ["crew\n", "crew\r", "\ncrew", "cr\u0000ew", " crew"]) {
+    assert.equal(r.register({ source, bindings: [LIST] }).accepted, false, JSON.stringify(source));
+  }
+  assert.deepEqual(r.bindings(), []);
   assert.equal(r.register({ source: "@scope/pkg.name:x_y-z", bindings: [] }).accepted, true);
   assert.match(messages(r.register({ source: "user", bindings: [LIST] }).diagnostics)[0] ?? "", /reserved/);
   assert.match(messages(r.register({ source: "crew", bindings: "nope" }).diagnostics)[0] ?? "", /array/);
@@ -285,6 +313,35 @@ test("a keymap label relabels a group, and creates an empty one that isn't shown
     { keys: ["z", "a"], label: "a", command: { name: "a" } },
   ]);
   assert.deepEqual(option(r, [], "z"), { key: "z", label: "later", hasChildren: true });
+});
+
+test("a label-only keymap entry never destroys a leaf on its path", () => {
+  const r = new LeaderRegistry(CORE);
+  r.register({ source: "crew", bindings: [LIST] });
+  r.setKeymap([
+    { keys: ["q", "q", "x"], label: "later" },
+    { keys: ["c", "l", "x", "y"], label: "deeper" },
+  ]);
+  const leaves = r.bindings().map((b) => b.keys.join(" "));
+  assert.ok(leaves.includes("q q"), "the quit leaf survives");
+  assert.ok(leaves.includes("c l"), "the crew leaf survives");
+  assert.equal(option(r, ["q"], "q")?.hasChildren, false);
+  assert.deepEqual(messages(r.diagnostics()), [
+    "q q x skipped: q q is a binding, and a label-only entry can't replace it",
+    "c l x y skipped: c l is a binding, and a label-only entry can't replace it",
+  ]);
+  assert.ok(r.diagnostics().every((d) => d.source === "user"));
+
+  // The plan's repro: a top-level leaf, then a label-only entry under it.
+  const top = new LeaderRegistry();
+  top.register({ source: "x", bindings: [{ id: "q", path: [{ key: "q", label: "quit" }], command: { name: "quit" } }] });
+  top.setKeymap([{ keys: ["q", "x"], label: "later" }]);
+  assert.deepEqual(top.bindings().map((b) => b.keys), [["q"]]);
+
+  // A keymap bind still wins over the same leaf.
+  top.setKeymap([{ keys: ["q", "x"], label: "x", command: { name: "x" } }]);
+  assert.deepEqual(top.bindings().map((b) => b.keys), [["q", "x"]]);
+  assert.deepEqual(top.diagnostics(), []);
 });
 
 test("a keymap unbind removes a leaf or a whole group", () => {
