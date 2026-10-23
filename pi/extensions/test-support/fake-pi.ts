@@ -65,7 +65,8 @@ const STUBS: Record<string, string> = {
     // Throws so callers take their no-clipboard path, as they did before this stub existed.
     export const copyToClipboard = async () => { throw new Error("no clipboard in tests"); };
     // Just enough of Pi's Editor for vi-mode: the private fields its bridge reads, public
-    // getText/setText, and handleInput that types printable keys and submits on "enter".
+    // getText/setText, and handleInput that types printable keys, submits on "enter", moves
+    // left on the left arrow, and collapses a bracketed paste into a marker as Pi does.
     // Pi sets onSubmit, onEscape, and actionHandlers after construction; tests do the same.
     export class CustomEditor {
       constructor(tui) {
@@ -90,6 +91,9 @@ const STUBS: Record<string, string> = {
       isShowingAutocomplete() { return false; }
       getText() { return this.state.lines.join("\\n"); }
       getCursor() { return { line: this.state.cursorLine, col: this.state.cursorCol }; }
+      getExpandedText() {
+        return this.getText().replace(/\\[paste #(\\d+) [^\\]]*\\]/g, (m, id) => this.pastes.get(Number(id)) ?? m);
+      }
       // As Pi's: an undo step if the text changes, pastes cleared, cursor at the end.
       setText(text) {
         if (this.getText() !== text) this.pushUndoSnapshot();
@@ -108,7 +112,22 @@ const STUBS: Record<string, string> = {
           this.undoStack.stack.length = 0;
           return this.onSubmit?.(text);
         }
+        if (data === "\\x1b[D") {
+          const { lines, cursorLine, cursorCol } = this.state;
+          if (cursorCol > 0) this.state.cursorCol = cursorCol - 1;
+          else if (cursorLine > 0) this.state = { lines, cursorLine: cursorLine - 1, cursorCol: lines[cursorLine - 1].length };
+          return;
+        }
+        const paste = /^\\x1b\\[200~([\\s\\S]*)\\x1b\\[201~$/.exec(data);
+        if (paste) {
+          const id = ++this.pasteCounter;
+          this.pastes.set(id, paste[1]);
+          return this.insert("[paste #" + id + " +" + paste[1].split("\\n").length + " lines]");
+        }
         if ([...data].length !== 1) return;
+        this.insert(data);
+      }
+      insert(data) {
         this.pushUndoSnapshot();
         const { lines, cursorLine, cursorCol } = this.state;
         const line = lines[cursorLine];

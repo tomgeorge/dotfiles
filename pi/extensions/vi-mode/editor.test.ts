@@ -192,3 +192,53 @@ test("a custom leader key \\ opens the leader, and space doesn't", () => {
   s.type("c");
   assert.match(s.editor.border(), / \\ c /);
 });
+
+test("a draft with a collapsed paste survives a command binding: paste, cursor and undo", () => {
+  const s = setup();
+  s.type("a", "escape", "A", "\x1b[200~one\ntwo\x1b[201~", "b", "escape", "0");
+  const text = s.editor.getText();
+  assert.match(text, /^a\[paste #1 \+2 lines\]b$/);
+  s.type(" ", "c", "l");
+  assert.deepEqual(s.submitted, [{ text: "/crews", editorText: "" }]);
+  assert.equal(s.editor.getText(), text);
+  assert.equal(s.editor.getExpandedText(), "aone\ntwob", "the marker still expands");
+  assert.deepEqual(s.editor.getCursor(), { line: 0, col: 0 });
+  // Undo depth is as before the run: one u undoes the second INSERT session.
+  s.type("u");
+  assert.equal(s.editor.getText(), "a");
+  s.type("ctrl+r");
+  assert.equal(s.editor.getExpandedText(), "aone\ntwob", "redo brings the paste back too");
+});
+
+test("without the bridge's fields, the draft comes back through setText and Left", () => {
+  const s = setup();
+  s.type("o", "n", "e", "escape", "o", "t", "w", "o", "escape", "k");
+  const cursor = s.editor.getCursor();
+  assert.deepEqual(cursor, { line: 0, col: 2 });
+  s.type(" ", "c");
+  // As though Pi dropped a field the bridge needs after the leader opened.
+  assert.ok(Reflect.deleteProperty(s.editor, "lastAction"));
+  s.type("l");
+  assert.deepEqual(s.submitted, [{ text: "/crews", editorText: "" }]);
+  assert.equal(s.editor.getText(), "one\ntwo");
+  assert.deepEqual(s.editor.getCursor(), cursor);
+  assert.ok(!Reflect.has(s.editor, "lastAction"), "the bridge, which sets lastAction, wasn't used");
+});
+
+test("dispose closes the leader, stops listening, and clears a missed path", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const s = setup();
+  s.type("escape", " ");
+  assert.ok(s.open());
+  s.editor.dispose();
+  assert.equal(s.panels.at(-1), undefined);
+  const count = s.panels.length;
+  s.registry.register({ source: "late", bindings: [{ id: "z", path: [{ key: "z", label: "zebra" }], command: { name: "crews" } }] });
+  assert.equal(s.panels.length, count, "no redraw after dispose");
+  s.type(" ", "c", "x");
+  assert.match(s.editor.border(), / SPC c x /);
+  s.editor.dispose();
+  assert.match(s.editor.border(), / NORMAL /);
+  t.mock.timers.tick(1500);
+  assert.equal(s.renders(), 0, "the missed-path timer was cleared");
+});
