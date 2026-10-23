@@ -85,7 +85,7 @@ registerHooks({
 });
 
 type Handler = (event: unknown, ctx: unknown) => unknown;
-export interface Tool { name: string; execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): unknown }
+export interface Tool { name: string; execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<unknown> }
 export interface Command { handler(args: string, ctx: unknown): unknown }
 export interface Shortcut { handler(ctx: unknown): unknown }
 type Flag = boolean | string;

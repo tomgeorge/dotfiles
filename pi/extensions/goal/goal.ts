@@ -46,20 +46,21 @@ export function newGoal(objective: string, check: string, maxContinuations = DEF
   return { objective: objective.trim(), check: check.trim(), status: "active", continuations: 0, maxContinuations, startedAt: now };
 }
 
-export type ParsedCommand =
-  | { kind: "status" | "pause" | "resume" | "clear" }
-  | { kind: "set"; objective: string; check?: string; max?: number };
+export type LifecycleWord = "status" | "pause" | "resume" | "clear";
+
+export interface SetCommand { kind: "set"; objective: string; check?: string; max?: number }
+
+export type ParsedCommand = { kind: LifecycleWord } | SetCommand;
 
 /** `/goal <objective> [--check <command>] [--max N]`, or a lifecycle word. --check takes the rest of the line. */
 export function parseGoalArgs(raw: string): ParsedCommand {
   const text = raw.trim();
   if (!text || text === "status") return { kind: "status" };
   if (text === "pause" || text === "resume" || text === "clear") return { kind: text };
-  let rest = text;
   let max: number | undefined;
   // A trailing --max is ours even after --check; a check that needs its own trailing
   // --max can be wrapped in quotes or a script.
-  rest = rest.replace(/\s--max\s+(\S+)\s*$/, (_m, n: string) => {
+  let rest = text.replace(/\s--max\s+(\S+)\s*$/, (_m, n: string) => {
     max = Number(n);
     return "";
   });
@@ -139,6 +140,11 @@ export function statusLine(goal: Goal | undefined): string {
   return `Goal [${goal.status}] ${goal.objective}\ncheck: ${goal.check}\n${goal.continuations}/${goal.maxContinuations} continuations · ${last}${goal.reason ? `\nreason: ${goal.reason}` : ""}`;
 }
 
+const TAIL_CHARS = 16_384;
+const TAIL_LINES = 40;
+// How long after the shell exits to keep reading output its children may still be writing.
+const DRAIN_MS = 500;
+
 /** Run the check in its own process group; keep only the tail. */
 export function runCheck(cwd: string, command: string, timeoutMs: number): Promise<CheckResult> {
   return new Promise((resolve) => {
@@ -147,7 +153,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number): Promi
     let timedOut = false;
     let done = false;
     let drain: NodeJS.Timeout | undefined;
-    const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-16_384); };
+    const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-TAIL_CHARS); };
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
     const killGroup = () => {
@@ -164,7 +170,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number): Promi
       // A daemon that left the process group can hold the pipes open forever; stop reading.
       child.stdout.destroy();
       child.stderr.destroy();
-      resolve({ exit, tail: out.split("\n").slice(-40).join("\n"), timedOut, at: Date.now() });
+      resolve({ exit, tail: out.split("\n").slice(-TAIL_LINES).join("\n"), timedOut, at: Date.now() });
     };
     const timer = setTimeout(() => {
       timedOut = true;
@@ -172,7 +178,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number): Promi
     }, timeoutMs);
     child.on("error", (error) => { out += error.message; finish(null); });
     // "close" waits for every pipe holder; after the shell exits, give output a moment to drain.
-    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), 500); });
+    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), DRAIN_MS); });
     child.on("close", (code) => finish(code));
   });
 }

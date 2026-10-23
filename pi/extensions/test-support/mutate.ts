@@ -13,34 +13,37 @@ import { fileURLToPath } from "node:url";
 
 interface Mutant { name: string; file: string; from: string; to: string }
 
+// Bad input must exit 2, not crash with exit 1, which reads like "mutants survived".
+function usageError(message: string): never {
+  console.error(message);
+  process.exit(2);
+}
+
+const isMutant = (m: unknown): m is Mutant =>
+  typeof m === "object" && m !== null && ["name", "file", "from", "to"].every((k) => typeof (m as Record<string, unknown>)[k] === "string");
+
+function readMutants(extension: string, path: string): Mutant[] {
+  let all: unknown;
+  try {
+    all = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    return usageError(`${extension}/mutants.json: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!Array.isArray(all) || !all.every(isMutant)) {
+    return usageError(`${extension}/mutants.json: expected an array of { name, file, from, to } strings`);
+  }
+  return all;
+}
+
 const here = dirname(fileURLToPath(import.meta.url));
 const extensions = dirname(here);
 const [extension, ...only] = process.argv.slice(2);
-if (!extension) {
-  console.error("usage: mutate.ts <extension> [mutant name...]");
-  process.exit(2);
-}
+if (!extension) usageError("usage: mutate.ts <extension> [mutant name...]");
 const source = join(extensions, extension);
-// Bad input must exit 2, not crash with exit 1, which reads like "mutants survived".
-let all: unknown;
-try {
-  all = JSON.parse(readFileSync(join(source, "mutants.json"), "utf8"));
-} catch (e) {
-  console.error(`${extension}/mutants.json: ${(e as Error).message}`);
-  process.exit(2);
-}
-const isMutant = (m: unknown): m is Mutant =>
-  typeof m === "object" && m !== null && ["name", "file", "from", "to"].every((k) => typeof (m as Record<string, unknown>)[k] === "string");
-if (!Array.isArray(all) || !all.every(isMutant)) {
-  console.error(`${extension}/mutants.json: expected an array of { name, file, from, to } strings`);
-  process.exit(2);
-}
+const all = readMutants(extension, join(source, "mutants.json"));
 // A misspelt name would otherwise select nothing and report "all 0 mutants killed".
 const unknown = only.filter((name) => !all.some((m) => m.name === name));
-if (unknown.length) {
-  console.error(`unknown mutant: ${unknown.join("; ")}`);
-  process.exit(2);
-}
+if (unknown.length) usageError(`unknown mutant: ${unknown.join("; ")}`);
 const mutants = all.filter((m) => !only.length || only.includes(m.name));
 
 const work = mkdtempSync(join(tmpdir(), `mutate-${extension}-`));
@@ -83,12 +86,13 @@ try {
       survivors.push(m.name);
       continue;
     }
-    writeFileSync(file, original.replace(m.from, m.to));
-    const r = runTests();
+    // A function replacement, so a "to" containing $& or $1 is inserted literally.
+    writeFileSync(file, original.replace(m.from, () => m.to));
+    const run = runTests();
     writeFileSync(file, original);
-    const label = { pass: "SURVIVED", fail: "killed  ", error: "ERROR   " }[r.outcome];
-    console.log(`${label} ${m.name}${r.outcome === "pass" ? "" : `  (${r.summary})`}`);
-    if (r.outcome !== "fail") survivors.push(m.name);
+    const label = { pass: "SURVIVED", fail: "killed  ", error: "ERROR   " }[run.outcome];
+    console.log(`${label} ${m.name}${run.outcome === "pass" ? "" : `  (${run.summary})`}`);
+    if (run.outcome !== "fail") survivors.push(m.name);
   }
   console.log(survivors.length ? `\n${survivors.length} of ${mutants.length} mutants survived or errored: ${survivors.join("; ")}` : `\nall ${mutants.length} mutants killed`);
   process.exitCode = survivors.length ? 1 : 0;
