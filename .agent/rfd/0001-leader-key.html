@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFD 0001 · A leader key for Pi's prompt editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080f11;
+    --bg-raise: #0f1719;
+    --bg-sunk: #050a0b;
+    --line: #1c2527;
+    --line-strong: #2a3436;
+    --text: #e7e7e8;
+    --text-sec: #a1a4a5;
+    --text-ter: #6c7172;
+    --green: #48d597;
+    --green-dim: #1b3a2d;
+    --green-faint: #0e211a;
+    --yellow: #f5b944;
+    --yellow-dim: #3a2e13;
+    --blue: #8ba1ff;
+    --blue-dim: #1d2442;
+    --purple: #c08fe8;
+    --purple-dim: #2e1e3d;
+    --red: #fb6e88;
+    --red-dim: #3d1820;
+    --sans: "Inter", "Suisse Intl", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", "GT America Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.65 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--green); text-decoration: none; border-bottom: 1px solid var(--green-dim); }
+  a:hover { border-bottom-color: var(--green); }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10; height: 54px;
+    display: flex; align-items: center; gap: 14px; padding: 0 24px;
+    background: rgba(8,15,17,.92); backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+    font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-ter);
+  }
+  .topbar .logo { color: var(--green); font-weight: 700; letter-spacing: .12em; }
+  .topbar .crumb { color: var(--text-sec); }
+  .topbar .sep { color: var(--line-strong); }
+  .topbar .right { margin-left: auto; display: flex; gap: 18px; }
+
+  /* ---------- header ---------- */
+  header.rfd {
+    max-width: 1180px; margin: 0 auto; padding: 56px 24px 32px;
+    border-bottom: 1px solid var(--line);
+  }
+  .rfd-num { font: 500 13px/1 var(--mono); color: var(--green); letter-spacing: .08em; text-transform: uppercase; }
+  h1.title { font-weight: 500; font-size: 40px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 28px; max-width: 900px; }
+  .meta { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .meta div { padding: 12px 16px; border-right: 1px solid var(--line); }
+  .meta div:last-child { border-right: 0; }
+  .meta dt { font: 500 11px/1 var(--mono); color: var(--text-ter); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .meta dd { margin: 0; font-size: 14px; color: var(--text-sec); }
+  .state { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--yellow); background: var(--yellow-dim); padding: 5px 8px; border-radius: 3px; }
+  .state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); }
+
+  /* ---------- layout ---------- */
+  .layout { max-width: 1180px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 56px; }
+  nav.toc { position: sticky; top: 54px; align-self: start; max-height: calc(100vh - 54px); overflow-y: auto; padding: 36px 0; }
+  nav.toc h4 { font: 500 11px/1 var(--mono); color: var(--text-ter); letter-spacing: .08em; text-transform: uppercase; margin: 0 0 14px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; }
+  nav.toc li a { display: flex; gap: 10px; padding: 5px 0; font-size: 13px; color: var(--text-sec); border: 0; line-height: 1.35; }
+  nav.toc li a::before { content: counter(toc); font: 12px/1.6 var(--mono); color: var(--text-ter); min-width: 16px; }
+  nav.toc li a:hover { color: var(--text); }
+  nav.toc li a.active { color: var(--green); }
+  nav.toc li a.active::before { color: var(--green); }
+
+  main { padding: 36px 0 120px; max-width: 780px; counter-reset: sec; }
+  main > section { counter-increment: sec; counter-reset: sub; margin-bottom: 56px; }
+  main h2 { font-weight: 500; font-size: 24px; letter-spacing: -.01em; margin: 0 0 18px; padding-top: 8px; display: flex; gap: 14px; align-items: baseline; }
+  main h2::before { content: counter(sec); font: 500 15px/1 var(--mono); color: var(--green); min-width: 22px; }
+  main h3 { counter-increment: sub; font-weight: 500; font-size: 17px; margin: 34px 0 12px; display: flex; gap: 12px; align-items: baseline; }
+  main h3::before { content: counter(sec) "." counter(sub); font: 500 13px/1 var(--mono); color: var(--text-ter); min-width: 22px; }
+  p { margin: 0 0 16px; color: #d4d6d7; }
+  strong { color: var(--text); font-weight: 600; }
+  ul, ol { padding-left: 22px; margin: 0 0 16px; color: #d4d6d7; }
+  li { margin-bottom: 6px; }
+  code { font: 13px/1.4 var(--mono); background: var(--bg-raise); border: 1px solid var(--line); padding: 1px 5px; border-radius: 3px; color: #dfe3e4; }
+  kbd { font: 500 12px/1 var(--mono); background: var(--bg-raise); border: 1px solid var(--line-strong); border-bottom-width: 2px; padding: 2px 6px; border-radius: 4px; color: var(--text); white-space: nowrap; }
+  .lede { font-size: 17px; line-height: 1.6; color: var(--text-sec); }
+
+  /* ---------- admonitions ---------- */
+  .adm { display: grid; grid-template-columns: 96px 1fr; border: 1px solid var(--line); border-radius: 6px; margin: 20px 0; overflow: hidden; }
+  .adm .label { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 16px 14px; border-right: 1px solid var(--line); }
+  .adm .body { padding: 13px 18px; }
+  .adm .body p:last-child { margin-bottom: 0; }
+  .adm.note .label { color: var(--blue); background: var(--blue-dim); }
+  .adm.important .label { color: var(--yellow); background: var(--yellow-dim); }
+  .adm.tip .label { color: var(--green); background: var(--green-faint); }
+  .adm.caution .label { color: var(--red); background: var(--red-dim); }
+
+  /* ---------- tables ---------- */
+  .tbl { border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font: 500 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-ter); background: var(--bg-raise); padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; color: #d4d6d7; }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { color: var(--text-sec); font-weight: 500; white-space: nowrap; }
+  td code { font-size: 12px; }
+  .yes { color: var(--green); } .no { color: var(--red); } .meh { color: var(--yellow); }
+
+  /* ---------- code ---------- */
+  pre { font: 12.5px/1.6 var(--mono); background: var(--bg-sunk); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; overflow-x: auto; margin: 20px 0; color: #c9cdce; }
+  pre .k { color: var(--purple); } pre .s { color: var(--green); } pre .c { color: var(--text-ter); font-style: italic; }
+  pre .t { color: var(--blue); } pre .n { color: var(--yellow); }
+  figure { margin: 24px 0; }
+  figcaption { font: 12px/1.5 var(--mono); color: var(--text-ter); margin-top: 10px; }
+  figcaption b { color: var(--text-sec); font-weight: 500; }
+
+  /* ---------- terminal mockups ---------- */
+  .term { background: #1b1c20; border: 1px solid #2a2c31; border-radius: 8px; overflow: hidden; font: 13px/1.55 var(--mono); color: #d5d7da; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .term .chrome { display: flex; gap: 7px; padding: 10px 12px; background: #232429; border-bottom: 1px solid #2a2c31; }
+  .term .chrome i { width: 11px; height: 11px; border-radius: 50%; background: #3a3c42; }
+  .term .screen { padding: 14px 16px; white-space: pre; overflow-x: auto; }
+  .term .dim { color: #6c7078; } .term .acc { color: #6cb6ff; } .term .grn { color: #7ee2a8; } .term .yel { color: #f2c46d; }
+  .term .badge { background: #c08fe8; color: #1b1c20; font-weight: 700; padding: 0; }
+  .term .kb { background: #6cb6ff; color: #1b1c20; font-weight: 700; padding: 0; }
+  .term .kbx { background: #f2c46d; color: #1b1c20; font-weight: 700; padding: 0; }
+  .term .panel { background: #24262c; display: block; margin: 0 -16px; padding: 0 16px; }
+  .term .cursor { background: #e7e7e8; color: #1b1c20; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pair .term .screen { font-size: 12px; }
+
+  /* ---------- diagram ---------- */
+  .diagram { background: var(--bg-sunk); border: 1px solid var(--line); border-radius: 6px; padding: 18px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* ---------- options cards ---------- */
+  .opts { display: grid; gap: 12px; margin: 20px 0; }
+  .opt { border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; background: var(--bg-raise); }
+  .opt.pick { border-color: var(--green-dim); box-shadow: inset 3px 0 0 var(--green); }
+  .opt h4 { margin: 0 0 6px; font-weight: 500; font-size: 15px; display: flex; gap: 10px; align-items: center; }
+  .opt h4 .tag { font: 500 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-radius: 3px; }
+  .opt h4 .tag.g { color: var(--green); background: var(--green-faint); }
+  .opt h4 .tag.r { color: var(--red); background: var(--red-dim); }
+  .opt h4 .tag.y { color: var(--yellow); background: var(--yellow-dim); }
+  .opt p { margin: 0; font-size: 14px; color: var(--text-sec); }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
+  .stat { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .stat .v { font: 500 26px/1.1 var(--mono); color: var(--text); }
+  .stat .l { font: 11px/1.4 var(--mono); color: var(--text-ter); text-transform: uppercase; letter-spacing: .06em; margin-top: 6px; }
+  .stat .v small { font-size: 13px; color: var(--text-ter); }
+
+  ol.refs { font-size: 13.5px; }
+  ol.refs li { color: var(--text-sec); }
+
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { display: none; }
+    .meta, .stat-row { grid-template-columns: 1fr 1fr; }
+    .pair { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">RFD</span><span class="sep">/</span><span class="crumb">dotfiles</span><span class="sep">/</span><span class="crumb">0001</span>
+  <div class="right"><span>pi/extensions/vi-mode</span><span>doompi@c3f057a</span></div>
+</div>
+
+<header class="rfd">
+  <div class="rfd-num">RFD 0001</div>
+  <h1 class="title">A leader key for Pi's prompt editor: what to take from DoomPi, and where it lives next to vi&nbsp;mode</h1>
+  <dl class="meta">
+    <div><dt>Authors</dt><dd>Tom George</dd></div>
+    <div><dt>State</dt><dd><span class="state">ideation</span></dd></div>
+    <div><dt>Updated</dt><dd>2026-10-23</dd></div>
+    <div><dt>Source</dt><dd><a href="../../IDEAS.md">IDEAS.md</a> · Pi UI</dd></div>
+  </dl>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#background">Background</a></li>
+    <li><a href="#terms">Three meanings of "mode"</a></li>
+    <li><a href="#editors">The two editors, side by side</a></li>
+    <li><a href="#registry">DoomPi's leader registry</a></li>
+    <li><a href="#whichkey">The which-key panel</a></li>
+    <li><a href="#options">Where the leader lives</a></li>
+    <li><a href="#design">Proposed design</a></li>
+    <li><a href="#space">SPC in NORMAL mode</a></li>
+    <li><a href="#protocol">Registering bindings</a></li>
+    <li><a href="#map">A first key map</a></li>
+    <li><a href="#risks">Risks</a></li>
+    <li><a href="#open">Open questions</a></li>
+    <li><a href="#refs">References</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ===================================================== 1 -->
+<section id="background">
+  <h2>Background</h2>
+  <p class="lede">Our Pi extensions each claim their own <kbd>ctrl+shift</kbd> chord to open a panel. That doesn't scale, and nobody can see what's bound. DoomPi solves the same problem with a Doom Emacs–style leader key and a which-key map. This RFD compares DoomPi's editor with our vi-mode extension and proposes how to bring the leader into our setup.</p>
+
+  <p>Today three extensions register panel shortcuts directly with <code>pi.registerShortcut</code>:</p>
+  <div class="tbl"><table>
+    <tr><th>Chord</th><th>Extension</th><th>Opens</th></tr>
+    <tr><td><kbd>ctrl+shift+c</kbd></td><td><code>crew/index.ts</code></td><td>Crew panel</td></tr>
+    <tr><td><kbd>ctrl+shift+s</kbd></td><td><code>subagent/index.ts</code></td><td>Subagent jobs panel</td></tr>
+    <tr><td><kbd>ctrl+shift+w</kbd></td><td><code>watch/index.ts</code></td><td>Watches and loops panel</td></tr>
+  </table></div>
+  <p>Every new extension needs a new chord, chords collide with terminal and multiplexer bindings, and none of them can be discovered from inside Pi. The <a href="../../IDEAS.md">IDEAS.md</a> entry proposes copying <a href="https://github.com/AgiFlow/doompi">DoomPi</a>'s leader: <kbd>SPC</kbd> on an empty prompt opens a map of commands, keys narrow it step by step, and extensions contribute bindings to one registry.</p>
+
+  <p>The catch is that Pi has exactly one editor slot. <code>ctx.ui.setEditorComponent</code> replaces the prompt editor wholesale, and vi-mode already uses it. DoomPi's leader <em>is</em> its editor (<code>DoomEditor</code>). Both can't be installed at once, so we have to decide where the leader lives.</p>
+
+  <div class="adm note"><div class="label">Scope</div><div class="body">
+    <p>This compares DoomPi at commit <code>c3f057a</code> (2026-10-14, <code>@agimon-ai/doompi-ui</code> 0.0.1-alpha.128, MIT) with <code>pi/extensions/vi-mode</code> as it stands in this repository, running on Pi 1.0.2.</p>
+  </div></div>
+</section>
+
+<!-- ===================================================== 2 -->
+<section id="terms">
+  <h2>Three meanings of "mode"</h2>
+  <p>"Modal editing" covers three different things in these codebases. Keeping them apart avoids most of the confusion.</p>
+
+  <div class="adm important"><div class="label">Finding</div><div class="body">
+    <p><strong>DoomPi has no vi-style modal editing.</strong> A search of the repository for <code>vim</code>, <code>normal mode</code>, <code>insert mode</code> and <code>modal</code> finds only dialog modals and a persona prompt. Its prompt editor is Pi's default editor plus a leader. Its "modes" are the Emacs kind.</p>
+  </div></div>
+
+  <div class="tbl"><table>
+    <tr><th>Sense</th><th>What it is</th><th>DoomPi</th><th>Our setup</th></tr>
+    <tr><td>Editing modes</td><td>vi's INSERT and NORMAL: the same key types text or runs a command depending on mode.</td><td class="no">None</td><td class="yes">vi-mode: INSERT, NORMAL, counts, operators, text objects, register, undo and redo</td></tr>
+    <tr><td>Transient leader mode</td><td>A short-lived state, entered by a prefix key, in which each key narrows a command tree.</td><td class="yes"><code>leaderActive</code> + <code>leaderPath</code> in <code>DoomEditor</code></td><td class="no">None; proposed here</td></tr>
+    <tr><td>Major and minor modes</td><td>Emacs sense. A major mode is a preset of extension layers chosen at launch. Minor modes (plan, goal, loop, voice) toggle on and off in a session.</td><td class="yes">Major mode badge plus minor-mode names in the editor's top row; enter and exit rows in the leader</td><td class="meh">Ad hoc: <code>/goal</code>, crews and watches are separate extensions with their own widgets</td></tr>
+  </table></div>
+
+  <p>So the comparison isn't "DoomPi's vi mode against ours". It's DoomPi's <strong>leader and which-key</strong> against our <strong>vi editing</strong>, and how the two would share one editor.</p>
+</section>
+
+<!-- ===================================================== 3 -->
+<section id="editors">
+  <h2>The two editors, side by side</h2>
+  <p>Both subclass Pi's <code>CustomEditor</code> and override <code>handleInput</code>. They do very different amounts of work behind that override.</p>
+
+  <div class="stat-row">
+    <div class="stat"><div class="v">339</div><div class="l">lines · DoomEditor</div></div>
+    <div class="stat"><div class="v">683</div><div class="l">lines · leader registry</div></div>
+    <div class="stat"><div class="v">1,339</div><div class="l">lines · vi-mode, all files</div></div>
+    <div class="stat"><div class="v">37<small>/37</small></div><div class="l">vi-mode tests pass</div></div>
+  </div>
+
+  <div class="pair">
+    <figure>
+      <div class="term"><div class="chrome"><i></i><i></i><i></i></div><div class="screen"><span class="acc">╭──────────────────────────────╮</span>
+<span class="acc">│</span> <span class="badge">LEADER SPC c</span> <span class="acc">plan</span> <span class="dim">esc cancel</span> <span class="acc">│</span>
+<span class="acc">├</span><span class="dim">──────────────────────────────</span><span class="acc">┤</span>
+<span class="acc">│</span> <span class="acc">❯</span> <span class="cursor"> </span>                          <span class="acc">│</span>
+<span class="acc">╰──────────────────────────────╯</span>
+<span class="panel"> </span><span class="panel"><span class="badge"> LEADER </span> SPC › c / crew</span><span class="panel"> </span><span class="panel"><span class="kb"> l </span> list      <span class="kb"> s </span> status</span><span class="panel"><span class="dim">    crews here    one crew</span></span><span class="panel"> </span></div></div>
+      <figcaption><b>DoomPi.</b> Framed editor with a badge row; the which-key panel is a widget below it.</figcaption>
+    </figure>
+    <figure>
+      <div class="term"><div class="chrome"><i></i><i></i><i></i></div><div class="screen"><span class="dim">──────────────────────────────────</span>
+ fix the <span class="cursor">f</span>lag parsing in ci(args)
+
+
+<span class="dim">─</span> <span class="grn">NORMAL</span> <span class="dim">───────────────────────────</span>
+
+
+
+<span class="dim">─</span> <span class="yel">2d3</span> <span class="dim">──────────────────────────────</span>
+<span class="dim">  pending command replaces the label</span></div></div>
+      <figcaption><b>vi-mode.</b> Pi's own editor chrome; the mode or the half-typed command sits in the bottom border.</figcaption>
+    </figure>
+  </div>
+
+  <div class="tbl"><table>
+    <tr><th>Aspect</th><th>DoomEditor</th><th>ViEditor</th></tr>
+    <tr><td>Job</td><td>Leader key, plus a restyled frame showing major mode, minor modes and domains</td><td>vi editing grammar on top of Pi's editor</td></tr>
+    <tr><td>Input routing</td><td><code>parseKey(data)</code>; if leader active, route to leader; if <kbd>SPC</kbd> on empty draft or <kbd>ctrl+space</kbd>, start leader; otherwise <code>super</code></td><td>Paste guard, then INSERT or NORMAL. NORMAL feeds printable keys to a pure <code>Engine</code>; ctrl chords, arrows and pastes fall through to <code>super</code></td></tr>
+    <tr><td>State</td><td>Two fields: <code>leaderActive</code>, <code>leaderPath</code></td><td>Mode, insert-start undo depth, redo stack, paste flag; the engine holds the parser, register, last <kbd>f</kbd>/<kbd>t</kbd>, sticky column</td></tr>
+    <tr><td>Logic placement</td><td>In the editor class, but tree lookup lives in <code>DoomLeaderRegistry</code></td><td>Pure modules (<code>keys.ts</code>, <code>engine.ts</code>, <code>motions.ts</code>…) return actions; the editor applies them</td></tr>
+    <tr><td>Private Pi fields</td><td>None. Uses public <code>setText</code>, <code>onSubmit</code>, <code>actionHandlers</code></td><td><code>bridge.ts</code> writes <code>state</code>, <code>undoStack</code>, <code>pastes</code> and friends, and checks they exist at startup</td></tr>
+    <tr><td>Rendering</td><td>Overrides <code>render()</code>, re-frames the base output, finds the bottom border heuristically</td><td>Overrides the protected <code>renderBottomBorder</code> only</td></tr>
+    <tr><td>Help for the user</td><td>Which-key panel below the editor, live as you type</td><td>README tables; the bottom border echoes pending keys</td></tr>
+    <tr><td>Extensibility</td><td>Other packages register bindings through a shared hub service</td><td>Closed key set</td></tr>
+    <tr><td>Tests</td><td>Registry (449 lines), panel (172), exit tone (95)</td><td>Engine, parser, motions driven by key strings: 37 tests</td></tr>
+  </table></div>
+
+  <p>The editors overlap very little. DoomEditor adds an entry point and a dispatcher. ViEditor rewires the meaning of almost every printable key. Combining them is mostly a question of who gets <kbd>SPC</kbd> first.</p>
+</section>
+
+<!-- ===================================================== 4 -->
+<section id="registry">
+  <h2>DoomPi's leader registry</h2>
+  <p>The registry is the part worth copying. It's a tree of one-character keys built from flat contributions, with careful handling of conflicts. Here is the contract, from <code>doompi-core/src/schemas/leader.ts</code>:</p>
+
+<pre><span class="k">type</span> <span class="t">LeaderSegment</span> = {
+  key: <span class="t">string</span>;          <span class="c">// one char, must match /^[a-z0-9]$/</span>
+  label: <span class="t">string</span>;        <span class="c">// ≤ 32 chars</span>
+  detail?: <span class="t">string</span>;      <span class="c">// ≤ 80 chars, the grey second line</span>
+  order?: <span class="t">number</span>;       <span class="c">// group identity only; options sort by key</span>
+  tone?: <span class="s">"default"</span> | <span class="s">"exit"</span>;  <span class="c">// "exit" paints the badge yellow</span>
+};
+
+<span class="k">type</span> <span class="t">LeaderBinding</span> = { id: <span class="t">string</span>; path: [<span class="t">LeaderSegment</span>, ...<span class="t">LeaderSegment</span>[]] }  <span class="c">// 1–4 segments</span>
+  &amp; ({ command: { name: <span class="t">string</span>; args?: <span class="t">string</span> } }   <span class="c">// submits "/name args"</span>
+   | { action: { name: <span class="t">string</span> } });                  <span class="c">// calls a handler the source registered</span>
+
+<span class="k">type</span> <span class="t">LeaderContribution</span> = { source: <span class="t">string</span>; bindings: <span class="t">LeaderBinding</span>[] };</pre>
+
+  <h3>Behaviour worth keeping</h3>
+  <ul>
+    <li><strong>Parse at the boundary.</strong> <code>register(value: unknown)</code> validates every field: lengths, control characters, key and identifier patterns, duplicate ids, exactly one of <code>command</code> or <code>action</code>. A malformed contribution is rejected whole, with diagnostics. An unknown <code>tone</code> is ignored rather than rejected, so a package built against a newer contract doesn't lose its whole menu over a colour.</li>
+    <li><strong>Last registration wins.</strong> When two sources claim the same leaf, the later one takes it and the registry reports who lost what (<code>SPC c l taken over from crew</code>). The tree is rebuilt from every stored contribution, so when the winner unregisters, the displaced binding comes back.</li>
+    <li><strong>Re-registering is reclaiming.</strong> A source that registers again moves to the back of the order. A <code>/reload</code> therefore counts as a fresh claim.</li>
+    <li><strong>Group labels may disagree.</strong> If two packages spell the <code>SPC e</code> group differently, the first label stays and a warning is logged, but both bindings work. Losing a key is worse than an inconsistent label.</li>
+    <li><strong>Sort by key, not by <code>order</code>.</strong> A reader looking for a chord knows the key. <code>order</code> numbers scattered across many packages produce a sequence nobody can see.</li>
+    <li><strong>Bindings can change at runtime.</strong> <code>handle.update(bindings)</code> swaps a source's bindings. Plan and goal use this to show <kbd>e</kbd> <em>enter</em> when off and <kbd>e</kbd> <em>exit</em> (yellow, <code>tone: "exit"</code>) when on.</li>
+    <li><strong>Commands are checked before they run.</strong> The editor asks <code>pi.getCommands()</code> whether <code>/name</code> exists and warns instead of submitting an unknown command. It also keeps the draft: it clears the text, submits the command, then restores the draft.</li>
+  </ul>
+
+  <h3>Core bindings</h3>
+  <p>DoomPi seeds the tree with groups that map to Pi's own app actions through <code>CustomEditor.actionHandlers</code>, which is public in Pi 1.0.2:</p>
+  <div class="tbl"><table>
+    <tr><th>Keys</th><th>Label</th><th>Target</th></tr>
+    <tr><td><kbd>SPC m m</kbd> · <kbd>m n</kbd> · <kbd>m t</kbd></td><td>models: select, next, thinking</td><td><code>app.model.select</code>, <code>app.model.cycleForward</code>, <code>app.thinking.cycle</code></td></tr>
+    <tr><td><kbd>SPC s n</kbd> · <kbd>s r</kbd> · <kbd>s t</kbd> · <kbd>s f</kbd></td><td>sessions: new, resume, tree, fork</td><td><code>app.session.*</code></td></tr>
+    <tr><td><kbd>SPC e t</kbd> · <kbd>e c</kbd></td><td>extension: tools, config</td><td><code>/tools</code>, <code>/config</code></td></tr>
+    <tr><td><kbd>SPC h h</kbd></td><td>help: hotkeys</td><td><code>/hotkeys</code></td></tr>
+    <tr><td><kbd>SPC q q</kbd></td><td>quit</td><td><code>app.exit</code></td></tr>
+  </table></div>
+</section>
+
+<!-- ===================================================== 5 -->
+<section id="whichkey">
+  <h2>The which-key panel</h2>
+  <p>The editor publishes a <code>LeaderSnapshot</code> (prefix, label, options, root options) on every step. A listener mounts <code>LeaderHints</code> as a widget with <code>placement: "belowEditor"</code>, and removes it when the leader closes. The panel shows up the moment <kbd>SPC</kbd> is pressed; unlike Emacs which-key, there's no idle delay.</p>
+
+  <figure>
+    <div class="term"><div class="chrome"><i></i><i></i><i></i></div><div class="screen"><span class="acc">╭──────────────────────────────────────────────────────────────────────────╮</span>
+<span class="acc">│</span> <span class="badge">LEADER SPC</span>  <span class="acc">plan</span>  <span class="dim">default</span>                   <span class="dim">draft preserved · esc cancel</span> <span class="acc">│</span>
+<span class="acc">├</span><span class="dim">──────────────────────────────────────────────────────────────────────────</span><span class="acc">┤</span>
+<span class="acc">│</span> <span class="acc">❯</span> <span class="cursor"> </span>                                                                      <span class="acc">│</span>
+<span class="acc">╰──────────────────────────────────────────────────────────────────────────╯</span>
+<span class="panel"> </span><span class="panel"><span class="badge"> LEADER </span> SPC / leader                                      <span class="dim">esc cancel · backspace up</span></span><span class="panel"> </span><span class="panel"><span class="kb"> a </span> agents          <span class="kb"> e </span> extension       <span class="kb"> g </span> goal            <span class="kb"> h </span> help</span><span class="panel"><span class="dim">    subagent runs</span></span><span class="panel"><span class="kb"> l </span> loops           <span class="kb"> m </span> models          <span class="kb"> p </span> plan            <span class="kb"> q </span> quit</span><span class="panel"> </span><span class="panel"><span class="kb"> r </span> runners         <span class="kb"> s </span> sessions        <span class="kb"> t </span> tasks           <span class="kb"> w </span> workflows</span><span class="panel"><span class="dim">──────────────────────────────────────────────────────────────────────────</span></span><span class="panel"><span class="yel">MODES</span>      plan <span class="dim">(fable - read only)</span></span><span class="panel"><span style="color:#c08fe8">SESSION</span>    ↑166k ↓5.2k  <span class="grn">$1.753</span>  <span class="dim">ctx 57.1% / 272k</span></span><span class="panel"><span class="acc">EXTENSIONS</span> OpenAI cache 1292/1309 · plan:fable · Agents ◐◑●</span><span class="panel"> </span></div></div>
+    <figcaption><b>Figure 1.</b> DoomPi's root board, redrawn from the project's README screenshot. Sub-boards drop the diagnostics rows.</figcaption>
+  </figure>
+
+  <ul>
+    <li><strong>Fixed grid.</strong> The column count depends only on terminal width (4 columns from 130 wide, 3 from 90, 2 from 56, otherwise 1), so every board lines up the same way. Cells are equal width and long details are cut with an ellipsis.</li>
+    <li><strong>Two-line cards.</strong> Key badge and bold label, then the grey <code>detail</code> underneath. If there isn't room, details are dropped before options are.</li>
+    <li><strong>Hard height cap.</strong> 21 rows, including padding. Options get space before diagnostics, because a truncated option is a key you can't see.</li>
+    <li><strong>Shade, not frame.</strong> A background tint sets the panel apart, saving the two rows a border would take.</li>
+    <li><strong>Root board extras.</strong> MODES, SESSION and EXTENSIONS rows summarise the session. On wide terminals, a <code>root</code> trail of top-level keys stays visible on sub-boards.</li>
+  </ul>
+  <p>We'd want the grid, the cards, the cap and the breadcrumb. We'd skip the diagnostics rows: the footer and the crew, subagent and watch widgets already show that information.</p>
+</section>
+
+<!-- ===================================================== 6 -->
+<section id="options">
+  <h2>Where the leader lives</h2>
+  <p>Pi allows one editor component, so the leader has to live in whichever editor is installed. These are the options.</p>
+
+  <div class="opts">
+    <div class="opt pick">
+      <h4>A. A LEADER mode inside vi-mode <span class="tag g">proposed</span></h4>
+      <p>Add a third, transient mode to <code>ViEditor</code>. The tree walk goes in a pure <code>leader.ts</code> beside <code>engine.ts</code>, and the registry in <code>leaderRegistry.ts</code>. One editor owns all key routing, so the <kbd>SPC</kbd> and <kbd>Esc</kbd> rules can be designed together. Cost: vi-mode stops being only about vi.</p>
+    </div>
+    <div class="opt">
+      <h4>B. A shared "editor" extension that composes layers <span class="tag y">later</span></h4>
+      <p>One extension owns <code>setEditorComponent</code> and stacks key handlers (leader, vi) that each return handled or pass. It's the cleanest separation, but it's a framework for two users. Worth doing only if a third key layer shows up. Option A's pure modules make that split easy later.</p>
+    </div>
+    <div class="opt">
+      <h4>C. Install <code>@agimon-ai/doompi-ui</code> alongside <span class="tag r">rejected</span></h4>
+      <p>Whichever <code>setEditorComponent</code> call runs last wins, so we'd lose vi-mode or the leader. Its hub is also a Cordis service, and the whole DoomPi host is bundled into one runtime. We'd be taking a distribution to get one feature.</p>
+    </div>
+    <div class="opt">
+      <h4>D. A separate leader extension that doesn't own the editor <span class="tag r">rejected</span></h4>
+      <p>Open the which-key map from a <code>registerShortcut</code> chord into a <code>ctx.ui.custom</code> overlay. This needs no editor changes, but it loses the <kbd>SPC</kbd> trigger, which is the point of the idea, and adds one more chord.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 7 -->
+<section id="design">
+  <h2>Proposed design</h2>
+  <p>The leader becomes a transient third mode. It remembers which mode it came from and goes back to it when it closes.</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 760 330" font-family="JetBrains Mono, monospace" font-size="12">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6c7172"/></marker>
+        <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c08fe8"/></marker>
+      </defs>
+      <!-- nodes -->
+      <rect x="40" y="40" width="180" height="70" rx="6" fill="#0f1719" stroke="#2a3436"/>
+      <text x="130" y="72" text-anchor="middle" fill="#e7e7e8" font-size="15" font-weight="500">INSERT</text>
+      <text x="130" y="92" text-anchor="middle" fill="#6c7172">Pi's editor</text>
+
+      <rect x="540" y="40" width="180" height="70" rx="6" fill="#0f1719" stroke="#2a3436"/>
+      <text x="630" y="72" text-anchor="middle" fill="#48d597" font-size="15" font-weight="500">NORMAL</text>
+      <text x="630" y="92" text-anchor="middle" fill="#6c7172">engine.ts</text>
+
+      <rect x="270" y="215" width="220" height="80" rx="6" fill="#1a1222" stroke="#c08fe8" stroke-dasharray="5 4"/>
+      <text x="380" y="248" text-anchor="middle" fill="#c08fe8" font-size="15" font-weight="500">LEADER (transient)</text>
+      <text x="380" y="268" text-anchor="middle" fill="#6c7172">leader.ts · path: [c, l]</text>
+
+      <!-- insert <-> normal -->
+      <path d="M220 62 H540" stroke="#6c7172" fill="none" marker-end="url(#ar)"/>
+      <text x="380" y="54" text-anchor="middle" fill="#a1a4a5">Esc (no autocomplete open)</text>
+      <path d="M540 92 H220" stroke="#6c7172" fill="none" marker-end="url(#ar)"/>
+      <text x="380" y="110" text-anchor="middle" fill="#a1a4a5">i a I A o O · c s S C · Enter</text>
+
+      <!-- into leader -->
+      <path d="M195 110 C195 200 220 245 270 245" stroke="#c08fe8" fill="none" marker-end="url(#ag)"/>
+      <text x="30" y="168" fill="#c08fe8">SPC on empty draft</text>
+      <text x="30" y="184" fill="#c08fe8">ctrl+space</text>
+      <path d="M565 110 C565 200 540 245 490 245" stroke="#c08fe8" fill="none" marker-end="url(#ag)"/>
+      <text x="745" y="168" text-anchor="end" fill="#c08fe8">SPC (nothing pending)</text>
+      <text x="745" y="184" text-anchor="end" fill="#c08fe8">ctrl+space</text>
+
+      <!-- back -->
+      <path d="M300 215 C260 170 230 140 205 112" stroke="#6c7172" stroke-dasharray="3 3" fill="none" marker-end="url(#ar)"/>
+      <path d="M460 215 C500 170 530 140 555 112" stroke="#6c7172" stroke-dasharray="3 3" fill="none" marker-end="url(#ar)"/>
+      <text x="380" y="140" text-anchor="middle" fill="#a1a4a5">back to the previous mode:</text>
+      <text x="380" y="156" text-anchor="middle" fill="#a1a4a5">leaf runs · Esc</text>
+      <text x="380" y="172" text-anchor="middle" fill="#a1a4a5">unknown key · BS at root</text>
+
+      <!-- self loop -->
+      <path d="M490 270 C560 280 560 315 470 300" stroke="#c08fe8" fill="none" marker-end="url(#ag)"/>
+      <text x="566" y="296" fill="#c08fe8">group key → descend</text>
+      <text x="566" y="312" fill="#c08fe8">BS → up one level</text>
+    </svg>
+    <figcaption><b>Figure 2.</b> Key routing with a LEADER mode. Dashed arrows return to the mode the leader was opened from.</figcaption>
+  </figure>
+
+  <h3>Shape of the code</h3>
+  <p>This follows vi-mode's existing split: pure modules decide, the editor applies.</p>
+<pre><span class="c">// leader.ts: pure. Given the tree, the path so far and a key, say what happens.</span>
+<span class="k">export type</span> <span class="t">LeaderStep</span> =
+  | { type: <span class="s">"descend"</span>; path: <span class="t">string</span>[] }       <span class="c">// re-render the panel</span>
+  | { type: <span class="s">"run"</span>; target: <span class="t">Target</span> }          <span class="c">// close, then dispatch</span>
+  | { type: <span class="s">"close"</span> };                        <span class="c">// Esc, unknown key, BS at root</span>
+
+<span class="k">export function</span> <span class="n">leaderKey</span>(tree: <span class="t">Tree</span>, path: <span class="t">string</span>[], key: <span class="t">LeaderKey</span>): <span class="t">LeaderStep</span>;
+
+<span class="c">// editor.ts: one more branch in handleInput, ahead of the paste guard.</span>
+<span class="k">if</span> (<span class="k">this</span>.leader) <span class="k">return this</span>.leaderInput(data);
+<span class="k">if</span> (<span class="k">this</span>.opensLeader(data)) <span class="k">return this</span>.openLeader();   <span class="c">// remembers this.mode</span>
+<span class="k">if</span> (<span class="k">this</span>.mode === <span class="s">"insert"</span>) <span class="k">this</span>.insertKey(data); <span class="k">else this</span>.normalKey(data);</pre>
+
+  <h3>Behaviour</h3>
+  <div class="tbl"><table>
+    <tr><th>Key</th><th>DoomPi</th><th>vi-mode today</th><th>Proposed</th></tr>
+    <tr><td><kbd>SPC</kbd></td><td>Leader if draft empty, else a space</td><td>INSERT: a space. NORMAL: ignored</td><td>INSERT: as DoomPi. NORMAL: leader when no command is pending</td></tr>
+    <tr><td><kbd>ctrl+space</kbd></td><td>Leader, anywhere</td><td>Passed to Pi</td><td>Leader, either mode</td></tr>
+    <tr><td><kbd>Esc</kbd> in leader</td><td>Close</td><td>—</td><td>Close only. Never reaches Pi's abort</td></tr>
+    <tr><td><kbd>Backspace</kbd> in leader</td><td>Up a level; close at root</td><td>NORMAL: <kbd>h</kbd></td><td>As DoomPi</td></tr>
+    <tr><td>Unknown key</td><td>Close silently</td><td>—</td><td>Close, and show the path that missed in the border for a moment</td></tr>
+    <tr><td>Upper case</td><td>Lower-cased before lookup</td><td>—</td><td>Same. Keys stay <code>[a-z0-9]</code></td></tr>
+    <tr><td>Draft</td><td>Kept</td><td>—</td><td>Kept, including NORMAL cursor and undo stack</td></tr>
+    <tr><td>Indicator</td><td>Badge row: <code>LEADER SPC c</code></td><td>Bottom border: <code>NORMAL</code>, <code>2d3</code></td><td>Bottom border: <code>SPC c</code>, so it uses the slot <code>engine.pending</code> already uses</td></tr>
+  </table></div>
+
+  <figure>
+    <div class="term"><div class="chrome"><i></i><i></i><i></i></div><div class="screen"><span class="dim">──────────────────────────────────────────────────────────────────────────</span>
+ half-written prompt stays put while the leader is open<span class="cursor"> </span>
+
+<span class="dim">─</span> <span class="badge"> SPC c </span><span class="dim">─────────────────────────────────────────────────────────────────</span>
+<span class="panel"> </span><span class="panel"><span class="badge"> SPC </span> › c / crew                                           <span class="dim">esc cancel · backspace up</span></span><span class="panel"> </span><span class="panel"><span class="kb"> c </span> clean           <span class="kb"> l </span> list            <span class="kb"> r </span> resume          <span class="kb"> s </span> status</span><span class="panel"><span class="dim">    remove worktrees    crews in this repo  pick up a crew      one crew</span></span><span class="panel"><span class="kbx"> x </span> stop</span><span class="panel"><span class="dim">    end the active crew</span></span><span class="panel"> </span></div></div>
+    <figcaption><b>Figure 3.</b> Proposed: vi-mode's own border carries the path; the panel is a <code>belowEditor</code> widget. The yellow badge is DoomPi's <code>exit</code> tone, shown only while a crew is active.</figcaption>
+  </figure>
+</section>
+
+<!-- ===================================================== 8 -->
+<section id="space">
+  <h2>SPC in NORMAL mode</h2>
+  <p>IDEAS.md asks whether <kbd>SPC</kbd> should be the leader in NORMAL too, and whether that clashes with a vi binding.</p>
+  <p><strong>It doesn't clash.</strong> In Vim, <kbd>SPC</kbd> in Normal mode is a synonym for <kbd>l</kbd>, which almost nobody relies on. In our parser (<code>keys.ts</code>), a space at the <code>start</code> stage matches no list and falls through to <code>done(null)</code>, so today it does nothing. Doom Emacs and Spacemacs use <kbd>SPC</kbd> as the leader in evil's normal state for the same reason.</p>
+  <p>NORMAL has an advantage over INSERT here: space never types text, so the leader works whatever the draft holds. That fixes the one awkward thing about DoomPi's rule, which only works on an empty prompt.</p>
+
+  <div class="adm caution"><div class="label">Edge cases</div><div class="body">
+    <ul style="margin:0">
+      <li><strong>Mid-command.</strong> <code>d SPC</code>, <code>2 SPC</code> or <code>f SPC</code>: only take the leader when <code>engine.pending === ""</code>. Otherwise the space goes to the parser, so <code>f SPC</code> still finds a space.</li>
+      <li><strong>Paste.</strong> The paste guard runs first, so a pasted space is text.</li>
+      <li><strong>Autocomplete in INSERT.</strong> An empty draft can't have autocomplete open, so <kbd>SPC</kbd> needs no extra check. <kbd>ctrl+space</kbd> should check <code>isShowingAutocomplete()</code>, as <kbd>Esc</kbd> already does.</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ===================================================== 9 -->
+<section id="protocol">
+  <h2>Registering bindings</h2>
+  <p>DoomPi shares one registry through a Cordis service that every package injects. We don't have that. Pi loads each extension with <code>moduleCache: false</code>, so a module-level registry isn't shared either. What extensions do share is <code>pi.events</code>, an <code>EventBus</code> with <code>emit(channel, data)</code> and <code>on(channel, handler)</code>. The <code>/runs</code> idea in IDEAS.md uses the same approach.</p>
+
+<pre><span class="c">// Any extension (crew/index.ts). No import from vi-mode.</span>
+<span class="k">const</span> crewBindings = (active: <span class="t">boolean</span>) =&gt; [
+  { id: <span class="s">"crew.list"</span>,   path: [CREW, { key: <span class="s">"l"</span>, label: <span class="s">"list"</span>, detail: <span class="s">"crews in this repo"</span> }], command: { name: <span class="s">"crew-status"</span> } },
+  { id: <span class="s">"crew.resume"</span>, path: [CREW, { key: <span class="s">"r"</span>, label: <span class="s">"resume"</span> }], command: { name: <span class="s">"crew-resume"</span> } },
+  ...(active ? [{ id: <span class="s">"crew.stop"</span>, path: [CREW, { key: <span class="s">"x"</span>, label: <span class="s">"stop"</span>, tone: <span class="s">"exit"</span> }], command: { name: <span class="s">"crew-stop"</span> } }] : []),
+];
+<span class="k">const</span> announce = () =&gt; pi.events.emit(<span class="s">"leader:contribute"</span>, { source: <span class="s">"crew"</span>, bindings: crewBindings(isActive()) });
+pi.events.on(<span class="s">"leader:discover"</span>, announce);  <span class="c">// vi-mode loaded after us</span>
+announce();                                  <span class="c">// vi-mode loaded before us</span>
+
+<span class="c">// vi-mode/index.ts: parse once at the boundary, as DoomPi does.</span>
+pi.events.on(<span class="s">"leader:contribute"</span>, (data: <span class="t">unknown</span>) =&gt; report(registry.register(data)));
+pi.events.emit(<span class="s">"leader:discover"</span>, {});</pre>
+
+  <ul>
+    <li><strong>Load order doesn't matter.</strong> Each side announces on startup and answers the other's announcement.</li>
+    <li><strong>Updates are re-contributions.</strong> Sending the same <code>source</code> again replaces that source's bindings, which handles the enter/exit swap. An empty list unregisters.</li>
+    <li><strong>v1 is commands only.</strong> A <code>command</code> binding submits <code>/name args</code> through <code>onSubmit</code>, as DoomPi does, and needs nothing from the owning extension at run time. Named <code>action</code>s would need a return channel (<code>leader:action</code>) and a context in the handler. Add them when a binding can't be written as a slash command.</li>
+    <li><strong>Pi app actions are built in.</strong> Model, session and quit bindings call <code>this.actionHandlers.get(...)</code> directly, which is public on <code>CustomEditor</code>.</li>
+  </ul>
+
+  <div class="adm tip"><div class="label">Copy, don't import</div><div class="body">
+    <p>DoomPi's registry is MIT licensed, about 680 lines, and has no dependencies beyond its types. Port <code>parseContribution</code>, <code>insertBinding</code> and <code>getGroup</code> into <code>leaderRegistry.ts</code>, along with the relevant parts of the 449-line registry test file, and drop the hub, telemetry and Cordis wiring.</p>
+  </div></div>
+</section>
+
+<!-- ===================================================== 10 -->
+<section id="map">
+  <h2>A first key map</h2>
+  <p>Start with what IDEAS.md names plus DoomPi's core groups. Keep the existing <kbd>ctrl+shift</kbd> chords until the leader has been used for a while.</p>
+  <div class="tbl"><table>
+    <tr><th>Keys</th><th>Label</th><th>Runs</th><th>Contributed by</th></tr>
+    <tr><td><kbd>SPC c l</kbd></td><td>crew › list</td><td>Crew picker over the repo's ledger <span class="meh">(new)</span></td><td>crew</td></tr>
+    <tr><td><kbd>SPC c s</kbd></td><td>crew › status</td><td><code>/crew-status</code></td><td>crew</td></tr>
+    <tr><td><kbd>SPC c r</kbd> · <kbd>c c</kbd></td><td>crew › resume, clean</td><td><code>/crew-resume</code>, <code>/crew-clean</code></td><td>crew</td></tr>
+    <tr><td><kbd>SPC c x</kbd></td><td>crew › stop <span class="meh">(exit tone, only while active)</span></td><td><code>/crew-stop</code></td><td>crew</td></tr>
+    <tr><td><kbd>SPC a l</kbd></td><td>agents › list</td><td><code>/subagents</code></td><td>subagent</td></tr>
+    <tr><td><kbd>SPC w l</kbd></td><td>watches › list</td><td><code>/watches</code></td><td>watch</td></tr>
+    <tr><td><kbd>SPC g …</kbd></td><td>goal</td><td><code>/goal</code> enter, exit, show</td><td>goal</td></tr>
+    <tr><td><kbd>SPC m m</kbd> · <kbd>m t</kbd></td><td>models › select, thinking</td><td>Pi app actions</td><td>core (vi-mode)</td></tr>
+    <tr><td><kbd>SPC s n</kbd> · <kbd>s r</kbd> · <kbd>s t</kbd> · <kbd>s f</kbd></td><td>sessions</td><td>Pi app actions</td><td>core (vi-mode)</td></tr>
+    <tr><td><kbd>SPC h h</kbd></td><td>help › hotkeys</td><td><code>/hotkeys</code></td><td>core (vi-mode)</td></tr>
+  </table></div>
+  <p><kbd>SPC c l</kbd> needs a picker that doesn't exist yet; <code>/crew-status</code> opens a single crew. The <code>crewSource</code> panel work in IDEAS.md (multicrew) is the natural place to build it.</p>
+</section>
+
+<!-- ===================================================== 11 -->
+<section id="risks">
+  <h2>Risks</h2>
+  <div class="tbl"><table>
+    <tr><th>Risk</th><th>Notes</th><th>Mitigation</th></tr>
+    <tr><td>Bridge drift</td><td><code>bridge.ts</code> says it was checked against Pi 0.87.1; Pi is now 1.0.2. The private fields it needs (<code>state</code>, <code>undoStack</code>, <code>pastes</code>, <code>pasteCounter</code>, <code>lastAction</code>, <code>setCursorCol</code>, <code>pushUndoSnapshot</code>, <code>undo</code>, <code>exitHistoryBrowsing</code>) are still declared in 1.0.2's <code>editor.d.ts</code>, but that hasn't been checked at run time.</td><td>Update <code>CHECKED_PI_VERSION</code> after a manual pass. The leader itself uses only public API, so keep it working even when <code>missing.length &gt; 0</code>.</td></tr>
+    <tr><td><kbd>ctrl+space</kbd> is taken</td><td>macOS uses it for "previous input source" by default, and it's a common tmux prefix. Some terminals send it as NUL.</td><td><kbd>SPC</kbd> is the main trigger. Make the global chord configurable, and test it in Ghostty and WezTerm.</td></tr>
+    <tr><td>vi-mode grows a second job</td><td>The leader isn't vi. Mixing them makes the editor harder to reason about.</td><td>Keep <code>leader.ts</code> and <code>leaderRegistry.ts</code> pure and separate from <code>engine.ts</code>, so splitting them out later (option B) is a file move.</td></tr>
+    <tr><td>Leader with vi-mode disabled</td><td>If vi-mode isn't installed, nobody owns the registry, and contributions go nowhere.</td><td>Acceptable: contributions are harmless events. Document that the leader comes with vi-mode.</td></tr>
+    <tr><td>Muscle memory</td><td>A space typed into an empty INSERT prompt, say for indentation, opens the leader.</td><td>Same trade-off as DoomPi. <kbd>Esc</kbd> closes it with no side effects.</td></tr>
+  </table></div>
+</section>
+
+<!-- ===================================================== 12 -->
+<section id="open">
+  <h2>Open questions</h2>
+  <ol>
+    <li><strong>Which-key for vi itself?</strong> The same panel could list continuations after <kbd>g</kbd>, after an operator (<kbd>d</kbd> → motions and text objects), or after <kbd>i</kbd>/<kbd>a</kbd> in operator-pending mode. It's cheap once the panel exists, and it helps with discoverability. Is it noise for someone who knows vi?</li>
+    <li><strong>Idle delay.</strong> DoomPi shows the panel immediately. Emacs which-key waits for a pause, so fast chords never draw it. With the path already in the border, should the panel wait about 300&nbsp;ms?</li>
+    <li><strong>Retire the chords?</strong> Keep <kbd>ctrl+shift+c/s/w</kbd> as aliases, or remove them once <kbd>SPC c</kbd>, <kbd>SPC a</kbd> and <kbd>SPC w</kbd> exist?</li>
+    <li><strong>User remaps.</strong> Panel actions are already named (IDEAS.md: "Panel: user key maps"). Should a settings file be able to move leader bindings too, as a last contribution that always wins?</li>
+    <li><strong>Diagnostics surface.</strong> DoomPi warns through a notification. Ours: a one-off <code>ctx.ui.notify</code> on takeover, or only in a <code>/leader</code> command that dumps the tree and its conflicts?</li>
+  </ol>
+
+  <div class="adm note"><div class="label">Next step</div><div class="body">
+    <p>If this holds up in discussion, promote the IDEAS.md entry to TODO.md with option A, commands only, and <kbd>SPC</kbd> in both modes. Port the registry and its tests first: that's the part with the most edge cases and no Pi dependency.</p>
+  </div></div>
+</section>
+
+<!-- ===================================================== 13 -->
+<section id="refs">
+  <h2>References</h2>
+  <ol class="refs">
+    <li><a href="https://github.com/AgiFlow/doompi/blob/c3f057ab58a94667fb6f5c1e94c5a31e43bf84cf/packages/foundations/doompi-ui/src/tui/doomEditor.ts">doompi-ui/src/tui/doomEditor.ts</a>: editor, leader state, dispatch</li>
+    <li><a href="https://github.com/AgiFlow/doompi/blob/c3f057ab58a94667fb6f5c1e94c5a31e43bf84cf/packages/foundations/doompi-ui/src/services/leaderRegistry/index.ts">doompi-ui/src/services/leaderRegistry/index.ts</a>: parsing, takeover rules, core bindings</li>
+    <li><a href="https://github.com/AgiFlow/doompi/blob/c3f057ab58a94667fb6f5c1e94c5a31e43bf84cf/packages/foundations/doompi-ui/src/tui/leaderHints.ts">doompi-ui/src/tui/leaderHints.ts</a>: which-key panel layout</li>
+    <li><a href="https://github.com/AgiFlow/doompi/blob/c3f057ab58a94667fb6f5c1e94c5a31e43bf84cf/packages/core/doompi-core/src/schemas/leader.ts">doompi-core/src/schemas/leader.ts</a>: contribution contract</li>
+    <li><a href="https://github.com/AgiFlow/doompi/blob/c3f057ab58a94667fb6f5c1e94c5a31e43bf84cf/packages/minor/doompi-goal/src/services/goalPlugin/index.ts">doompi-goal/src/services/goalPlugin/index.ts</a>: dynamic enter/exit bindings</li>
+    <li><a href="../../pi/extensions/vi-mode/README.md">pi/extensions/vi-mode/README.md</a> and <a href="../../pi/extensions/vi-mode/VI_MODE_PLAN.md">VI_MODE_PLAN.md</a></li>
+    <li><a href="../../pi/extensions/vi-mode/editor.ts">vi-mode/editor.ts</a>, <a href="../../pi/extensions/vi-mode/keys.ts">keys.ts</a>, <a href="../../pi/extensions/vi-mode/bridge.ts">bridge.ts</a></li>
+    <li><a href="../../IDEAS.md">IDEAS.md</a>: "Doom-style leader key" and "One panel for every source (/runs)"</li>
+  </ol>
+</section>
+
+</main>
+</div>
+
+<script>
+  // Highlight the TOC entry for the section in view.
+  const links = new Map([...document.querySelectorAll('nav.toc a')].map(a => [a.getAttribute('href').slice(1), a]));
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) {
+      links.forEach(a => a.classList.remove('active'));
+      links.get(e.target.id)?.classList.add('active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('main > section').forEach(s => io.observe(s));
+</script>
+</body>
+</html>
