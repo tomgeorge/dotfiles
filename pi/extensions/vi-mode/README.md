@@ -57,10 +57,93 @@ Text objects, after `d`, `c` or `y`:
   the `c`, `o` or `s` that started it.
 - There's one register. `"_` (the black hole) discards; any other register
   name acts like the unnamed register.
-- In NORMAL, unmapped printable keys do nothing. Ctrl chords, arrows and
+- In NORMAL, unmapped printable keys do nothing, except the leader key (see
+  below). Ctrl chords, arrows and
   pastes keep their Pi meaning. In INSERT, undo stays Pi's `ctrl+-`.
 - Not supported: visual mode, `.` repeat, search, macros, marks, named
   registers, and ex commands.
+
+## Leader key
+
+In NORMAL mode, with no command half-typed, the leader key (`SPC` by
+default) opens a which-key panel below the editor listing the keys you can
+press next. INSERT mode never opens it: space types a space. After `f` or
+`d`, space is that command's argument, and a pasted space is text.
+
+Inside the leader:
+
+- A key with `+` opens its group; any other listed key runs its binding.
+- Backspace goes up a level, or closes the leader at the top.
+- Esc closes it. Esc never reaches Pi, so it doesn't abort a running turn.
+- An unknown key closes it, and the border briefly shows the path that
+  missed (`SPC c z`).
+
+The bottom border shows the path so far (`SPC c`). Closing or running a
+binding leaves NORMAL mode, the prompt, the cursor and undo as they were. A
+command binding submits `/name args` from an empty prompt, so it also shows
+up in prompt history.
+
+vi-mode's own bindings:
+
+| Keys | Runs |
+| --- | --- |
+| `SPC m m` `SPC m n` `SPC m t` | Select a model, next model, cycle thinking level |
+| `SPC s n` `SPC s r` `SPC s t` `SPC s f` | New, resume, tree, fork the session |
+| `SPC h h` `SPC h l` | `/hotkeys`, `/leader` |
+| `SPC q q` | `/quit` |
+
+Other extensions add their own groups, such as `SPC c` for crew.
+
+### `~/.pi/agent/leader.json`
+
+`link.sh` links it from `pi/leader.json`. It's read at every session start,
+so `/reload` picks up edits:
+
+```json
+{
+  "leader": "space",
+  "keymap": [
+    { "keys": "c", "label": "crew" },
+    { "keys": "c l", "label": "list", "command": "crews" },
+    { "keys": "g s", "label": "status", "command": "goal status", "detail": "current goal" },
+    { "keys": "q q", "unbind": true }
+  ]
+}
+```
+
+- `leader` is `"space"` or one printable character that NORMAL mode leaves
+  unused at the start of a command, such as `"\\"`. `d`, `,` or `1` are
+  refused.
+- `keys` is 1–4 space-separated keys from `a`–`z` and `0`–`9`.
+- `label` with `command` binds a leaf, running `/command`. It always wins over
+  vi-mode and other extensions. `detail` and `tone` (`"exit"`) are optional.
+- `label` alone relabels what's at `keys`, or creates an empty group there.
+- `unbind: true` removes the leaf or group. Move a binding by unbinding it
+  and binding it again elsewhere.
+- Any error rejects the whole file: Pi shows the errors, and the defaults
+  apply.
+
+### `/leader`
+
+Prints the leader key, every binding with its source
+(`SPC c l  crew › list  → /crews  (crew)`, or `(user)` for `leader.json`),
+conflicts between extensions, and any `leader.json` errors.
+
+### Contributing bindings from another extension
+
+Import only `../vi-mode/leaderContract.ts`. A later contribution from the
+same source replaces the earlier one, and vi-mode asks again when it loads:
+
+```ts
+import { contributeLeader } from "../vi-mode/leaderContract.ts";
+
+const leader = contributeLeader(pi.events, "crew", [
+  { id: "list", path: [{ key: "c", label: "crew" }, { key: "l", label: "list" }], command: { name: "crews" } },
+]);
+```
+
+`leader.update(bindings)` changes them, and `leader.dispose()` removes them.
+Bindings only run slash commands.
 
 ## How it works
 
@@ -70,6 +153,10 @@ Text objects, after `d`, `c` or `y`:
   cursor, it returns an action (move, edit, enter INSERT, undo, redo).
 - `keys.ts` parses keys into commands. `motions.ts`, `operators.ts`,
   `textobjects.ts` and `chars.ts` are the pure pieces the engine uses.
+- `leader.ts` decides each leader step and `whichKey.ts` draws the panel,
+  both pure. `leaderRegistry.ts` merges `coreBindings.ts`, contributions and
+  the keymap from `leaderConfig.ts` into one tree. `index.ts` wires them to
+  Pi's event bus, and `editor.ts` applies the steps.
 - `bridge.ts` is the only file that touches the Pi editor's private fields.
   Pi's editor has no public way to move the cursor or replace text without
   side effects, so the bridge writes its `state` directly. At startup it
