@@ -359,7 +359,8 @@ Manual checks in Pi, after `/reload` or a restart, in `~/git/dotfiles`:
 - [ ] Manual check in Pi for Milestone 3 (two parallel subagents; /subagents spinner moves, Activity follows, x asks before cancelling, Result shows markdown): pending for the user.
 - [x] (2026-10-23 00:14) Milestone 4: `watch/source.ts` (`watchSource(store, registry, now?)`: item ids are `WatchRecord.key`; glyphs `◷`/spinner/`●`/`✓`/`✗`/`⊘` via `mark()` in `panel.ts`, shared with the widget's `icon()`; columns id, kind, description, count, last, status; Overview, Log (`tail`), Output; `x` stop with no confirmation, available only while active, guarded by `registry.get(id) === watch`; `busy` while any check runs; `subscribe` via `WatchStore`). `/watches` and `ctrl+shift+w` open it through `run-panel/pi.ts`'s `openPanel` (id `watches`); the popup key map, `makeStyle`, and the popup code in `watch/panel.ts` are gone, and the widget is unchanged (it now uses `run-panel/pi.ts`'s `makeStyle`). New `PanelOptions.spinnerMs` in `run-panel/pi.ts`: watch and subagent panels tick at 120 ms while a spinner shows, as their popups did. Tests: the 2 store tests moved to `watch/store.test.ts`; `watch/panel.test.ts` keeps the 2 widget tests; the 5 popup tests became 8 in `watch/source.test.ts`; 1 new tick test in `run-panel/pi.test.ts`. Suite: `ℹ tests 249`, `ℹ pass 249`, `ℹ fail 0` (245 − 5 + 8 + 1). `rg 'from "\.\./(crew|subagent|watch)/' pi/extensions/run-panel` prints nothing; `crew/index.test.ts` unchanged. No `watch/mutants.json` exists, so nothing to retarget.
 - [ ] Manual check in Pi for Milestone 4 (/watch 5s date and /loop 1m say hi; Log grows and collapses ×N, Output shows last date, x stops, loop shows due when idle while busy): pending for the user.
-- [ ] Milestone 5: READMEs and `IDEAS.md`.
+- [x] (2026-10-23 00:17) Milestone 5: crew, subagent, and watch READMEs document the shared keys, each panel's tabs, and its actions (key tables checked against `run-panel/input.ts`, `render.ts`'s help, `pi.ts`'s `PANEL_KEYS`, and each `source.ts`); new `run-panel/README.md` (what it is, the `Source` fields and defaults, views and `Content` kinds, actions, reserved keys, `openPanel` options, the fixture as the example, prior art); `IDEAS.md` gains the multicrew note and the deferred ideas (`/runs` was already there). Docs only. Suite: `ℹ tests 249`, `ℹ pass 249`, `ℹ fail 0`. `rg 'from "\.\./(crew|subagent|watch)/' pi/extensions/run-panel` prints nothing.
+- [ ] Manual check: each README's key table matches the panel with it open: pending for the user.
 
 Work is committed per milestone on the crew branch (`crew/carry-out-the-execplan-in-agent-*`).
 
@@ -389,6 +390,7 @@ Work is committed per milestone on the crew branch (`crew/carry-out-the-execplan
 - 2026-10-23 (M4): **No `watch/mutants.json` existed** to retarget.
 - 2026-10-23 (M4): **The Overview now shows the whole command or prompt** in a wrapped `cmd`/`prompt` field, so the popup's "… N more lines" cut is gone. A long Log line is still cut at the pane edge, as in the popup.
 - 2026-10-23 (M4): **`watch/README.md` still documents the popup** (`a` toggles activity/output). Left for Milestone 5.
+- 2026-10-23 (M5): **The keys tables gained a few rows the old crew table didn't have**, all in the code since M2: `q` and the opening shortcut close; `shift+tab` goes back a tab; `ctrl+d`/`ctrl+u` page the details from either pane; `esc` steps back (clear the filter, leave the details, leave zoom, then close), not only "clear the filter, then close". `enter` in the details of a non-collapsible view returns to the list, which the tables leave out as a detail.
 - 2026-10-22: **The crew panel is already close to this shape.** It isolates its data behind `deps.diff` and `deps.transcript`, so most of Milestone 2 moves code rather than redesigning it.
 
 ## Decision Log
@@ -435,8 +437,21 @@ Work is committed per milestone on the crew branch (`crew/carry-out-the-execplan
 - 2026-10-23 (M4): **`PanelOptions.spinnerMs`: one interval at the fast rate, rendering only when something spins or `tickMs` has passed.** "Something spins" (`spinning(source)` in `run-panel/pi.ts`) is `source.busy()` or an item with no glyph, so it stays generic. One `setInterval` keeps the existing cleanup and timer-leak tests valid. Watch passes `tickMs: 1000` (countdowns) and `spinnerMs: 120`; subagent passes `spinnerMs: 120` and keeps the 500 ms default. Crew passes neither, so its panel is unchanged. This supersedes M3's "subagent panel ticks at 500 ms".
 - 2026-10-23 (M4): **Watch stop flashes `Stopped #N`, or `#N has ended`** when the id no longer belongs to that watch (ended and reused) or `registry.stop` finds nothing. Unavailable on ended records with the same reason. The list status is `N · <widget summary>` (`2 · 1 watching · 1 loop`), with `matched/total` while filtering.
 - 2026-10-23 (M4): **The wording the widget and panel share (`status`, `counter`, `kindLabel`, `summary`, and the new `mark`) stays in `watch/panel.ts`**, exported, rather than a new file: `panel.ts` is now the widget plus these helpers.
+- 2026-10-23 (M5): **Each extension README keeps a full key table** rather than linking to `run-panel/README.md` for the shared keys: a reader of one README gets that panel's keys in one place, and only the tab count, the action rows, the filter fields, and the close shortcut differ. `run-panel/README.md` documents sources, not keys.
 - 2026-10-22 (M1): **Watch store tests stay in `watch/panel.test.ts`, importing from `store.ts`.** (M4: moved to `watch/store.test.ts`.) The popup tests there build records through `WatchStore`, and Milestone 4 rewrites that file anyway.
 
 ## Outcomes & Retrospective
 
-To be filled in at the end.
+2026-10-23. The Purpose is met in code and tests; the in-Pi checks are still to do.
+
+- **Achieved.** `/crew-status`, `/subagents`, and `/watches` are all drawn by `pi/extensions/run-panel/`, which imports nothing from an extension. Each extension supplies a `Source` (`crew/source.ts`, `subagent/source.ts`, `watch/source.ts`), so subagents and watches gained the crew panel's tabs, filter, generated help, zoom, following tail views, and confirmations (subagent cancel asks; watch stop deliberately doesn't). A new kind of work needs only a source: subagents needed no presenter change, and watches needed one generic option (`spinnerMs`).
+- **Tests.** From 200 (baseline, three suites) to 249 across four suites (`run-panel` added), `ℹ fail 0`. `crew/index.test.ts` passed unchanged throughout, the check that crew behaviour didn't move.
+- **Deviations.** The interface grew in small declarative ways (M2a Decision Log: `text` as fields, optional `glyph`, `description`, `ActionContext.flash`, `bullets`, `status(matched, total)`, `empty`); `busy` shows a list-title spinner rather than recolouring the border; `PanelOptions.spinnerMs` was added in M4; some crew wording changed with the presenter ("Nothing done", the Live-tab notes, the help's read-only line); `crew/panel.ts` was deleted rather than shrunk; mutants for generic behaviour moved to `run-panel/mutants.json`.
+- **Left open.** The mutation tool (`test-support/mutate.ts`) copies only one extension, so it can't load `crew/`, `subagent/`, or `watch/` now that they import `run-panel/` (see Surprises, M2b). Deferred ideas are in `IDEAS.md`.
+- **Manual checks pending for the user** (in Pi, after `/reload`, in `~/git/dotfiles`):
+  - M1: each panel looks unchanged after the helper move.
+  - M2: `/crew-status` opens crew `is-the-extension-code-clean-code-0om6` from the ledger; header, list, six tabs, filter, `?`, `ctrl+o`, and `o` work as before.
+  - M3: two parallel subagents; in `/subagents` the spinner moves, Activity follows, `x` asks before cancelling, Result shows markdown.
+  - M4: `/watch 5s date` and `/loop 1m say hi`; in `/watches` the Log grows and collapses `×N`, Output shows the last `date`, `x` stops, the loop shows `due when idle` while Pi is busy.
+  - All panels: at 80 columns the list stacks above the details; `?` lists exactly that source's actions and views.
+  - M5: each README's key table matches the panel with it open.

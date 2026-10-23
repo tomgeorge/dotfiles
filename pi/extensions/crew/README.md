@@ -68,20 +68,24 @@ colour once it passes `stallMin`. The details pane has six tabs:
    and `G` follows again. The panel keeps the newest 400 entries of each worker; the session file
    has all of them.
 
+The keys are the shared panel's ([`run-panel`](../run-panel/)), the same in `/subagents` and
+`/watches`; only the tabs and the action keys differ.
+
 | Key | Action |
 |---|---|
-| type, `/` | Filter by title, id, status, kind, or branch |
+| type, `/` | Filter by id, status, kind, title, or branch. `enter` keeps the filter, `esc` clears it |
 | `j`/`k`, arrows | Move; in the details, scroll |
-| `enter`, `l` / `h` | Focus the details / back to the list |
-| `tab`, `1`-`6` | Switch tab |
+| `enter`, `l` / `h` | Focus the details / back to the list. On Checks, `enter` opens or closes a check |
+| `tab`/`shift+tab`, `1`-`6` | Switch tab |
 | `g`/`G` | Top/bottom. On Live, `G` follows the newest output again |
-| `ctrl+d`/`ctrl+u` | Page the details |
+| `ctrl+d`/`ctrl+u` | Page the details, from either pane |
 | `ctrl+o` | Zoom the details to the full panel |
 | `x` | Cancel the selected running task, after a `y` to confirm. Its handoff wakes the planner |
 | `o` | Copy the selected task's worktree path |
 | `e` | Export the selected worker's session to HTML, beside the session file, as `/export` does |
-| `?` | Help |
-| `esc` | Clear the filter, then close |
+| `?` | Help, generated from the tabs and actions above |
+| `esc` | Clear the filter, leave the details, leave zoom, then close |
+| `q`, `ctrl+shift+c` | Close |
 
 The panel is read-only apart from `x` and `e`: integrating and dispatching stay with the planner. While
 the crew runs in this session, the panel reads its in-memory state, which is fresher than the

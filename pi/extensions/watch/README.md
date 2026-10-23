@@ -55,26 +55,38 @@ While watches are active, a widget below the input box lists them, one row each
 `◷` waits for its next check, a spinner means a check is running, and `●` is a
 loop iteration waiting for Pi to go idle.
 
-`ctrl+shift+w` or `/watches` opens a two-pane popup: watches on the left, details
-for the selected one on the right (mode, cwd, interval and time left, counts,
-status, and the command or prompt), with a timestamped event log or the last
-check's output below. Identical consecutive checks collapse into one log line
-(`×12`). Ended watches stay listed for the session (the last 50), with how they
-ended.
+`ctrl+shift+w` or `/watches` opens the shared panel ([`run-panel`](../run-panel/)),
+with the crew panel's layout and keys: watches on the left (stacked above the
+details below 100 columns), and the selected one's details in three tabs:
 
-| Key | List | Details |
-| --- | --- | --- |
-| `j`/`k`, arrows, `ctrl+d`/`ctrl+u`, `g`/`G` | Select watch | Scroll |
-| `enter`, `tab` | Focus details | Back to list |
-| `a` | Switch activity/output | Same |
-| `x` | Stop selected watch | Same |
-| `esc` | Close | Back to list |
-| `q`, `ctrl+shift+w` | Close | Close |
+1. **Overview**: kind and mode, cwd, interval, timeout and time left, counts,
+   status, and the whole command or prompt.
+2. **Log**: the timestamped event log. Identical consecutive checks collapse into
+   one line (`×12`). It follows new entries; `k` or `ctrl+u` pauses and `G`
+   follows again.
+3. **Output**: the last check's stdout and stderr, or a loop's prompt, with the
+   error first when the watch ended in one.
+
+Ended watches stay listed for the session (the last 50), with how they ended.
+
+| Key | Action |
+|---|---|
+| type, `/` | Filter by id, kind, description, command or prompt, or status. `enter` keeps the filter, `esc` clears it |
+| `j`/`k`, arrows | Move; in the details, scroll |
+| `enter`, `l` / `h` | Focus the details / back to the list |
+| `tab`/`shift+tab`, `1`-`3` | Switch tab |
+| `g`/`G` | Top/bottom. On Log, `G` follows new entries again |
+| `ctrl+d`/`ctrl+u` | Page the details, from either pane |
+| `ctrl+o` | Zoom the details to the full panel |
+| `x` | Stop the selected watch or loop, at once (no confirmation) |
+| `?` | Help |
+| `esc` | Clear the filter, leave the details, leave zoom, then close |
+| `q`, `ctrl+shift+w` | Close |
 
 `ctrl+shift+w` needs a terminal that reports modifier keys (kitty keyboard
 protocol); elsewhere use `/watches`. Without a UI, `/watches` prints the list.
-Rendering and the session record (`panel.ts`) are separate from Pi so they can
-be tested with injected styling.
+The widget (`panel.ts`), the panel source (`source.ts`), and the session record
+(`store.ts`) are separate from Pi so they can be tested with injected styling.
 
 ### Conditions
 
@@ -163,5 +175,6 @@ How other harnesses do this, and what this extension takes from each:
 node --test pi/extensions/watch/*.test.ts
 ```
 
-`panel.ts` is modeled on `subagent/panel.ts`. The shared helpers are copied
-because each extension is linked on its own.
+The shared helpers and the panel come from [`run-panel`](../run-panel/), imported by
+relative path; Pi resolves imports from the symlink's real path, so this works
+although each extension is linked on its own.
