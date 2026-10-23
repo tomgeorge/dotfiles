@@ -50,6 +50,19 @@ export function textOf(content: Message["content"]): string {
   return content.filter((c): c is { type: "text"; text: string } => c.type === "text").map((c) => c.text).join("\n");
 }
 
+function serializeAssistant(msg: Extract<Message, { role: "assistant" }>): string[] {
+  const thinking = msg.content.flatMap((c) => (c.type === "thinking" ? [c.thinking] : []));
+  const text = msg.content.flatMap((c) => (c.type === "text" ? [c.text] : []));
+  const calls = msg.content.flatMap((c) => (c.type === "toolCall"
+    ? [`${c.name}(${Object.entries(c.arguments).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")})`]
+    : []));
+  const parts: string[] = [];
+  if (thinking.length) parts.push(`[Assistant thinking]: ${thinking.join("\n")}`);
+  if (text.length) parts.push(`[Assistant]: ${text.join("\n")}`);
+  if (calls.length) parts.push(`[Assistant tool calls]: ${calls.join("; ")}`);
+  return parts;
+}
+
 /**
  * Pi's serializeConversation is built for compaction summaries and cuts every tool
  * result to 2,000 characters. The advisor needs what the agent saw, so keep it whole;
@@ -62,14 +75,7 @@ export function serializeTranscript(messages: Message[]): string {
       const text = textOf(msg.content);
       if (text) parts.push(`[User]: ${text}`);
     } else if (msg.role === "assistant") {
-      const thinking = msg.content.flatMap((c) => (c.type === "thinking" ? [c.thinking] : []));
-      const text = msg.content.flatMap((c) => (c.type === "text" ? [c.text] : []));
-      const calls = msg.content.flatMap((c) => (c.type === "toolCall"
-        ? [`${c.name}(${Object.entries(c.arguments).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")})`]
-        : []));
-      if (thinking.length) parts.push(`[Assistant thinking]: ${thinking.join("\n")}`);
-      if (text.length) parts.push(`[Assistant]: ${text.join("\n")}`);
-      if (calls.length) parts.push(`[Assistant tool calls]: ${calls.join("; ")}`);
+      parts.push(...serializeAssistant(msg));
     } else if (msg.role === "toolResult") {
       const text = textOf(msg.content);
       if (text) parts.push(`[Tool result${msg.isError ? " (error)" : ""}]: ${text}`);

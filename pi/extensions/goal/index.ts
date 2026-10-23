@@ -1,7 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine, type Goal,
+  continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine,
+  type Goal, type LifecycleWord, type SetCommand,
 } from "./goal.ts";
 
 const CHECK_TIMEOUT_MS = 10 * 60_000;
@@ -9,7 +10,8 @@ const ENTRY = "goal-state";
 
 export default function (pi: ExtensionAPI) {
   let goal: Goal | undefined;
-  let ui: ExtensionContext | undefined;
+  // The loaded session's context, kept for rendering status outside event handlers.
+  let session: ExtensionContext | undefined;
   let toolCalls = 0;
   let aborted = false;
   let errored = false;
@@ -29,8 +31,8 @@ export default function (pi: ExtensionAPI) {
 
   function render() {
     syncTools();
-    if (!ui?.hasUI) return;
-    ui.ui.setStatus("goal", goal && goal.status !== "cleared"
+    if (!session?.hasUI) return;
+    session.ui.setStatus("goal", goal && goal.status !== "cleared"
       ? `goal ${goal.status === "active" ? `${goal.continuations}/${goal.maxContinuations}` : goal.status}`
       : undefined);
   }
@@ -57,39 +59,56 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  /** Applies a lifecycle word and returns what to tell the user, or nothing when the goal speaks for itself. */
+  function runLifecycle(word: LifecycleWord): string | undefined {
+    switch (word) {
+      case "status":
+        return statusLine(goal);
+      case "clear":
+        if (goal) { goal.status = "cleared"; save(); }
+        return "Goal cleared";
+      case "pause":
+        if (goal?.status !== "active") throw new Error("No active goal");
+        goal.status = "paused";
+        save();
+        return "Goal paused. /goal resume to continue.";
+      case "resume":
+        if (!goal || goal.status === "cleared" || goal.status === "complete") throw new Error("No goal to resume");
+        goal.status = "active";
+        goal.reason = undefined;
+        // Resuming after a budget stop grants a fresh budget of the same size.
+        if (goal.continuations >= goal.maxContinuations) goal.continuations = 0;
+        save();
+        say(startMessage(goal, "resumed"), true);
+        return undefined;
+      default:
+        return word satisfies never;
+    }
+  }
+
+  // Whatever the command line left out is asked for interactively.
+  async function setGoal(cmd: SetCommand, ctx: ExtensionContext) {
+    let check = cmd.check;
+    if (!check && ctx.hasUI) check = (await ctx.ui.input("Check command (exit 0 = goal met)", "npm test"))?.trim();
+    if (!check) throw new Error("A goal needs --check <command>; it's how the harness knows you're done");
+    const objective = cmd.objective || (ctx.hasUI ? (await ctx.ui.editor("Goal objective"))?.trim() ?? "" : "");
+    goal = newGoal(objective, check, cmd.max);
+    save();
+    say(startMessage(goal, "set"), true);
+  }
+
   pi.registerCommand("goal", {
     description: "Keep working until a check passes: /goal <objective> --check <cmd> [--max N] | status | pause | resume | clear",
     async handler(args, ctx) {
       const notify = (text: string, level: "info" | "error" = "info") => (ctx.hasUI ? ctx.ui.notify(text, level) : console.log(text));
       try {
         const cmd = parseGoalArgs(args);
-        if (cmd.kind === "status") return notify(statusLine(goal));
-        if (cmd.kind === "clear") {
-          if (goal) { goal.status = "cleared"; save(); }
-          return notify("Goal cleared");
+        if (cmd.kind === "set") {
+          await setGoal(cmd, ctx);
+          return;
         }
-        if (cmd.kind === "pause") {
-          if (goal?.status !== "active") throw new Error("No active goal");
-          goal.status = "paused";
-          save();
-          return notify("Goal paused. /goal resume to continue.");
-        }
-        if (cmd.kind === "resume") {
-          if (!goal || goal.status === "cleared" || goal.status === "complete") throw new Error("No goal to resume");
-          goal.status = "active";
-          goal.reason = undefined;
-          // Resuming after a budget stop grants a fresh budget of the same size.
-          if (goal.continuations >= goal.maxContinuations) goal.continuations = 0;
-          save();
-          return say(startMessage(goal, "resumed"), true);
-        }
-        let check = cmd.check;
-        if (!check && ctx.hasUI) check = (await ctx.ui.input("Check command (exit 0 = goal met)", "npm test"))?.trim();
-        if (!check) throw new Error("A goal needs --check <command>; it's how the harness knows you're done");
-        const objective = cmd.objective || (ctx.hasUI ? (await ctx.ui.editor("Goal objective"))?.trim() ?? "" : "");
-        goal = newGoal(objective, check, cmd.max);
-        save();
-        say(startMessage(goal, "set"), true);
+        const text = runLifecycle(cmd.kind);
+        if (text !== undefined) notify(text);
       } catch (error) {
         notify(error instanceof Error ? error.message : String(error), "error");
       }
@@ -115,7 +134,7 @@ export default function (pi: ExtensionAPI) {
     checking = true;
     try {
       const active = goal;
-      if (ui?.hasUI) ui.ui.setStatus("goal", "goal: checking…");
+      if (session?.hasUI) session.ui.setStatus("goal", "goal: checking…");
       const result = aborted ? undefined : await runCheck(ctx.cwd, active.check, CHECK_TIMEOUT_MS);
       if (goal !== active || active.status !== "active") return; // changed while the check ran
       if (result) active.lastCheck = result;
@@ -147,7 +166,7 @@ export default function (pi: ExtensionAPI) {
 
   // The branch's latest goal entry wins, so forks, resumes, and /tree keep their own goal.
   function load(ctx: ExtensionContext) {
-    ui = ctx;
+    session = ctx;
     goal = undefined;
     for (const entry of ctx.sessionManager.getBranch()) {
       // A malformed latest entry can't be a goal we wrote; leave no goal rather than run on
