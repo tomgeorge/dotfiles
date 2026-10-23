@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Parser, type Command } from "./keys.ts";
+import { isNormalStartKey, Parser, type Command } from "./keys.ts";
 
 function parse(keys: string): Command | null | "pending" {
   const p = new Parser();
@@ -91,4 +91,13 @@ test("pending shows what was typed and clears when done", () => {
   assert.equal(p.pending, "2d");
   p.feed("w");
   assert.equal(p.pending, "");
+});
+
+test("isNormalStartKey matches what the parser accepts first", () => {
+  for (let code = 32; code < 127; code++) {
+    const key = String.fromCharCode(code);
+    const r = new Parser().feed(key);
+    const used = !r.done || r.command !== null;
+    assert.equal(isNormalStartKey(key), used, `key ${JSON.stringify(key)}`);
+  }
 });

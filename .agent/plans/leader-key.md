@@ -341,7 +341,7 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 
 - [x] 2026-10-23 Read IDEAS.md, the RFD, vi-mode, the four contributing extensions, Pi 1.0.2's editor wiring, and DoomPi's registry, editor, and schema; wrote this plan.
 - [x] 2026-10-23 Revised the plan after review: NORMAL-only trigger, no `ctrl+space`, chords removed, configurable leader key and keymap.
-- [ ] Milestone 1: `leaderContract.ts`, `leaderRegistry.ts` (with keymap), `leaderConfig.ts`, and their tests.
+- [x] 2026-10-23 Milestone 1: `leaderContract.ts`, `leaderRegistry.ts` (with keymap), `leaderConfig.ts`, and their tests. `keys.ts` exports `isNormalStartKey`, tested against the parser itself.
 - [ ] Milestone 2: `leader.ts`, `whichKey.ts`, and their tests.
 - [ ] Milestone 3: LEADER mode in `editor.ts`, core bindings, config loading, `/leader`, `pi/leader.json` with its `link.sh` line, the fake-pi events, and the README.
 - [ ] Milestone 4a: crew bindings, `/crews`, and the crew chord removed.
@@ -355,6 +355,7 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 - 2026-10-23: Pi has no `app.exit` action handler; quit is the built-in `/quit`, so `SPC q q` submits `/quit`. Evidence: `rg -o 'onAction\("app\.[a-zA-Z.]+"' dist/modes/interactive/interactive-mode.js` lists no `app.exit`.
 - 2026-10-23: Pi copies `actionHandlers`, `onSubmit`, and `onCtrlD` into a custom editor after its factory returns, so the editor must look them up at run time.
 - 2026-10-23: Leader-run commands go through `onSubmit`, which calls `addToHistory`, so they show up in prompt history.
+- 2026-10-23 (M1): DoomPi keeps the first registrant's label even when a leaf is taken over, so the row says one thing and runs another. Ours doesn't; see the Decision Log.
 - 2026-10-23: `typecheck.sh` needs a `tsc`. Pi 1.0.2 bundles none and none is on PATH; `nix shell nixpkgs#typescript -c …` works (TypeScript 7.0.2, about 5 seconds).
 
 ## Decision Log
@@ -370,6 +371,10 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 - 2026-10-23: The panel shows at once, with no idle delay. That's simplest, and it matches DoomPi. Revisit after use (RFD open question 2).
 - 2026-10-23: Conflict diagnostics and config errors show in `/leader`. A notification fires only for a rejected contribution or a rejected `leader.json` (RFD open question 5).
 - 2026-10-23: Out of scope: which-key for vi operators, named actions, and DoomPi's mode badges and session-diagnostics rows (RFD open question 1).
+- 2026-10-23 (M1): API shapes for Milestones 2 and 3. `LeaderTarget = { command: LeaderCommand } | { app: string }`. `CoreBinding = { id, path, target }`, and core leaves report source `core`. `KeymapEntry` is `{ keys, label, detail?, tone?, command? }` or `{ keys, unbind: true }`. `LeaderConfig.leader` is parsed to `{ key, name }` (`{ key: " ", name: "SPC" }` by default), so callers never re-interpret `"space"`. `group()` options carry `target`; `bindings()` returns `{ keys, labels, detail?, tone?, target, source }`. `register()` returns only the registering source's diagnostics (its takeovers); `diagnostics()` returns all.
+- 2026-10-23 (M1): A leaf that takes over a key shows the newcomer's label, detail, and tone, and a leaf turned into a group takes the new group's label. Only shared groups keep the first label. A row that reads "list" but runs someone else's command would mislead.
+- 2026-10-23 (M1): A label-only keymap entry relabels whatever is at its keys, a leaf included (renaming `c l` keeps its command), and creates an empty group only when nothing is there. `detail` and `tone` are allowed on label-only entries as well as on bindings. A keymap bind through an existing leaf turns it into a group silently, labelled with its key.
+- 2026-10-23 (M1): Binding ids need only be non-empty, at most 128 characters, and free of control characters, as the plan says; DoomPi's stricter id pattern isn't ported. Command args may not contain control characters.
 - 2026-10-23: `SPC c l` runs a new `/crews` picker built on `ctx.ui.select`, not the full multicrew panel from IDEAS.md. It's the smallest thing that lists crews.
 
 ## Outcomes & Retrospective
