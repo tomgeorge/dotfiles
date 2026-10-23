@@ -347,7 +347,7 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 - [ ] Milestone 4a: crew bindings, `/crews`, and the crew chord removed.
 - [ ] Milestone 4b: subagent bindings and the subagent chord removed.
 - [x] 2026-10-23 Milestone 4c: watch bindings and the watch chord removed.
-- [ ] Milestone 4d: goal bindings.
+- [x] 2026-10-23 Milestone 4d: goal bindings.
 - [ ] Milestone 5: manual checks, the bridge version, IDEAS.md, and the retrospective.
 
 ## Surprises & Discoveries
