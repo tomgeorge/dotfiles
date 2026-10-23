@@ -1,0 +1,26 @@
+[
+  {
+    "name": "esc leaves the filter in place",
+    "file": "input.ts",
+    "from": "      if (state.query) state.query = \"\";\n      else if (state.focus === \"detail\")",
+    "to": "      if (state.focus === \"detail\")"
+  },
+  {
+    "name": "panes never stack",
+    "file": "render.ts",
+    "from": "} else if (width >= SIDE_BY_SIDE) {",
+    "to": "} else if (true) {"
+  },
+  {
+    "name": "a tail view does not follow new output",
+    "file": "render.ts",
+    "from": "if (view.tail && state.follow) state.scroll = max;",
+    "to": ""
+  },
+  {
+    "name": "scrolling up does not pause a tail view",
+    "file": "input.ts",
+    "from": "if (key === \"up\" || key === \"top\") state.follow = false;",
+    "to": ""
+  }
+]
