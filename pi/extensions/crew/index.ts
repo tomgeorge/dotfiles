@@ -228,6 +228,11 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     while (pending.size || planning.size) await Promise.allSettled([...pending, ...planning]);
   }
 
+  /** A start or resume can outlast session_shutdown (it waits on drain and the UI); activating then would restart the timers shutdown cleared. */
+  function refuseIfShuttingDown() {
+    if (shuttingDown) throw new Error("The session is shutting down; no crew was started or resumed");
+  }
+
   /** Run a crew start or resume, refusing a second one while it's in progress. */
   async function switchCrew(ctx: ExtensionContext, body: () => Promise<void>) {
     try {
@@ -743,6 +748,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const integrationBranch = `crew/${slug}`;
       const integrationPath = worktreePath(info.name, integrationBranch);
       await addWorktree(info.root, integrationPath, integrationBranch, info.head);
+      refuseIfShuttingDown();
       crew = {
         version: 1, status: "active", tasks: [], nextId: 1,
         config: {
@@ -792,6 +798,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const crews = listCrews(await commonDirOf(ctx.cwd)).filter((s) => s.status !== "finished");
       const state = args.trim() ? crews.find((s) => s.config.slug === args.trim()) : crews[0];
       if (!state) throw new Error("No resumable crew in this repository");
+      refuseIfShuttingDown();
       // Processes from a previous session are gone; keep their worktrees as evidence.
       for (const t of runningTasks(state)) endTask(t, "interrupted");
       state.status = "active";

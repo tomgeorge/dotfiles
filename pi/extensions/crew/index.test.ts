@@ -415,6 +415,18 @@ crewTest("a dispatch still setting up when the crew stops never launches its wor
   assert.doesNotMatch(await e.ledger(), /\[running\]/);
 });
 
+crewTest("a resume still draining when the session shuts down doesn't reactivate the crew", async (e) => {
+  await e.dispatch();
+  await e.f.command("crew-stop", "", e.ctx);
+  const resume = e.f.command("crew-resume", "", e.ctx); // waits for the stopped crew's worker
+  const down = e.shutdown();
+  e.w.list[0].finish(result("cancelled", ""));
+  await Promise.all([resume, down]);
+  assert.ok(!e.f.sent.some((s) => s.message.customType === "crew-resume"), "planner not told the crew resumed");
+  assert.ok(!e.f.active().some((name) => CREW.includes(name)), "crew tools stay hidden");
+  assert.equal(e.state().status, "stopped");
+}, { ignoreAbort: true });
+
 // ---- panel -------------------------------------------------------------------
 
 /** Capture the component ctx.ui.custom builds, with a plain-text theme and a fixed terminal. */
