@@ -107,12 +107,13 @@ export function parseConfig(raw: unknown): RouterConfig {
     for (const [backend, rule] of Object.entries(raw.unsure)) {
       if (!backends.includes(backend)) fail(`unsure: unknown backend "${backend}"`);
       if (!isObject(rule)) fail(`unsure.${backend} must be an object`);
-      for (const key of Object.keys(rule)) {
-        const v = rule[key];
+      const parsed: UnsureRule = {};
+      for (const [key, v] of Object.entries(rule)) {
         if (key !== "minP" && key !== "minMargin") fail(`unsure.${backend}: unknown key "${key}"`);
         if (typeof v !== "number" || v < 0 || v > 1) fail(`unsure.${backend}.${key} must be between 0 and 1`);
+        parsed[key] = v;
       }
-      unsure[backend] = rule as UnsureRule;
+      unsure[backend] = parsed;
     }
   }
   return { service: service.replace(/\/+$/, ""), backends, primary, timeoutMs, routes, unsure };
@@ -186,13 +187,10 @@ export async function route(
   }
   if (!isObject(body) || !isObject(body.results)) return unavailable("router response has no results");
   const results: Record<string, BackendResult> = {};
-  for (const backend of config.backends) {
-    const parsed = parseBackendResult(body.results[backend]);
-    results[backend] = parsed ?? { error: "missing or malformed result" };
-  }
   const errors: string[] = [];
   for (const backend of config.backends) {
-    const result = results[backend];
+    const result = parseBackendResult(body.results[backend]) ?? { error: "missing or malformed result" };
+    results[backend] = result;
     if ("error" in result) errors.push(`${backend}: ${result.error}`);
   }
   if (errors.length === config.backends.length) return unavailable(`every backend failed (${errors.join("; ")})`);
@@ -218,9 +216,9 @@ export function suggest(
 ): Suggestions {
   const have = new Set([...available].map((m) => `${m.provider}/${m.id}`));
   const ok = (b: string) => { const r = results[b]; return r && !("error" in r) ? r : undefined; };
-  const rankedBy = ok(config.primary) ? config.primary : config.backends.find((b) => ok(b));
-  if (!rankedBy) throw new Error("suggest() needs at least one successful backend result");
-  const ranking = ok(rankedBy)!.ranked;
+  const rankedBy = [config.primary, ...config.backends].find((b) => ok(b));
+  const ranking = rankedBy === undefined ? undefined : ok(rankedBy)?.ranked;
+  if (rankedBy === undefined || ranking === undefined) throw new Error("suggest() needs at least one successful backend result");
   const byName = new Map(config.routes.map((r) => [r.name, r]));
   const scoreOf = (backend: string, name: string) => ok(backend)?.ranked.find((s) => s.route === name)?.p;
 
@@ -242,26 +240,31 @@ export function suggest(
     }
   }
 
+  const unsure = isUnsure(ranking, config.unsure[rankedBy]);
+  const summary = summarize(results, config, rankedBy, unsure);
+  const unavailable = [...new Set(config.routes.flatMap((r) => r.models))].filter((id) => !have.has(id));
+  return { choices, rankedBy, unsure, summary, unavailable };
+}
+
+/** Each backend's top pick on one line, plus flags for disagreement, fallback ranking, and doubt. */
+function summarize(results: Record<string, BackendResult>, config: RouterConfig, rankedBy: string, unsure: boolean): string {
   const tops = config.backends.map((b) => {
     const r = results[b];
-    if (!r || "error" in r) return { b, text: `${b}: failed`, top: undefined };
+    if (!r || "error" in r) return { text: `${b}: failed`, top: undefined };
     const top = r.ranked[0];
-    return { b, text: `${b}: ${top ? `${top.route} ${top.p.toFixed(2)}` : "no ranking"}${r.truncated ? " (truncated)" : ""}`, top: top?.route };
+    return { text: `${b}: ${top ? `${top.route} ${top.p.toFixed(2)}` : "no ranking"}${r.truncated ? " (truncated)" : ""}`, top: top?.route };
   });
   const picks = new Set(tops.map((t) => t.top).filter(Boolean));
-  const unsure = isUnsure(ranking, config.unsure[rankedBy]);
-  const summary = tops.map((t) => t.text).join(" · ")
+  return tops.map((t) => t.text).join(" · ")
     + (picks.size > 1 ? " (disagree)" : "")
     + (rankedBy !== config.primary ? ` · ranked by ${rankedBy}` : "")
     + (unsure ? " · unsure" : "");
-  const unavailable = [...new Set(config.routes.flatMap((r) => r.models))].filter((id) => !have.has(id));
-  return { choices, rankedBy, unsure, summary, unavailable };
 }
 
 /** Picker row label. Unique per choice because each model appears once. */
 export function formatChoice(choice: Choice, backends: string[]): string {
   const scores = backends
-    .map((b) => `${b} ${choice.scores[b] === undefined ? "–" : choice.scores[b]!.toFixed(2)}`)
+    .map((b) => { const p = choice.scores[b]; return `${b} ${p === undefined ? "–" : p.toFixed(2)}`; })
     .join(" · ");
   return `${choice.provider}/${choice.model}   ${choice.route}   ${scores}`;
 }

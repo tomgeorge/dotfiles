@@ -11,7 +11,9 @@ import { buildGitArgv, GIT_ENV } from "./git-policy.ts";
 const TIMEOUT_MS = 60_000;
 // Stop reading a runaway command (e.g. `log -p` over all history) rather than
 // buffering it; the model sees the head plus a note to narrow the query.
-const MAX_CAPTURE_BYTES = 32 * 1024 * 1024;
+const MAX_CAPTURE_MIB = 32;
+const MAX_CAPTURE_BYTES = MAX_CAPTURE_MIB * 1024 * 1024;
+const STDERR_TAIL = 8192;
 
 function runGit(argv: string[], cwd: string, signal?: AbortSignal) {
   return new Promise<{ code: number | null; stdout: string; stderr: string; capped: boolean }>((resolve, reject) => {
@@ -33,7 +35,7 @@ function runGit(argv: string[], cwd: string, signal?: AbortSignal) {
       if (size > MAX_CAPTURE_BYTES) { capped = true; kill(); }
     });
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-8192); });
+    child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-STDERR_TAIL); });
     child.on("error", (error) => { clearTimeout(timer); reject(error); });
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -65,7 +67,7 @@ export default function (pi: ExtensionAPI) {
         const dir = await mkdtemp(join(tmpdir(), "pi-subagent-git-"));
         const file = join(dir, "output.txt");
         await writeFile(file, stdout, { mode: 0o600 });
-        text += `\n\n[Output truncated${capped ? " (command stopped at 32 MiB)" : ""}. Full captured output: ${file}]`;
+        text += `\n\n[Output truncated${capped ? ` (command stopped at ${MAX_CAPTURE_MIB} MiB)` : ""}. Full captured output: ${file}]`;
       }
       return { content: [{ type: "text", text }], details: undefined };
     },
