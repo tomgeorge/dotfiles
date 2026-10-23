@@ -3,10 +3,10 @@ import { exitText } from "./report.ts";
 import { formatDuration, type EndReason, type RunResult, type Watch } from "./watcher.ts";
 
 // Session record of every watch: an event log per watch, kept for the widget and the
-// /watches popup after the Registry forgets an ended watch.
+// /watches panel after the Registry forgets an ended watch.
 
 export const LOG_LIMIT = 200;
-/** Ended watches kept for the popup; the oldest go first. */
+/** Ended watches kept for the panel; the oldest go first. */
 export const ENDED_LIMIT = 50;
 
 export interface LogEntry {

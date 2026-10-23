@@ -5,7 +5,7 @@ import "../test-support/fake-pi.ts";
 import { fixtureSource, job, type FixtureOptions, type Job } from "./fixture.ts";
 import type { Source } from "./source.ts";
 
-const { openPanel, panelEvent } = await import("./pi.ts");
+const { openPanel, panelEvent, spinning } = await import("./pi.ts");
 
 /**
  * A ctx whose ui.custom captures the component, with a plain-text theme and a fixed terminal.
@@ -232,6 +232,49 @@ test("the tick animates spinners and re-renders", async () => {
     handle.close();
   }
   await handle.closed;
+});
+
+test("with spinnerMs, the tick runs fast while something spins and slow otherwise", async () => {
+  // Timers and the clock are driven by hand, so the test doesn't depend on timing.
+  const { setInterval: set, clearInterval: clear } = globalThis;
+  const realNow = Date.now;
+  let fire: (() => void) | undefined;
+  let every: number | undefined;
+  let now = 1_000_000;
+  globalThis.setInterval = ((fn: () => void, ms: number) => { fire = fn; every = ms; return 0; }) as unknown as typeof set;
+  globalThis.clearInterval = (() => {}) as typeof clear;
+  Date.now = () => now;
+  const jobs = [job(1)];
+  const f = fakeCtx();
+  let handle: ReturnType<typeof openPanel>;
+  try {
+    handle = openPanel(f.ctx, fixtureSource(jobs), { tickMs: 1_000, spinnerMs: 100 })!;
+  } finally {
+    globalThis.setInterval = set;
+    globalThis.clearInterval = clear;
+  }
+  try {
+    assert.equal(every, 100);
+    const renders = () => f.opened[0].renders;
+    let before = renders();
+    now += 100;
+    fire!();
+    assert.equal(renders(), before + 1, "a running item spins at the fast rate");
+    jobs[0].status = "done";
+    before = renders();
+    now += 100;
+    fire!();
+    assert.equal(renders(), before, "nothing spins: wait for the slow interval");
+    now += 900;
+    fire!();
+    assert.equal(renders(), before + 1);
+    const busy = fixtureSource(jobs, { busy: true });
+    assert.ok(spinning(busy), "a busy source spins");
+  } finally {
+    Date.now = realNow;
+    handle!.close();
+  }
+  await handle!.closed;
 });
 
 test("closing before Pi installs the component still stops the tick, unsubscribes, and disposes once", async () => {

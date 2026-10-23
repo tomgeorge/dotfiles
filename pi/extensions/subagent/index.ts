@@ -80,7 +80,7 @@ export default function (pi: ExtensionAPI) {
       job?.controller.abort();
       return !!job;
     });
-    showPanel(ctx, source, { id: "subagents", closeKey: PANEL_KEY });
+    showPanel(ctx, source, { id: "subagents", closeKey: PANEL_KEY, spinnerMs: SPINNER_MS });
   }
 
   pi.registerFlag(MAX_CONCURRENT_FLAG, {

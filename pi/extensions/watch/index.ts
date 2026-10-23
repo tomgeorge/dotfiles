@@ -1,13 +1,14 @@
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import type { Style } from "../run-panel/format.ts";
-import { initialPopup, popupKey, popupLines, widgetLines, type PopupKey, type PopupState } from "./panel.ts";
+import { makeStyle, openPanel as showPanel } from "../run-panel/pi.ts";
+import { widgetLines } from "./panel.ts";
 import {
   describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt, type FirstCheck,
 } from "./report.ts";
 import { runCheck } from "./runner.ts";
+import { watchSource } from "./source.ts";
 import { anyChecking, WatchStore } from "./store.ts";
 import {
   buildSpec, DELIVER, oneLine, parseArgs, Registry, UNTIL,
@@ -24,32 +25,6 @@ const WIDGET_KEY = "watches";
 const SPINNER_MS = 120;
 const IDLE_TICK_MS = 1_000;
 
-function makeStyle(theme: Theme): Style {
-  return {
-    fg: (tone, text) => theme.fg(tone, text),
-    bold: (text) => theme.bold(text),
-    selected: (text) => theme.bg("selectedBg", text),
-    width: visibleWidth,
-    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
-    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
-  };
-}
-
-// First match wins; letters mirror lazygit/vim, as in /subagents.
-const POPUP_KEYS: [KeyId[], PopupKey][] = [
-  [["up", "k"], "up"],
-  [["down", "j"], "down"],
-  [["pageUp", "ctrl+u"], "pageUp"],
-  [["pageDown", "ctrl+d"], "pageDown"],
-  [["home", "g"], "top"],
-  [["end", "shift+g"], "bottom"],
-  [["enter", "tab", "l", "right"], "enter"],
-  [["escape", "h", "left"], "back"],
-  [["a"], "toggle"],
-  [["x"], "stop"],
-  [["q", "ctrl+c", PANEL_KEY], "close"],
-];
-
 export default function (pi: ExtensionAPI) {
   let ctx: ExtensionContext | undefined;
   let shuttingDown = false;
@@ -62,13 +37,12 @@ export default function (pi: ExtensionAPI) {
   const startingByTool = new Map<Watch, string | undefined>();
 
   const registry = new Registry(runCheck, { onFire, onDue, onEnd, onUpdate });
-  // Every watch this session, ended ones included, for the widget and popup.
+  // Every watch this session, ended ones included, for the widget and panel.
   const store = new WatchStore();
   let frame = 0;
   let ticker: ReturnType<typeof setTimeout> | undefined;
   let widgetTui: TUI | undefined;
   let widgetCtx: ExtensionContext | undefined;
-  let popupOpen = false;
 
   function tick() {
     frame++;
@@ -112,43 +86,10 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function openPopup(context: ExtensionContext) {
-    if (!context.hasUI || popupOpen) return;
-    popupOpen = true;
-    try {
-      await context.ui.custom<void>((tui, theme, _keybindings, done) => {
-        const state: PopupState = initialPopup(store.list());
-        let page = 1;
-        const unsubscribe = store.subscribe(() => tui.requestRender());
-        // The widget's ticker stops when nothing is active; tick here too.
-        const popupTicker = setInterval(() => { frame++; tui.requestRender(); }, SPINNER_MS);
-        return {
-          render(width) {
-            const height = Math.max(8, Math.floor(tui.terminal.rows * 0.8));
-            const out = popupLines(store.list(), state, Date.now(), width, height, makeStyle(theme), frame);
-            page = out.page;
-            return out.lines;
-          },
-          handleInput(data) {
-            const key = POPUP_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1]
-              ?? (data === "G" ? "bottom" : undefined);
-            if (!key) return;
-            const action = popupKey(state, store.list(), key, page);
-            if (action.type === "close") return done();
-            // Ids are reused: stop only if the id still belongs to this watch.
-            if (action.type === "stop" && registry.get(action.watch.id) === action.watch) registry.stop(action.watch.id);
-            tui.requestRender();
-          },
-          invalidate() {},
-          dispose() {
-            unsubscribe();
-            clearInterval(popupTicker);
-          },
-        };
-      }, { overlay: true, overlayOptions: { anchor: "center", width: "90%", minWidth: 60, maxHeight: "80%" } });
-    } finally {
-      popupOpen = false;
-    }
+  /** Show the panel. Returns once it's up: Pi blocks the editor while a command handler runs. */
+  function openPanel(context: ExtensionContext) {
+    // Spinner speed while a check runs; countdowns only need the idle tick.
+    showPanel(context, watchSource(store, registry), { id: "watches", closeKey: PANEL_KEY, tickMs: IDLE_TICK_MS, spinnerMs: SPINNER_MS });
   }
 
   // Queued messages count as busy: a new turn now would jump ahead of them.
@@ -380,13 +321,13 @@ export default function (pi: ExtensionAPI) {
     async handler(_args, context) {
       if (!context.hasUI) return console.log(listText());
       ctx = context;
-      await openPopup(context);
+      openPanel(context);
     },
   });
 
   pi.registerShortcut(PANEL_KEY, {
     description: "Browse watches and loops",
-    handler: (context) => openPopup(context),
+    handler: (context) => openPanel(context),
   });
 
   pi.registerCommand("unwatch", {
