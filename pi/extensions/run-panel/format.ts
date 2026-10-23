@@ -4,7 +4,10 @@
 // those extensions. Styling is injected (Pi's theme and pi-tui in production) so layout is
 // testable without Pi.
 
-export type Tone = "accent" | "muted" | "dim" | "success" | "error" | "warning" | "border" | "borderAccent" | "text";
+// Pi theme colour tokens. Past the semantic ones, `mdLink` (blue), `syntaxVariable` (cyan),
+// `syntaxString` (gold), and `mdHeading` (yellow) are borrowed for colour that pops.
+export type Tone = "accent" | "muted" | "dim" | "success" | "error" | "warning" | "border" | "borderAccent" | "borderMuted" | "text"
+  | "mdLink" | "syntaxVariable" | "syntaxString" | "mdHeading";
 
 export interface Style {
   fg(tone: Tone, text: string): string;
@@ -79,16 +82,19 @@ export function expandTabs(text: string): string {
   }).join("\n");
 }
 
-/** A bordered pane `height` lines tall, with `title` in the top border and optional `bottom` text in the bottom one. */
-export function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style, bottom = ""): string[] {
-  const tone: Tone = focused ? "borderAccent" : "border";
+/**
+ * A rounded, bordered pane `height` lines tall, with `title` in the top border and optional
+ * `bottom` text in the bottom one. Focused panes get an accent border and a bold title; `tone`
+ * overrides the border colour.
+ */
+export function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style, bottom = "", tone: Tone = focused ? "borderAccent" : "borderMuted"): string[] {
   const inner = Math.max(1, width - 2);
-  const head = s.truncate(` ${title} `, Math.max(0, inner - 1));
-  const lines = [s.fg(tone, "┌─") + head + s.fg(tone, `${"─".repeat(Math.max(0, inner - 1 - s.width(head)))}┐`)];
+  const head = s.truncate(` ${focused ? s.bold(title) : title} `, Math.max(0, inner - 1));
+  const lines = [s.fg(tone, "╭─") + head + s.fg(tone, `${"─".repeat(Math.max(0, inner - 1 - s.width(head)))}╮`)];
   for (let i = 0; i < height - 2; i++) lines.push(s.fg(tone, "│") + s.truncate(body[i] ?? "", inner, true) + s.fg(tone, "│"));
   const tail = bottom && s.width(bottom) + 3 <= inner ? ` ${bottom} ` : "";
   lines.push(tail
-    ? s.fg(tone, `└${"─".repeat(inner - s.width(tail) - 1)}`) + tail + s.fg(tone, "─┘")
-    : s.fg(tone, `└${"─".repeat(inner)}┘`));
+    ? s.fg(tone, `╰${"─".repeat(inner - s.width(tail) - 1)}`) + tail + s.fg(tone, "─╯")
+    : s.fg(tone, `╰${"─".repeat(inner)}╯`));
   return lines;
 }

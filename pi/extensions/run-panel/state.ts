@@ -19,6 +19,11 @@ export interface PanelState {
    * `defaultView`, which can change while it's selected (a run finishing).
    */
   viewPicked?: boolean;
+  /**
+   * First list row on screen. Kept between renders so the selection moves within the window
+   * and the window scrolls only when the selection would leave it.
+   */
+  listTop: number;
   /** Detail body scroll offset in lines. */
   scroll: number;
   /** Selected entry of a collapsible view. */
@@ -53,7 +58,7 @@ export function initialState<T>(source: Source<T>, items: Item<T>[] = source.ite
   const pick = [...items].reverse().find((i) => i.running) ?? items.at(-1);
   const view = pick?.defaultView && source.views.some((v) => v.id === pick.defaultView) ? pick.defaultView : source.views[0].id;
   return {
-    selected: pick?.id, query: "", filtering: false, focus: "list", view, scroll: 0, cursor: 0,
+    selected: pick?.id, query: "", filtering: false, focus: "list", view, listTop: 0, scroll: 0, cursor: 0,
     expanded: {}, follow: true, zoom: false, help: false, page: 1,
   };
 }

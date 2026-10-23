@@ -53,9 +53,14 @@ export function segments(parts: string | Segment[], s: Style): string {
   }).join("");
 }
 
-function headerLines(source: Source<any>, width: number, s: Style): string[] {
-  // Padded, so the overlay covers what's beneath it.
-  return (source.header?.() ?? []).map((line) => s.truncate(` ${segments(line, s)}`, width, true));
+/** The frame's title (the first header line, else the source name) and the header lines under it. */
+function headerLines(source: Source<any>, width: number, s: Style): { title: string; lines: string[] } {
+  const [first, ...rest] = source.header?.() ?? [];
+  return {
+    title: first ? segments(first, s) : s.bold(source.name),
+    // Padded, so the overlay covers what's beneath it.
+    lines: rest.map((line) => s.truncate(` ${segments(line, s)}`, width, true)),
+  };
 }
 
 interface Layout { column: Column; width: number }
@@ -104,8 +109,8 @@ function itemRow(item: Item<any>, layout: Layout[], width: number, s: Style, sel
 function tabBar(views: View<any>[], active: string, width: number, s: Style): string {
   const line = (short: boolean) => views.map((view, i) => {
     const label = `${i + 1} ${view.label}`;
-    return view.id === active ? s.bold(s.fg("accent", `[${label}]`)) : s.fg("dim", short ? `${i + 1}` : label);
-  }).join(" ");
+    return view.id === active ? s.selected(s.bold(s.fg("accent", ` ${label} `))) : s.fg("muted", short ? ` ${i + 1} ` : ` ${label} `);
+  }).join("");
   // In a narrow pane, inactive tabs shrink to their number so the active one stays visible.
   const full = line(false);
   return s.truncate(s.width(full) <= width ? full : line(true), width);
@@ -286,28 +291,37 @@ function footer(source: Source<any>, state: PanelState, width: number, s: Style,
   }
   if (state.flash) return s.truncate(` ${s.fg(state.flash.tone, state.flash.text)}`, width, true);
   const n = source.views.length;
-  const tabs = n > 1 ? [`tab/1-${n} tabs`] : [];
-  const actions = source.actions.map((a) => `${a.key} ${a.label}`);
-  const hints = state.filtering ? ["type to filter", "↑/↓ move", "enter keep filter", "esc clear"]
-    : state.focus === "detail" ? ["j/k scroll", ...tabs, "ctrl+d/u page", "ctrl+o zoom", ...actions, "h back", "? help"]
-    : ["j/k move", "type to filter", ...tabs, "enter details", ...actions, "? help", `esc ${state.query ? "clear" : "close"}`];
-  if (opts.closeHint) hints.push(opts.closeHint);
-  return s.truncate(s.fg("dim", ` ${hints.join(" · ")}`), width, true);
+  type Hint = [key: string, what: string];
+  const tabs: Hint[] = n > 1 ? [[`tab/1-${n}`, "tabs"]] : [];
+  const actions = source.actions.map((a): Hint => [a.key, a.label]);
+  const hints: Hint[] = state.filtering ? [["type", "to filter"], ["↑/↓", "move"], ["enter", "keep filter"], ["esc", "clear"]]
+    : state.focus === "detail" ? [["j/k", "scroll"], ...tabs, ["ctrl+d/u", "page"], ["ctrl+o", "zoom"], ...actions, ["h", "back"], ["?", "help"]]
+    : [["j/k", "move"], ["type", "to filter"], ...tabs, ["enter", "details"], ...actions, ["?", "help"], ["esc", state.query ? "clear" : "close"]];
+  if (opts.closeHint) {
+    const cut = opts.closeHint.indexOf(" ");
+    hints.push(cut < 0 ? [opts.closeHint, ""] : [opts.closeHint.slice(0, cut), opts.closeHint.slice(cut + 1)]);
+  }
+  const text = hints.map(([key, what]) => `${s.fg("accent", key)}${what ? ` ${s.fg("dim", what)}` : ""}`).join(s.fg("dim", " · "));
+  return s.truncate(` ${text}`, width, true);
 }
 
 // ── Panel ────────────────────────────────────────────────────────────────
 
-export function render<T>(source: Source<T>, state: PanelState, now: number, width: number, height: number, s: Style, opts: RenderOptions, items: Item<T>[] = source.items()): PanelRender {
+export function render<T>(source: Source<T>, state: PanelState, now: number, frameW: number, height: number, s: Style, opts: RenderOptions, items: Item<T>[] = source.items()): PanelRender {
+  // Everything sits in an outer frame, so the panel's edge stands out from the session beneath.
+  const width = Math.max(1, frameW - 2);
   const header = headerLines(source, width, s);
-  const paneH = Math.max(6, height - header.length - 1);
+  const paneH = Math.max(6, height - 2 - header.lines.length - 1);
   const { shown, item } = visible(state, source, items);
   const view = source.views.find((v) => v.id === state.view) ?? source.views[0];
 
   const listPane = (w: number, h: number) => {
     const rows = h - 2;
     const index = Math.max(0, shown.findIndex((i) => i.id === state.selected));
-    // Scroll just enough to keep the selection visible.
-    const first = Math.max(0, Math.min(index - rows + 1, shown.length - rows));
+    // Scroll just enough to keep the selection visible, from where the window was.
+    const kept = Math.min(index, Math.max(index - rows + 1, state.listTop));
+    const first = Math.max(0, Math.min(kept, shown.length - rows));
+    state.listTop = first;
     // Laid out over every item, not just the matches, so columns don't jump while filtering.
     const layout = layoutColumns(source.columns, items, w - 2 - 3, s);
     const body = shown.slice(first, first + rows)
@@ -361,5 +375,6 @@ export function render<T>(source: Source<T>, state: PanelState, now: number, wid
     panes = [...listPane(width, listH), ...detailPane(width, paneH - listH)];
   }
   state.page = page;
-  return { lines: [...header, ...panes, footer(source, state, width, s, opts)], page };
+  const body = [...header.lines, ...panes, footer(source, state, width, s, opts)];
+  return { lines: box(header.title, body, frameW, body.length + 2, true, s, "", "border"), page };
 }

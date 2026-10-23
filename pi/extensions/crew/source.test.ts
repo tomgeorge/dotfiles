@@ -122,9 +122,9 @@ test("the filter matches title, id, status, kind, and branch, one field at a tim
 test("the header shows slug, goal, branch, running/max, spend against budget, and models once", () => {
   const crew = crewOf([task(1, { cost: 2.5 }), task(2, { status: "submitted", cost: 2.5 })], { reviewerModel: { provider: "q", model: "reviewer" } });
   const [line1, line2, line3] = panel(crew).render();
-  assert.match(line1, /Crew demo-ab12 active · Add a lazygit-like theme/);
+  assert.match(line1, /^╭─ Crew demo-ab12 active · Add a lazygit-like theme/);
   assert.match(line2, /crew\/demo-ab12 · 1\/3 running · \$5\.00\/\$10\.00 █████░░░░░/);
-  assert.equal(line3.trim(), "worker p/worker · reviewer q/reviewer");
+  assert.match(line3, /^│ worker p\/worker · reviewer q\/reviewer +│$/);
   assert.match(panel(crewOf([])).render()[2], /reviewer same/);
   assert.match(panel(crewOf([task(1, { cost: 12 })])).render(120, 30, toned)[1], /<error>██████████<\/error>/);
 });
@@ -132,18 +132,18 @@ test("the header shows slug, goal, branch, running/max, spend against budget, an
 test("rows show glyph, id, kind, title, elapsed, cost, and live activity", () => {
   const crew = crewOf([task(1, { status: "integrated", endedAt: NOW - 30_000 }), task(2, { kind: "review", reviewOf: 1 })]);
   const lines = panel(crew).render(140);
-  const row = (id: number) => lines.find((l) => l.startsWith("│") && l.includes(`#${id} `))!;
+  const row = (id: number) => lines.find((l) => l.startsWith("││") && l.includes(`#${id} `))!;
   assert.match(row(1), /● #1 impl task 1 +1m00s +\$0\.25 +integrated/);
   assert.match(row(2), /▸⠋ #2 rev +task 2 +1m30s +\$0\.25 +read file2\.ts/);
   // Every column still fits at the narrowest side-by-side width.
-  const narrow = panel(crew).render(100).find((l) => l.startsWith("│") && l.includes("#1 "))!;
+  const narrow = panel(crew).render(100).find((l) => l.startsWith("││") && l.includes("#1 "))!;
   assert.match(narrow, /● #1 impl task 1 +1m00s +\$0\.25 +integrat/);
 });
 
 test("quiet running tasks are coloured in the list and the overview", () => {
   const p = panel(crewOf([task(1, { lastEventAt: NOW - 2 * 60_000 }), task(2, { lastEventAt: NOW - 11 * 60_000 })]));
   const lines = p.render(140, 30, toned);
-  const row = (id: number) => lines.find((l) => l.includes(`<accent>#${id}</accent> <muted>impl</muted>`))!;
+  const row = (id: number) => lines.find((l) => l.includes(`<accent>#${id}</accent> <syntaxVariable>impl</syntaxVariable>`))!;
   assert.match(row(1), /<warning>quiet 2m · read f[^<]*<\/warning>/);
   assert.match(row(2), /<error>quiet 11m · read [^<]*<\/error>/);
   assert.match(lines.join("\n"), /last event +<\/muted><error>11m00s ago \(quiet 11m\)/);
@@ -158,7 +158,7 @@ test("the overview shows status, model, branch, base, worktree, session, timings
     /session +\/git\/pi-crew\/demo\/t1\.jsonl/,
     /time +1m30s elapsed/, /last event +1s ago/, /cost +\$0\.25 · 3 tools/, /activity +read file1\.ts/, /paths +src\/, test\//,
     /checks +npm test/, /- themes load/]) assert.match(text, want);
-  assert.match(panel(crewOf([task(1)])).screen(), /acceptance *│?\n.* {2}none/);
+  assert.match(panel(crewOf([task(1)])).screen(), /acceptance *│*\n.* {2}none/);
 });
 
 test("the handoff tab separates the worker's claims from the harness's observations", () => {
@@ -235,7 +235,7 @@ test("the diff tab colours the diff, and a review shows the diff of the task it 
   p.render(120, 30, toned);
   assert.deepEqual(asked, [], "no diff is loaded until the Diff tab is shown");
   p.press("5");
-  const text = p.screen(120, 30, toned);
+  const text = p.screen(130, 30, toned);
   assert.deepEqual(asked, [[2, "crew/demo-t1"]]);
   assert.match(text, /git diff 1111111111\.\.crew\/demo-t1 \(task #1, under review\)/);
   assert.match(text, /<accent>@@ -1 \+1 @@<\/accent>/);
@@ -263,7 +263,7 @@ test("the live tab prefers the stream, else reads the session file, and says why
   const live = panel(crewOf([task(1)]), { streamed: () => streamed() });
   live.press("6");
   let text = live.screen();
-  assert.match(text, /\[6 Live\]/);
+  assert.match(live.screen(120, 30, toned), /<accent> 6 Live <\/accent>/);
   assert.match(text, /streaming from the worker/);
   assert.match(text, /✓ read theme\.ts/);
   assert.match(text, /following/);

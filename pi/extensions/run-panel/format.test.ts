@@ -50,12 +50,12 @@ test("padStart right-aligns by display width; tildify shortens paths under HOME"
 
 test("box draws a title, pads the body, and puts bottom text in the border when it fits", () => {
   assert.deepEqual(box("T", ["hi"], 12, 4, false, plain), [
-    "┌─ T ──────┐",
+    "╭─ T ──────╮",
     "│hi        │",
     "│          │",
-    "└──────────┘",
+    "╰──────────╯",
   ]);
-  assert.equal(box("T", [], 12, 3, true, plain, "1/9").at(-1), "└──── 1/9 ─┘");
+  assert.equal(box("T", [], 12, 3, true, plain, "1/9").at(-1), "╰──── 1/9 ─╯");
   // Too long for the border: dropped rather than cut.
-  assert.equal(box("T", [], 12, 3, true, plain, "far too long").at(-1), "└──────────┘");
+  assert.equal(box("T", [], 12, 3, true, plain, "far too long").at(-1), "╰──────────╯");
 });

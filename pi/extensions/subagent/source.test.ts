@@ -60,13 +60,16 @@ test("opens on the newest running job, on Live; a finished job opens on Result",
 test("a selected job moves from Live to Result when it finishes, unless a tab was picked", () => {
   const store = storeWith(2);
   const p = panel(store);
-  assert.match(p.screen(), /\[4 Live\]/);
+  p.render();
+  assert.equal(p.state.view, "live");
   store.finish(2, "ok", { result: "**found it**" });
-  assert.match(p.screen(), /\[5 Result\][^]*md:\*\*found it\*\*/);
+  assert.match(p.screen(), /md:\*\*found it\*\*/);
+  assert.equal(p.state.view, "result");
   // Picking a tab sticks.
   p.press("k", "2");
   store.finish(1, "ok", { result: "other" });
-  assert.match(p.screen(), /\[2 Task\][^]*md:task 1/);
+  assert.match(p.screen(), /md:task 1/);
+  assert.equal(p.state.view, "task");
 });
 
 test("rows show glyph, id, model, elapsed time, tool calls, cost, and what the job is doing", () => {
@@ -75,7 +78,7 @@ test("rows show glyph, id, model, elapsed time, tool calls, cost, and what the j
   store.update(2, progress({ phase: "thinking" }));
   store.finish(3, "cancelled", { error: "Subagent cancelled" }, 5_000);
   const lines = panel(store).render(140);
-  const row = (id: number) => lines.find((l) => l.startsWith("│") && l.includes(`#${id} `))!;
+  const row = (id: number) => lines.find((l) => l.startsWith("││") && l.includes(`#${id} `))!;
   assert.match(row(1), /⠋ #1 model-1 +1m04s 3 tools \$0\.11 grep setStatus/);
   assert.match(row(2), /⠋ #2 model-2 +1m04s 0 tools +\$0\.00 thinking…/);
   assert.match(row(3), / ⊘ #3 model-3 +5s 0 tools +\$0\.00 cancelled/);

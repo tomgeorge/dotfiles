@@ -35,7 +35,7 @@ A source provides:
 | `columns` | required | Declared once: `id`, `width`, `fill` (a weight), `align`, `drop` |
 | `views` | required, at least one | The details tabs |
 | `actions` | required (may be empty) | Named actions; help and footer hints come from them |
-| `header()` | none | Lines above the panes, as segments (text, tone, bold, or a bar) |
+| `header()` | none | Lines as segments (text, tone, bold, or a bar); the first titles the panel's frame (default: `name`), the rest sit above the panes |
 | `status(matched, total)` | `matched/total`, or `total` unfiltered | Beside the list title |
 | `busy()` | not busy | Shows a spinner beside the list title |
 | `empty` | `Nothing yet` | Text in an empty list |

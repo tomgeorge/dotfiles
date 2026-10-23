@@ -121,7 +121,7 @@ test("rows show glyph, id, kind, description, count, last exit, and status", () 
   store.end(met, "met");
   const p = panel(store);
   const lines = p.render(140);
-  const row = (id: number) => lines.find((l) => l.startsWith("│") && l.includes(`#${id} `))!;
+  const row = (id: number) => lines.find((l) => l.startsWith("││") && l.includes(`#${id} `))!;
   assert.match(row(1), /◷ #1 watch CI for PR 123 +3 checks exit 8 next in 25s/);
   assert.match(row(2), /● #2 loop +slack incidents +2 runs +due when idle/);
   assert.match(row(3), /⠋ #3 watch deploy +0 checks +checking…/);
@@ -160,7 +160,7 @@ test("Log shows timestamped entries and collapses repeated checks into ×N", () 
   const p = panel(store);
   p.press("2");
   const screen = p.screen();
-  assert.match(screen, /\[2 Log\]/);
+  assert.equal(p.state.view, "log");
   assert.ok(screen.includes(`${wallClock(91_000)} check · exit 1 · gh: not logged in ×2`), screen);
   assert.ok(screen.includes(`${wallClock(0)} started`));
 });

@@ -158,15 +158,15 @@ export function crewSource(getCrew: () => CrewState, deps: CrewSourceDeps): Sour
     text: [`#${task.id}`, task.status, task.kind, task.title, task.branch ?? ""],
     cells: {
       id: { text: `#${task.id}`, tone: "accent" },
-      kind: { text: task.kind === "implement" ? "impl" : "rev", tone: "muted" },
+      kind: task.kind === "implement" ? { text: "impl", tone: "syntaxVariable" } : { text: "rev", tone: "mdLink" },
       title: oneLine(task.title),
       time: { text: duration(elapsed(task, at)), tone: "dim" },
-      cost: { text: money(task.cost), tone: "dim" },
+      cost: { text: money(task.cost), tone: "syntaxString" },
       activity: activity(task, crew, at),
     },
     glyph: task.status === "running" ? undefined : { text: STATUS_GLYPH[task.status], tone: STATUS_TONE[task.status] },
     running: task.status === "running",
-    title: [{ text: `#${task.id}`, tone: "accent" }, { text: " " }, { text: kindOf(task), tone: "muted" }, { text: ` ${oneLine(task.title)}` }],
+    title: [{ text: `#${task.id}`, tone: "accent", bold: true }, { text: " " }, { text: kindOf(task), tone: task.kind === "implement" ? "syntaxVariable" : "mdLink" }, { text: ` ${oneLine(task.title)}` }],
   });
 
   const header = (): Segment[][] => {
@@ -177,13 +177,13 @@ export function crewSource(getCrew: () => CrewState, deps: CrewSourceDeps): Sour
     const sep: Segment = { text: " · ", tone: "dim" };
     const same = ref(c.reviewerModel) === ref(c.workerModel);
     return [
-      [{ text: "Crew", bold: true }, { text: " " }, { text: c.slug, tone: "accent" }, { text: " " }, { text: crew.status, tone: statusTone }, sep, { text: oneLine(c.goal) }],
+      [{ text: "Crew", bold: true }, { text: " " }, { text: c.slug, tone: "accent", bold: true }, { text: " " }, { text: crew.status, tone: statusTone, bold: true }, sep, { text: oneLine(c.goal), tone: "mdHeading" }],
       [
-        { text: c.integrationBranch, tone: "accent" }, sep,
-        { text: `${runningTasks(crew).length}/${c.maxConcurrent} running` }, sep,
-        { text: `${money(total)}/${money(c.budgetUsd)} ` }, { bar: c.budgetUsd > 0 ? total / c.budgetUsd : 1, cells: 10 },
+        { text: c.integrationBranch, tone: "mdLink" }, sep,
+        { text: `${runningTasks(crew).length}/${c.maxConcurrent}`, tone: "accent", bold: true }, { text: " running" }, sep,
+        { text: money(total), tone: "syntaxString" }, { text: `/${money(c.budgetUsd)} ` }, { bar: c.budgetUsd > 0 ? total / c.budgetUsd : 1, cells: 10 },
       ],
-      [{ text: `worker ${ref(c.workerModel)} · reviewer ${same ? "same" : ref(c.reviewerModel)}`, tone: "muted" }],
+      [{ text: "worker ", tone: "muted" }, { text: ref(c.workerModel), tone: "syntaxVariable" }, { text: " · reviewer ", tone: "muted" }, { text: same ? "same" : ref(c.reviewerModel), tone: same ? "muted" : "syntaxVariable" }],
     ];
   };
 

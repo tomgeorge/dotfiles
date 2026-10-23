@@ -228,7 +228,8 @@ test("enter focuses the details, where j/k scroll, and paging works from either 
 test("the header draws the source's segments, with a budget bar that warns and errors", () => {
   const p = panel([job(1, { cost: 2.5 }), job(2, { cost: 2.5 })]);
   const [line1, line2] = p.render();
-  assert.equal(line1.trimEnd(), " Crew demo-ab12 active");
+  // The first header line titles the outer frame.
+  assert.match(line1, /^╭─ Crew demo-ab12 active ─+╮$/);
   assert.match(line2, /\$5\.00\/\$10\.00 █████░░░░░/);
   assert.match(panel([job(1, { cost: 8 })]).render(120, 30, toned)[1], /<warning>████████<\/warning>/);
   assert.match(panel([job(1, { cost: 12 })]).render(120, 30, toned)[1], /<error>██████████<\/error>/);
@@ -237,11 +238,11 @@ test("the header draws the source's segments, with a budget bar that warns and e
 test("rows show the glyph and every column; a running item's glyph is a spinner", () => {
   const p = panel([job(1, { status: "done", ms: 60_000 }), job(2, { kind: "rev" })]);
   const lines = p.render(140);
-  const row = (id: number) => lines.find((l) => l.startsWith("│") && l.includes(`#${id} `))!;
+  const row = (id: number) => lines.find((l) => l.startsWith("││") && l.includes(`#${id} `))!;
   assert.match(row(1), /│ ✓ #1 impl task 1 +1m00s \$0\.25 done/);
   assert.match(row(2), /│▸⠋ #2 rev +task 2 +1m30s \$0\.25 read file2\.ts/);
   // Every column still fits at the narrowest side-by-side width.
-  assert.match(p.render(100).find((l) => l.startsWith("│") && l.includes("#1 "))!, /✓ #1 impl task 1 +1m00s \$0\.25 done/);
+  assert.match(p.render(100).find((l) => l.startsWith("││") && l.includes("#1 "))!, /✓ #1 impl task 1 +1m00s \$0\.25 done/);
   const coloured = p.render(140, 30, toned).join("\n");
   assert.match(coloured, /<success>✓<\/success> <accent>#1<\/accent> <muted>impl<\/muted>/);
   assert.match(coloured, /<accent>⠋<\/accent>/);
@@ -282,13 +283,13 @@ test("at 80 columns the panes stack and nothing overflows; at 120 they sit side 
       const lines = p.render(width, 30);
       for (const line of lines) assert.ok(plain.width(line) <= width, `${width} cols, tab ${tab}: ${line}`);
       assert.equal(lines.length, 30);
-      const listTop = lines.findIndex((l) => l.startsWith("┌─ Tasks"));
-      const detailTop = lines.findIndex((l) => l.startsWith("┌─ #"));
+      const listTop = lines.findIndex((l) => l.startsWith("│╭─ Tasks"));
+      const detailTop = lines.findIndex((l) => l.startsWith("│╭─ #"));
       assert.ok(listTop >= 0 && detailTop > listTop, `stacked at ${width}`);
     }
   }
   const wide = panel(jobs).render(120);
-  assert.ok(wide.some((l) => l.startsWith("┌─ Tasks") && l.includes("┐┌─ #12")), "side by side at 120");
+  assert.ok(wide.some((l) => l.startsWith("│╭─ Tasks") && l.includes("╮╭─ #12")), "side by side at 120");
   for (const line of wide) assert.ok(plain.width(line) <= 120);
 });
 
@@ -298,6 +299,21 @@ test("the list keeps the selection on screen", () => {
   assert.ok(p.render().some((l) => l.includes("▸✓ #30")));
   p.press("g");
   assert.ok(p.render().some((l) => l.includes("▸✓ #1 ")));
+});
+
+test("moving up from the bottom moves the selection, not the window", () => {
+  const p = panel(Array.from({ length: 60 }, (_, i) => job(i + 1, { status: "done" })));
+  const rows = () => p.render().filter((l) => /#\d+ /.test(l) && !l.includes("╭"));
+  const before = rows();
+  const top = before[0].match(/#(\d+) /)![1];
+  assert.ok(before.at(-1)!.includes("▸✓ #60"), "opens on the last item, at the bottom");
+  p.press("k", "k");
+  const after = rows();
+  assert.equal(after[0].match(/#(\d+) /)![1], top, "the window stays put");
+  assert.ok(after.at(-3)!.includes("▸✓ #58"));
+  // Past the window's top, it scrolls one row at a time.
+  for (let i = 0; i < before.length; i++) p.press("k");
+  assert.ok(rows()[0].includes("▸✓ #"), "the selection leads at the top");
 });
 
 test("an empty filter result says so", () => {
@@ -311,7 +327,7 @@ test("status and busy come from the source", () => {
   const source = { ...fixtureSource([job(1), job(2)], { busy: true }), status: (m: number, t: number) => `${m} of ${t}` };
   const state = initialState(source);
   const text = renderPanel(source, state, NOW, 120, 30, plain, { frame: 1 }).lines.join("\n");
-  assert.match(text, /┌─ Tasks ⠙ 2 of 2/);
+  assert.match(text, /╭─ Tasks ⠙ 2 of 2/);
 });
 
 test("ctrl+o zooms the details to the full panel", () => {
@@ -319,14 +335,14 @@ test("ctrl+o zooms the details to the full panel", () => {
   p.press(key("zoom"));
   const lines = p.render(120);
   assert.ok(!lines.some((l) => l.includes("Tasks")));
-  assert.ok(lines.some((l) => l.startsWith("┌─ #1 impl task 1") && l.length === 120));
+  assert.ok(lines.some((l) => l.startsWith("│╭─ #1 impl task 1") && l.length === 120));
 });
 
 test("help lists the keys, the views, and the source's actions", () => {
   const p = panel([job(1)]);
   p.press("?");
   const text = p.screen(160, 40);
-  assert.match(text, /┌─ Help/);
+  assert.match(text, /╭─ Help/);
   assert.match(text, /tab, 1-5 +switch tab: overview, spec, checks, diff, live/);
   assert.match(text, /on Live, k pauses and G follows again/);
   assert.match(text, /x +cancel the selected running task \(asks first\)/);
@@ -345,7 +361,7 @@ test("the footer hints come from the views and actions", () => {
   assert.match(p.screen(), /type to filter · ↑\/↓ move · enter keep filter · esc clear/);
   const single = { ...fixtureSource([job(1)]), views: [fixtureSource([]).views[0]] };
   const state = initialState(single);
-  const text = renderPanel(single, state, NOW, 120, 30, plain, { frame: 0, closeHint: "ctrl+shift+c close" }).lines.at(-1)!;
+  const text = renderPanel(single, state, NOW, 124, 30, plain, { frame: 0, closeHint: "ctrl+shift+c close" }).lines.at(-2)!;
   assert.doesNotMatch(text, /tabs/);
   assert.match(text, /ctrl\+shift\+c close/);
 });
@@ -353,8 +369,9 @@ test("the footer hints come from the views and actions", () => {
 test("a narrow pane keeps the active tab visible", () => {
   const p = panel([job(1)]);
   p.press("5");
-  assert.match(p.screen(100, 40), /│ 1 Overview 2 Spec 3 Checks 4 Diff \[5 Live\] +│/);
-  assert.match(p.screen(40, 40), /│ 1 2 3 4 \[5 Live\] +│/);
+  assert.match(p.screen(100, 40), /│  1 Overview  2 Spec  3 Checks  4 Diff  5 Live  +│/);
+  assert.match(p.screen(40, 40), /│  1  2  3  4  5 Live  +│/);
+  assert.match(p.screen(40, 40, toned), /<muted> 4 <\/muted><accent> 5 Live <\/accent>/);
 });
 
 test("fields, bullets, and sections render in the overview", () => {
@@ -362,7 +379,7 @@ test("fields, bullets, and sections render in the overview", () => {
   const text = p.screen();
   assert.match(text, /status +running/);
   assert.match(text, /branch +crew\/demo-t1/);
-  assert.match(text, /checks *│?\n.*- npm test/);
+  assert.match(text, /checks *│*\n.*- npm test/);
   assert.match(panel([job(1)]).screen(), /  none declared/);
   assert.match(p.screen(120, 30, toned), /<muted>status {7}<\/muted><accent>running<\/accent>/);
 });
@@ -449,10 +466,10 @@ test("a transcript shows the prompt, thinking, text, notes, and tool calls with 
   const p = panel([job(1, { entries: entries(), dropped: 3 })]);
   p.press("5");
   const text = p.screen(120, 60);
-  assert.match(text, /\[5 Live\]/);
+  assert.equal(p.state.view, "live");
   assert.match(text, /streaming from the worker/);
   assert.match(text, /… 3 earlier entries not kept here/);
-  assert.match(text, /following ─*┘/);
+  assert.match(text, /following ─*╯/);
   assert.match(text, /prompt\s*│[^\n]*\n[^\n]*spec line 0/);
   assert.match(text, /… 3 more lines/);
   assert.match(text, /∴ Check the theme first/);
@@ -483,7 +500,7 @@ test("a tail view follows the newest output; k pauses it and G follows again", (
   assert.equal(p.state.follow, false);
   let text = p.screen();
   assert.doesNotMatch(text, /out 99/);
-  assert.match(text, /paused · G follows · \d+-\d+\/\d+ ─*┘/);
+  assert.match(text, /paused · G follows · \d+-\d+\/\d+ ─*╯/);
   // New output arrives while paused: the view stays put.
   const before = p.state.scroll;
   j.entries.push({ kind: "text", text: "newest" });
@@ -531,7 +548,7 @@ test("a selected item's default view follows it as it changes, until the user pi
   state.follow = false;
   // #2 finishes while selected: same id, new default view.
   jobs[1].status = "done";
-  assert.match(screen(), /\[2 Spec\]/);
+  screen();
   assert.equal(state.view, "spec");
   assert.equal(state.scroll, 0, "scroll resets with the view");
   assert.equal(state.follow, true);
