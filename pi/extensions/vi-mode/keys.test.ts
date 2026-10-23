@@ -93,11 +93,11 @@ test("pending shows what was typed and clears when done", () => {
   assert.equal(p.pending, "");
 });
 
-test("isNormalStartKey matches what the parser accepts first", () => {
-  for (let code = 32; code < 127; code++) {
-    const key = String.fromCharCode(code);
-    const r = new Parser().feed(key);
-    const used = !r.done || r.command !== null;
-    assert.equal(isNormalStartKey(key), used, `key ${JSON.stringify(key)}`);
+test("isNormalStartKey is true for keys that start a vi command, false for unused ones", () => {
+  for (const key of ["1", "9", '"', "h", "0", ";", ",", "%", "{", "g", "f", "T", "d", "c", "y", "r", "x", "~", "u", "i", "O"]) {
+    assert.equal(isNormalStartKey(key), true, `key ${JSON.stringify(key)}`);
+  }
+  for (const key of [" ", "\\", "q", "m", "z", "Z", "K", "!", "-", "+"]) {
+    assert.equal(isNormalStartKey(key), false, `key ${JSON.stringify(key)}`);
   }
 });

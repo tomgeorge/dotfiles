@@ -47,19 +47,6 @@ const isIn = <T extends string>(keys: readonly T[], key: string): key is T => (k
 // A count can't start with 0: that's the line-start motion.
 const isCountDigit = (key: string, digitsSoFar: string): boolean => /[1-9]/.test(key) || (key === "0" && digitsSoFar !== "");
 
-// Whether a key means something at the start of a NORMAL command, mirroring
-// the "start" stage below. The leader key must not be one of these, or it
-// would shadow a vi command.
-export const isNormalStartKey = (key: string): boolean =>
-  /^[1-9]$/.test(key) ||
-  key === '"' ||
-  key === "g" ||
-  key === "r" ||
-  isIn(CHAR_MOTIONS, key) ||
-  isIn(OPERATORS, key) ||
-  isIn(MOTIONS, key) ||
-  isIn(SIMPLE, key);
-
 // Each stage carries what it has collected beyond the counts and register.
 type Stage =
   | { type: "start" } // counts and a register may still come
@@ -192,4 +179,12 @@ export class Parser {
     const count = a === null && b === null ? null : (a ?? 1) * (b ?? 1);
     return this.done({ type: "operator", op, count, register: this.register, target });
   }
+}
+
+// Whether a key means something at the start of a NORMAL command: the parser
+// either waits for more or returns a command. The leader key must not be one
+// of these, or it would shadow a vi command.
+export function isNormalStartKey(key: string): boolean {
+  const result = new Parser().feed(key);
+  return !result.done || result.command !== null;
 }

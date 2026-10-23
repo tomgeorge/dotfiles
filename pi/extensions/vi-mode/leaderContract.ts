@@ -6,6 +6,7 @@
 // the shape a well-behaved contributor sends.
 
 export type LeaderTone = "default" | "exit";
+export const isLeaderTone = (value: unknown): value is LeaderTone => value === "default" || value === "exit";
 
 // One step of a path. key is one character from a-z or 0-9.
 export interface LeaderSegment {
@@ -21,9 +22,11 @@ export interface LeaderCommand {
   args?: string;
 }
 
+export type LeaderPath = [LeaderSegment, ...LeaderSegment[]];
+
 export interface LeaderBinding {
   id: string;
-  path: [LeaderSegment, ...LeaderSegment[]];
+  path: LeaderPath;
   command: LeaderCommand;
 }
 

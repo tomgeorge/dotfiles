@@ -33,7 +33,6 @@ const SWEEP_MS = 30_000;
 const RENDER_MS = 1_000;
 const REVIEW_DIFF_BYTES = 60_000;
 const DEFAULTS = { maxConcurrent: 3, budgetUsd: 10, taskTimeoutMin: 45, stallMin: 10 };
-// Free in Pi's defaults and in Ghostty on macOS; Linux terminals often bind it to copy.
 // A crew that isn't live in this session is re-read from its ledger at most this often.
 const LEDGER_RELOAD_MS = 2_000;
 

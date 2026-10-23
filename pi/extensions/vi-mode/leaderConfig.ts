@@ -10,7 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import { isNormalStartKey } from "./keys.ts";
-import type { LeaderCommand, LeaderTone } from "./leaderContract.ts";
+import { isLeaderTone, type LeaderCommand, type LeaderTone } from "./leaderContract.ts";
 import { commandNameError, detailError, hasControlChar, keyError, labelError, type KeymapEntry } from "./leaderRegistry.ts";
 
 // key is what the terminal sends; name is how paths are shown ("SPC c l").
@@ -53,19 +53,27 @@ function parseLeader(value: unknown, errors: string[]): LeaderKey | undefined {
   return { key: value, name: value };
 }
 
-function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntry | undefined {
-  const before = errors.length;
-  const fail = (message: string): undefined => {
+// Hand-typed text is trimmed, but checked raw when it has control characters,
+// because trimming would hide a leading or trailing newline or escape.
+const handTyped = (text: string): string => (hasControlChar(text) ? text : text.trim());
+
+interface ParsedEntry {
+  entry?: KeymapEntry;
+  errors: string[];
+}
+
+function parseEntry(value: unknown, field: string): ParsedEntry {
+  const errors: string[] = [];
+  const fail = (message: string): void => {
     errors.push(`${field}: ${message}`);
-    return undefined;
   };
-  if (!isRecord(value)) return fail("must be an object");
+  if (!isRecord(value)) {
+    fail("must be an object");
+    return { errors };
+  }
   for (const name of Object.keys(value)) if (!ENTRY_FIELDS.has(name)) fail(`unknown field "${name}"`);
 
   let keys: string[] | undefined;
-  // leader.json is hand-typed, so surrounding spaces are trimmed, but only after
-  // the raw text is checked for control characters: trimming would otherwise
-  // hide a leading or trailing newline or escape.
   if (typeof value.keys !== "string") fail(`keys must be a string of space-separated keys, such as "c l"`);
   else if (hasControlChar(value.keys)) fail("keys must not contain control characters");
   else {
@@ -83,14 +91,14 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
     for (const name of ["label", "command", "detail", "tone"]) {
       if (Object.hasOwn(value, name)) fail(`an unbind entry can't have ${name}`);
     }
-    if (keys === undefined || errors.length > before) return undefined;
-    return { keys, unbind: true };
+    if (keys === undefined || errors.length > 0) return { errors };
+    return { entry: { keys, unbind: true }, errors };
   }
 
   let label: string | undefined;
   if (typeof value.label !== "string") fail("needs a label (or unbind: true)");
   else {
-    const error = labelError(hasControlChar(value.label) ? value.label : value.label.trim());
+    const error = labelError(handTyped(value.label));
     if (error) fail(`label ${error}`);
     else label = value.label.trim();
   }
@@ -106,7 +114,6 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
       const args = space === -1 ? "" : text.slice(space).trim();
       const error = commandNameError(name);
       if (error) fail(`command name ${error}`);
-      else if (hasControlChar(args)) fail("command must not contain control characters");
       else command = args ? { name, args } : { name };
     }
   }
@@ -115,7 +122,7 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
   if (value.detail !== undefined) {
     if (typeof value.detail !== "string") fail("detail must be a string");
     else {
-      const error = detailError(hasControlChar(value.detail) ? value.detail : value.detail.trim());
+      const error = detailError(handTyped(value.detail));
       if (error) fail(`detail ${error}`);
       else detail = value.detail.trim();
     }
@@ -123,12 +130,12 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
 
   let tone: LeaderTone | undefined;
   if (value.tone !== undefined) {
-    if (value.tone === "default" || value.tone === "exit") tone = value.tone;
+    if (isLeaderTone(value.tone)) tone = value.tone;
     else fail(`tone must be "default" or "exit"`);
   }
 
-  if (keys === undefined || label === undefined || errors.length > before) return undefined;
-  return { keys, label, ...(command ? { command } : {}), ...(detail ? { detail } : {}), ...(tone ? { tone } : {}) };
+  if (keys === undefined || label === undefined || errors.length > 0) return { errors };
+  return { entry: { keys, label, ...(command ? { command } : {}), ...(detail ? { detail } : {}), ...(tone ? { tone } : {}) }, errors };
 }
 
 export function parseLeaderConfig(value: unknown): LeaderConfigResult {
@@ -142,8 +149,9 @@ export function parseLeaderConfig(value: unknown): LeaderConfigResult {
     if (!Array.isArray(value.keymap)) errors.push("keymap must be an array");
     else {
       value.keymap.forEach((entry: unknown, i) => {
-        const parsed = parseEntry(entry, `keymap[${i}]`, errors);
-        if (parsed) keymap.push(parsed);
+        const parsed = parseEntry(entry, `keymap[${i}]`);
+        errors.push(...parsed.errors);
+        if (parsed.entry) keymap.push(parsed.entry);
       });
     }
   }

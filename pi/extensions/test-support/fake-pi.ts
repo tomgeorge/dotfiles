@@ -107,8 +107,8 @@ const STUBS: Record<string, string> = {
         if (data === "escape") return this.onEscape?.();
         if (data === "enter") {
           const text = this.getText();
-          this.undoStack.stack.length = 0;
           this.setText("");
+          // Pi's submit leaves no undo history; setText just pushed a step.
           this.undoStack.stack.length = 0;
           return this.onSubmit?.(text);
         }

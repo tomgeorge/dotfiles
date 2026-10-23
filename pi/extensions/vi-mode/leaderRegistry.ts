@@ -14,10 +14,10 @@
 // Because nothing is mutated in place, a binding displaced by a later source
 // comes back when that source unregisters.
 
-import type { LeaderCommand, LeaderSegment, LeaderTone } from "./leaderContract.ts";
+import { isLeaderTone, type LeaderCommand, type LeaderPath, type LeaderSegment, type LeaderTone } from "./leaderContract.ts";
 
 export type LeaderTarget = { command: LeaderCommand } | { app: string };
-export type LeaderPath = [LeaderSegment, ...LeaderSegment[]];
+export type { LeaderPath };
 
 // vi-mode's own bindings. Unlike contributions they may target Pi app actions.
 export interface CoreBinding {
@@ -183,7 +183,7 @@ function parseSegment(value: unknown, field: string, report: Report): LeaderSegm
   const detail = value.detail === undefined ? undefined : parseText(value.detail, `${field}.detail`, (t) => detailError(t) ?? surroundError(t), report);
   // An unknown tone is cosmetic, so it's dropped rather than costing the
   // contributor its whole menu (a contributor built against a later contract).
-  const tone: LeaderTone | undefined = value.tone === "default" || value.tone === "exit" ? value.tone : undefined;
+  const tone: LeaderTone | undefined = isLeaderTone(value.tone) ? value.tone : undefined;
   if (parsedKey === undefined || label === undefined) return undefined;
   return { key: parsedKey, label, ...(detail ? { detail } : {}), ...(tone ? { tone } : {}) };
 }
@@ -372,15 +372,14 @@ function applyKeymap(root: Node, entry: KeymapEntry): LeaderDiagnostic[] {
   }
 
   const existing = current.children.get(last);
+  const segment: LeaderSegment = { key: last, label: entry.label, ...(entry.detail ? { detail: entry.detail } : {}), ...(entry.tone ? { tone: entry.tone } : {}) };
   if (entry.command) {
-    const segment: LeaderSegment = { key: last, label: entry.label, ...(entry.detail ? { detail: entry.detail } : {}), ...(entry.tone ? { tone: entry.tone } : {}) };
     current.children.set(last, segmentNode(segment, USER_SOURCE, { command: { ...entry.command } }));
   } else if (existing) {
     existing.label = entry.label;
     if (entry.detail) existing.detail = entry.detail;
     if (entry.tone) existing.tone = entry.tone;
   } else {
-    const segment: LeaderSegment = { key: last, label: entry.label, ...(entry.detail ? { detail: entry.detail } : {}), ...(entry.tone ? { tone: entry.tone } : {}) };
     current.children.set(last, segmentNode(segment, USER_SOURCE));
   }
   return [];
