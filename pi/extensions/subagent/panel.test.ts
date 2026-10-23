@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { JobStore, LOG_LIMIT, readGitInfo } from "./jobs.ts";
 import {
-  duration, initialPopup, money, popupKey, popupLines, summary, tokens, widgetLines, WIDGET_ROWS, type Style,
+  duration, initialPopup, money, popupKey, popupLines, progressLine, summary, tokens, widgetLines, WIDGET_ROWS, type Style,
 } from "./panel.ts";
 import type { Progress } from "./runner.ts";
 
@@ -50,6 +50,15 @@ test("formats durations, money, and tokens compactly", () => {
   assert.deepEqual([0, 12_400, 64_000, 3_720_000].map(duration), ["0s", "12s", "1m04s", "1h02m"]);
   assert.deepEqual([0, 0.004, 0.281].map(money), ["$0.00", "<$0.01", "$0.28"]);
   assert.deepEqual([999, 41_200, 1_250_000].map(tokens), ["999", "41k", "1.3M"]);
+});
+
+test("progress line shows live elapsed time and current activity", () => {
+  const store = storeWith(1, 1000);
+  store.update(1, progress({ toolCalls: 2, activity: "grep foo", phase: "tool", usage: { input: 0, output: 0, cost: 0.05 } }));
+  assert.equal(progressLine(store.get(1)!, 13_000), "Subagent #1 model-1 \u00b7 12s \u00b7 2 tool calls \u00b7 $0.05 \u00b7 grep foo");
+  store.finish(1, "ok", {}, 5000);
+  // Unlike summary, the tool row keeps counting until the tool call returns.
+  assert.equal(progressLine(store.get(1)!, 13_000), "Subagent #1 model-1 \u00b7 12s \u00b7 2 tool calls \u00b7 $0.05 \u00b7 done");
 });
 
 test("summary reports spend from the finished job", () => {

@@ -1,6 +1,6 @@
 import { git as runGit, type GitResult } from "./git.ts";
 import type { CheckResult, TaskReport } from "./handoff.ts";
-import { runningTasks, spent, type CrewState, type ModelRef, type TaskRecord, type TaskStatus } from "./state.ts";
+import { money, ref, runningTasks, spent, type CrewState, type TaskRecord, type TaskStatus } from "./state.ts";
 
 // The /crew panel: a lazygit-style view of one crew. Styling and terminal-width handling are
 // injected (Pi's theme and pi-tui in production), as in the subagent and watch panels, so
@@ -19,20 +19,20 @@ export interface Style {
   wrap(text: string, width: number): string[];
 }
 
-export const TABS = ["overview", "spec", "handoff", "checks", "diff"] as const;
+const TABS = ["overview", "spec", "handoff", "checks", "diff"] as const;
 export type Tab = (typeof TABS)[number];
 const TAB_LABELS: Record<Tab, string> = { overview: "Overview", spec: "Spec", handoff: "Handoff", checks: "Checks", diff: "Diff" };
 
 /** Panes sit side by side from this panel width; below it they stack. */
-export const SIDE_BY_SIDE = 100;
+const SIDE_BY_SIDE = 100;
 /** A running task with no stream event for this long is shown as quiet. */
-export const QUIET_MS = 60_000;
+const QUIET_MS = 60_000;
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TAIL_LINES = 40;
 
 // ── Formatting ───────────────────────────────────────────────────────────
 
-export function duration(ms: number): string {
+function duration(ms: number): string {
   const secs = Math.max(0, Math.floor(ms / 1000));
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
@@ -40,8 +40,6 @@ export function duration(ms: number): string {
   return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m`;
 }
 
-const money = (usd: number) => `$${usd.toFixed(2)}`;
-const ref = (m: ModelRef) => `${m.provider}/${m.model}`;
 const home = process.env.HOME ?? "";
 const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
 
@@ -87,7 +85,7 @@ const padStart = (text: string, width: number, s: Style) => " ".repeat(Math.max(
 // ── Filtering ────────────────────────────────────────────────────────────
 
 /** Subsequence match; lower scores are better. Undefined when `query` isn't in `text` in order. */
-export function fuzzyScore(query: string, text: string): number | undefined {
+function fuzzyScore(query: string, text: string): number | undefined {
   const q = query.toLowerCase();
   const t = text.toLowerCase();
   let score = 0;
@@ -105,7 +103,7 @@ export function fuzzyScore(query: string, text: string): number | undefined {
 }
 
 /** What the filter searches. A token matches within one field, so letters scattered across fields don't. */
-export const searchFields = (t: TaskRecord) => [`#${t.id}`, t.status, t.kind, t.title, t.branch ?? ""];
+const searchFields = (t: TaskRecord) => [`#${t.id}`, t.status, t.kind, t.title, t.branch ?? ""];
 
 const fieldScore = (token: string, fields: string[]) =>
   fields.reduce<number | undefined>((best, field) => {
@@ -174,7 +172,7 @@ export function initialPanel(crew: CrewState | undefined): PanelState {
 }
 
 /** The visible tasks and the selected one, re-anchoring the selection when the filter hides it. */
-export function visible(state: PanelState, tasks: TaskRecord[]): { shown: TaskRecord[]; task: TaskRecord | undefined; index: number } {
+function visible(state: PanelState, tasks: TaskRecord[]): { shown: TaskRecord[]; task: TaskRecord | undefined; index: number } {
   const shown = filterTasks(tasks, state.query);
   let index = shown.findIndex((t) => t.id === state.selected);
   if (index < 0 && shown.length) {
@@ -431,7 +429,7 @@ function bar(fraction: number, cells: number, s: Style): string {
   return s.fg(tone, "█".repeat(filled)) + s.fg("dim", "░".repeat(cells - filled));
 }
 
-export function headerLines(crew: CrewState, width: number, s: Style): string[] {
+function headerLines(crew: CrewState, width: number, s: Style): string[] {
   const c = crew.config;
   const statusTone: Tone = crew.status === "active" ? "success" : crew.status === "finished" ? "accent" : "warning";
   const total = spent(crew);
@@ -450,7 +448,7 @@ export function headerLines(crew: CrewState, width: number, s: Style): string[] 
 }
 
 /** One list row: glyph, id, kind, title, elapsed, cost, activity. Columns drop as width shrinks. */
-export function taskRow(task: TaskRecord, crew: CrewState, now: number, width: number, s: Style, opts: { selected: boolean; idW: number; frame: number }): string {
+function taskRow(task: TaskRecord, crew: CrewState, now: number, width: number, s: Style, opts: { selected: boolean; idW: number; frame: number }): string {
   const lead = `${opts.selected ? s.fg("accent", "▸") : " "}${glyph(task, opts.frame, s)} ${s.fg("accent", `#${task.id}`.padEnd(opts.idW))} `;
   const rest = width - s.width(lead) - 6;
   // All columns fit from a 48-column list (a 100-column panel); only narrower lists drop some.
@@ -572,7 +570,7 @@ function verdict(c: CheckResult | undefined, task: TaskRecord, s: Style): string
 
 const checkFailed = (c: CheckResult | undefined) => !!c && (c.timedOut || c.exit !== 0);
 
-export function checkOpen(state: PanelState, task: TaskRecord, index: number): boolean {
+function checkOpen(state: PanelState, task: TaskRecord, index: number): boolean {
   return state.expanded[`${task.id}:${index}`] ?? checkFailed(task.report?.checks[index]);
 }
 
@@ -626,7 +624,7 @@ function tabBody(crew: CrewState, task: TaskRecord, state: PanelState, now: numb
   }
 }
 
-export const HELP = [
+const HELP = [
   ["type, /", "filter by title, id, status, kind, or branch"],
   ["j/k, ↑/↓", "move (scroll in details)"],
   ["enter, l", "focus details · on Checks, open a check's output"],

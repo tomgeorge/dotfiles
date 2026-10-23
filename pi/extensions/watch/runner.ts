@@ -30,8 +30,13 @@ export function runCheck(command: string, cwd: string, signal: AbortSignal, time
     const signalGroup = (sig: NodeJS.Signals) => {
       if (proc.pid === undefined) return;
       try { process.kill(-proc.pid, sig); } catch (error) {
-        // ESRCH: the group is already gone.
-        if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+        // ESRCH: the group is already gone. EPERM: on macOS, killpg skips members
+        // that are exiting or zombies (e.g. a killed `sleep` reparented to launchd
+        // and not yet reaped) and reports EPERM when nothing else is left. Every
+        // member runs as our user, so it can't be a real permission denial unless
+        // a member changed uid (sudo), which we couldn't signal anyway.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ESRCH" && code !== "EPERM") throw error;
       }
     };
     let forceTimer: ReturnType<typeof setTimeout> | undefined;

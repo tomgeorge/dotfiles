@@ -109,6 +109,9 @@ export class ViEditor extends CustomEditor {
 
   private apply(action: Action): void {
     switch (action.type) {
+      case "none":
+      case "pending":
+        return;
       case "move":
         this.bridge.setCursor(action.cursor);
         return;

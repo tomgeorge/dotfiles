@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { formatStatus, listCrews, loadState, saveState, slugify, spent, type CrewState } from "./state.ts";
+import { formatStatus, formatWidget, listCrews, loadState, saveState, slugify, spent, type CrewState } from "./state.ts";
 
 const state = (commonDir: string, slug: string, createdAt: number): CrewState => ({
   version: 1, status: "active", nextId: 3,
@@ -36,6 +36,15 @@ test("status shows spend, liveness, and review targets", () => {
   assert.match(out, /spent \$0\.75 of \$5\.00 · 1\/3 running/);
   assert.match(out, /#1 implement \[integrated\] "A" · p\/w · 1m05s/);
   assert.match(out, /#2 review of #1 \[running\] .* 1m00s, last event 30s ago · \$0\.25 · 2 tools · read a\.ts/);
+});
+
+test("the widget lists running tasks only, flagging quiet ones", () => {
+  const s = state("/x", "s", 0);
+  assert.deepEqual(formatWidget(s, "hint", 160_000), [
+    "crew s \u00b7 1/3 running \u00b7 $0.75/$5.00 \u00b7 hint",
+    " #2 review      1m00s    2 tools  $0.25  read a.ts",
+  ]);
+  assert.match(formatWidget(s, "hint", 191_000)[1], /1m31s .* \(quiet 61s\) read a\.ts$/);
 });
 
 test("slugs are short, safe, and unique-ish", () => {

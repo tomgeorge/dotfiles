@@ -19,9 +19,9 @@
   },
   {
     "name": "loaded goal aliases its entry",
-    "file": "index.ts",
-    "from": "goal = structuredClone(entry.data as Goal)",
-    "to": "goal = entry.data as Goal"
+    "file": "goal.ts",
+    "from": "return ok ? structuredClone(data as Goal) : undefined;",
+    "to": "return ok ? (data as Goal) : undefined;"
   },
   {
     "name": "saved entry aliases the live goal",
@@ -58,5 +58,35 @@
     "file": "index.ts",
     "from": "const result = aborted ? undefined : await",
     "to": "const result = await"
+  },
+  {
+    "name": "stop decision ignores its status",
+    "file": "index.ts",
+    "from": "active.status = decision.status;",
+    "to": "active.status = \"paused\";"
+  },
+  {
+    "name": "entry status not validated",
+    "file": "goal.ts",
+    "from": "&& isGoalStatus(g.status)",
+    "to": ""
+  },
+  {
+    "name": "malformed latest entry resurrects the earlier goal",
+    "file": "index.ts",
+    "from": "goal = goalFromEntry(entry.data);",
+    "to": "goal = goalFromEntry(entry.data) ?? goal;"
+  },
+  {
+    "name": "loader reads other extensions' entries",
+    "file": "index.ts",
+    "from": "entry.type === \"custom\" && entry.customType === ENTRY",
+    "to": "entry.type === \"custom\""
+  },
+  {
+    "name": "exit doesn't cancel the check deadline",
+    "file": "goal.ts",
+    "from": "child.on(\"exit\", (code) => { clearTimeout(timer); ",
+    "to": "child.on(\"exit\", (code) => { "
   }
 ]

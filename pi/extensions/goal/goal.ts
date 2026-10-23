@@ -5,7 +5,9 @@ import { spawn } from "node:child_process";
 // it runs the check whenever the agent settles and continues only while the
 // check fails and the run is making progress.
 
-export type GoalStatus = "active" | "paused" | "complete" | "parked" | "budget" | "cleared";
+const STATUSES = ["active", "paused", "complete", "parked", "budget", "cleared"] as const;
+
+export type GoalStatus = (typeof STATUSES)[number];
 
 export interface CheckResult { exit: number | null; tail: string; timedOut: boolean; at: number }
 
@@ -22,6 +24,20 @@ export interface Goal {
 }
 
 export const DEFAULT_MAX_CONTINUATIONS = 20;
+
+function isGoalStatus(value: unknown): value is GoalStatus {
+  return STATUSES.some((status) => status === value);
+}
+
+/** A goal read back from a session entry, or undefined if the entry isn't shaped like one. */
+export function goalFromEntry(data: unknown): Goal | undefined {
+  if (typeof data !== "object" || data === null) return undefined;
+  const g = data as Record<string, unknown>;
+  const ok = typeof g.objective === "string" && typeof g.check === "string" && isGoalStatus(g.status)
+    && typeof g.continuations === "number" && typeof g.maxContinuations === "number";
+  // Copy, so mutating the live goal never rewrites the entry it came from.
+  return ok ? structuredClone(data as Goal) : undefined;
+}
 
 export function newGoal(objective: string, check: string, maxContinuations = DEFAULT_MAX_CONTINUATIONS, now = Date.now()): Goal {
   if (!objective.trim()) throw new Error("goal objective must not be empty");
@@ -65,20 +81,19 @@ export type Decision =
   | { action: "none" }
   | { action: "complete" }
   | { action: "continue" }
-  | { action: "pause"; reason: string }
-  | { action: "park"; reason: string }
-  | { action: "budget"; reason: string };
+  /** Stop without completing; `status` is the goal's new status. */
+  | { action: "stop"; status: "paused" | "parked" | "budget"; reason: string };
 
 /** What to do after an agent run settles, given the check result. Pure. */
 export function decide(goal: Goal, run: { checkPassed: boolean; toolCalls: number; aborted: boolean; errored?: boolean }): Decision {
   if (goal.status !== "active") return { action: "none" };
-  if (run.aborted) return { action: "pause", reason: "you interrupted the run" };
-  if (run.errored && !run.checkPassed) return { action: "pause", reason: "the run ended with an error (for example a provider or rate-limit failure)" };
+  if (run.aborted) return { action: "stop", status: "paused", reason: "you interrupted the run" };
+  if (run.errored && !run.checkPassed) return { action: "stop", status: "paused", reason: "the run ended with an error (for example a provider or rate-limit failure)" };
   if (run.checkPassed) return { action: "complete" };
   // A run that touched nothing can't have moved the check; repeating it just spins.
-  if (run.toolCalls === 0) return { action: "park", reason: "the last run made no tool calls, so it wasn't making progress" };
+  if (run.toolCalls === 0) return { action: "stop", status: "parked", reason: "the last run made no tool calls, so it wasn't making progress" };
   if (goal.continuations >= goal.maxContinuations) {
-    return { action: "budget", reason: `used all ${goal.maxContinuations} automatic continuations` };
+    return { action: "stop", status: "budget", reason: `used all ${goal.maxContinuations} automatic continuations` };
   }
   return { action: "continue" };
 }
@@ -135,7 +150,10 @@ export function runCheck(cwd: string, command: string, timeoutMs: number): Promi
     const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-16_384); };
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
-    const killGroup = () => { try { process.kill(-child.pid!, "SIGKILL"); } catch { /* gone */ } };
+    const killGroup = () => {
+      if (child.pid === undefined) return; // never spawned
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* the group already exited */ }
+    };
     const finish = (exit: number | null) => {
       if (done) return;
       done = true;

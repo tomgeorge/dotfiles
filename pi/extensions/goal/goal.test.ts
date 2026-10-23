@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { continuationMessage, decide, GOAL_GUIDELINES, newGoal, parseGoalArgs, runCheck, startMessage, statusLine } from "./goal.ts";
+import { continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine } from "./goal.ts";
 
 test("parses objective, check (rest of line), max, and lifecycle words", () => {
   assert.deepEqual(parseGoalArgs(""), { kind: "status" });
@@ -26,11 +28,22 @@ test("decide: the check decides done; no-progress runs park; budget stops; inter
   const g = newGoal("x", "true", 2);
   assert.deepEqual(decide(g, { checkPassed: true, toolCalls: 0, aborted: false }), { action: "complete" });
   assert.equal(decide(g, { checkPassed: false, toolCalls: 3, aborted: false }).action, "continue");
-  assert.equal(decide(g, { checkPassed: false, toolCalls: 0, aborted: false }).action, "park");
-  assert.equal(decide(g, { checkPassed: false, toolCalls: 3, aborted: true }).action, "pause");
-  assert.match((decide(g, { checkPassed: false, toolCalls: 0, aborted: false, errored: true }) as { reason: string }).reason, /error/);
-  assert.equal(decide({ ...g, continuations: 2 }, { checkPassed: false, toolCalls: 3, aborted: false }).action, "budget");
+  assert.deepEqual(decide(g, { checkPassed: false, toolCalls: 0, aborted: false }), { action: "stop", status: "parked", reason: "the last run made no tool calls, so it wasn't making progress" });
+  assert.deepEqual(decide(g, { checkPassed: false, toolCalls: 3, aborted: true }), { action: "stop", status: "paused", reason: "you interrupted the run" });
+  const errored = decide(g, { checkPassed: false, toolCalls: 0, aborted: false, errored: true });
+  assert.ok(errored.action === "stop" && errored.status === "paused" && /error/.test(errored.reason));
+  assert.deepEqual(decide({ ...g, continuations: 2 }, { checkPassed: false, toolCalls: 3, aborted: false }), { action: "stop", status: "budget", reason: "used all 2 automatic continuations" });
   assert.equal(decide({ ...g, status: "paused" }, { checkPassed: true, toolCalls: 1, aborted: false }).action, "none");
+});
+
+test("goalFromEntry copies goal-shaped entry data and rejects anything else", () => {
+  const g = newGoal("x", "true");
+  const loaded = goalFromEntry(g);
+  assert.deepEqual(loaded, g);
+  assert.notEqual(loaded, g);
+  for (const bad of [undefined, null, "x", {}, { ...g, status: "done" }, { ...g, check: 1 }, { ...g, objective: undefined }, { ...g, continuations: "0" }, { ...g, maxContinuations: null }]) {
+    assert.equal(goalFromEntry(bad), undefined, JSON.stringify(bad));
+  }
 });
 
 test("prompts carry the objective, check, budget, and check output", () => {
@@ -63,11 +76,41 @@ test("runCheck kills background jobs the check leaves in its process group", asy
   const r = await runCheck(tmpdir(), "sleep 30 & echo $!; exit 0", 5000);
   const pid = Number(r.tail.trim());
   assert.ok(pid > 0);
-  await new Promise((done) => setTimeout(done, 100));
+  // The killed job lingers as a zombie until init reaps it, which can be slow on a loaded machine.
+  await until(() => gone(pid));
   assert.throws(() => process.kill(pid, 0), /ESRCH/);
 });
 
-test("runCheck keeps the real exit code when the timeout lands while output drains", async () => {
-  const r = await runCheck(tmpdir(), "sleep 5 & sleep 0.1; exit 0", 300);
+test("runCheck keeps the real exit code when the timeout lands while output drains", async (t) => {
+  // Mocked timers put the deadline inside the drain window no matter how slow a loaded machine
+  // spawns the shell; real time would race the spawn against a few hundred milliseconds.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const pidFile = join(mkdtempSync(join(tmpdir(), "goal-check-")), "pid");
+  const pending = runCheck(tmpdir(), `echo $$ > ${pidFile}; sleep 5 & exit 0`, 300);
+  // The child is reaped, and its exit seen, only once its pid is gone.
+  await until(() => existsSync(pidFile) && /\n$/.test(readFileSync(pidFile, "utf8")));
+  await until(() => gone(Number(readFileSync(pidFile, "utf8"))));
+  t.mock.timers.tick(300);
+  t.mock.timers.tick(500);
+  const r = await pending;
   assert.deepEqual([r.exit, r.timedOut], [0, false]);
 });
+
+// Polls on setImmediate, which mocked setTimeout leaves alone; gives up after 10 s of real time.
+async function until(ready: () => boolean) {
+  const deadline = Date.now() + 10_000;
+  while (!ready()) {
+    assert.ok(Date.now() < deadline, "timed out waiting");
+    await new Promise((done) => setImmediate(done));
+  }
+}
+
+function gone(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+    throw error;
+  }
+}

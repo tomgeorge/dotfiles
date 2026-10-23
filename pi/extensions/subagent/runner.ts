@@ -44,18 +44,32 @@ export interface Progress {
 
 const ZERO_USAGE: Usage = { input: 0, output: 0, cost: 0 };
 
+/** Fields of a JSON value from the child; non-objects have none, as with `?.` access. */
+function fields(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+}
+
 function readUsage(raw: unknown): Usage {
-  const u = (raw ?? {}) as Record<string, unknown>;
+  const u = fields(raw);
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-  const cost = (u.cost ?? {}) as Record<string, unknown>;
+  const cost = fields(u.cost);
   return { input: n(u.input) + n(u.cacheRead) + n(u.cacheWrite), output: n(u.output), cost: n(cost.total) };
+}
+
+/** Joined text parts of an assistant message. Throws on content that isn't a list of parts. */
+function messageText(content: unknown): string {
+  if (content === undefined || content === null) return "";
+  // A null part used to throw a TypeError on `part.type`; rejecting it keeps the event "invalid"
+  // rather than silently skipping the part. Other non-object parts are skipped, as before.
+  if (!Array.isArray(content) || content.includes(null)) throw new Error("Malformed message content");
+  return content.filter((part) => fields(part).type === "text").map((part) => fields(part).text).join("\n");
 }
 
 const addUsage = (a: Usage, b: Usage): Usage =>
   ({ input: a.input + b.input, output: a.output + b.output, cost: a.cost + b.cost });
 
-function describeToolCall(name: string, args: unknown): string {
-  const a = (args ?? {}) as Record<string, unknown>;
+function describeToolCall(name: unknown, args: unknown): string {
+  const a = fields(args);
   const detail = a.path ?? a.pattern ?? a.query ?? a.args ?? "";
   const shown = typeof detail === "string" ? detail
     : Array.isArray(detail) ? detail.join(" ") : JSON.stringify(detail);
@@ -137,24 +151,24 @@ export async function runSubagent(
       if (!line.trim() || failure) return;
       let reportProgress = false;
       try {
-        const event = JSON.parse(line);
-        if (event?.type === "tool_execution_start") {
+        const event = fields(JSON.parse(line));
+        if (event.type === "tool_execution_start") {
           progress.toolCalls++;
           progress.activity = describeToolCall(event.toolName, event.args);
           progress.phase = "tool";
           reportProgress = true;
           return;
         }
-        if (event?.type === "message_update") {
-          const kind = event.assistantMessageEvent?.type;
+        if (event.type === "message_update") {
+          const kind = fields(event.assistantMessageEvent).type;
           if (kind === "thinking_start") progress.phase = "thinking";
           else if (kind === "text_start") progress.phase = "writing";
           if (event.usage) progress.usage = addUsage(finishedUsage, readUsage(event.usage));
           reportProgress = true;
           return;
         }
-        const message = event?.message;
-        if (event?.type !== "message_end" || message?.role !== "assistant") return;
+        const message = fields(event.message);
+        if (event.type !== "message_end" || message.role !== "assistant") return;
         finishedUsage = addUsage(finishedUsage, readUsage(message.usage));
         progress.usage = finishedUsage;
         reportProgress = true;
@@ -163,11 +177,9 @@ export async function runSubagent(
           stop("Child used a different provider/model than requested");
           return;
         }
-        text = (message.content ?? [])
-          .filter((part: { type: string }) => part.type === "text")
-          .map((part: { text: string }) => part.text).join("\n");
-        stopReason = message.stopReason;
-        modelError = message.errorMessage ?? "";
+        text = messageText(message.content);
+        stopReason = typeof message.stopReason === "string" ? message.stopReason : "";
+        modelError = typeof message.errorMessage === "string" ? message.errorMessage : "";
       } catch {
         stop("Invalid JSON event from subagent");
       } finally {

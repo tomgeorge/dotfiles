@@ -44,7 +44,7 @@
   {
     "name": "task checks not run",
     "file": "index.ts",
-    "from": "report.checks.push(await runCheck(task.worktree, command, CHECK_TIMEOUT_MS, signal));",
+    "from": "report.checks = await runChecks(task.worktree, task.checks, CHECK_TIMEOUT_MS, signal);",
     "to": ""
   },
   {
@@ -80,8 +80,8 @@
   {
     "name": "integration worktree left dirty after post-merge checks",
     "file": "index.ts",
-    "from": "      const dirty = await discardChanges(state.config.integrationPath);\n      const failed = checks.filter((c) => c.exit !== 0);",
-    "to": "      const dirty: string[] = [];\n      const failed = checks.filter((c) => c.exit !== 0);"
+    "from": "      const dirty = await discardChanges(state.config.integrationPath);\n      const failed = failedChecks(checks, 15);",
+    "to": "      const dirty: string[] = [];\n      const failed = failedChecks(checks, 15);"
   },
   {
     "name": "finish ignores running workers",
@@ -92,8 +92,8 @@
   {
     "name": "finish passes with failing checks",
     "file": "index.ts",
-    "from": "const failed = results.filter((c) => c.exit !== 0);",
-    "to": "const failed = results.filter(() => false);"
+    "from": "const problems = failedChecks(results, 20);",
+    "to": "const problems: string[] = [];"
   },
   {
     "name": "finish passes when checks dirtied the worktree",
@@ -280,5 +280,23 @@
     "file": "index.ts",
     "from": "if (ctx.hasUI && state) return openPanel(ctx, state);",
     "to": ""
+  },
+  {
+    "name": "failed checks not reported",
+    "file": "handoff.ts",
+    "from": "checks.filter((c) => c.exit !== 0).map(",
+    "to": "checks.filter(() => false).map("
+  },
+  {
+    "name": "checks keep running after an abort",
+    "file": "git.ts",
+    "from": "    if (signal.aborted) break;\n    results.push(",
+    "to": "    results.push("
+  },
+  {
+    "name": "widget never flags quiet tasks",
+    "file": "state.ts",
+    "from": "${quiet > 60 ? `(quiet ${quiet}s) ` : \"\"}",
+    "to": "${\"\"}"
   }
 ]

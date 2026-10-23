@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  continuationMessage, decide, GOAL_GUIDELINES, newGoal, parseGoalArgs, runCheck, startMessage, statusLine, type Goal,
+  continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine, type Goal,
 } from "./goal.ts";
 
 const CHECK_TIMEOUT_MS = 10 * 60_000;
@@ -91,7 +91,7 @@ export default function (pi: ExtensionAPI) {
         save();
         say(startMessage(goal, "set"), true);
       } catch (error) {
-        notify((error as Error).message, "error");
+        notify(error instanceof Error ? error.message : String(error), "error");
       }
     },
   });
@@ -129,13 +129,15 @@ export default function (pi: ExtensionAPI) {
           active.continuations++;
           save();
           return say(continuationMessage(active), true);
-        case "pause":
-        case "park":
-        case "budget":
-          active.status = decision.action === "pause" ? "paused" : decision.action === "park" ? "parked" : "budget";
+        case "stop":
+          active.status = decision.status;
           active.reason = decision.reason;
           save();
           return say(`Goal ${active.status}: ${decision.reason}. Last check: ${result ? `exit ${result.exit}` : "skipped"}. /goal resume to continue.`);
+        case "none":
+          return;
+        default:
+          return decision satisfies never;
       }
     } finally {
       checking = false;
@@ -148,8 +150,9 @@ export default function (pi: ExtensionAPI) {
     ui = ctx;
     goal = undefined;
     for (const entry of ctx.sessionManager.getBranch()) {
-      // Copy, so mutating the live goal never rewrites an earlier entry.
-      if (entry.type === "custom" && entry.customType === ENTRY) goal = structuredClone(entry.data as Goal);
+      // A malformed latest entry can't be a goal we wrote; leave no goal rather than run on
+      // garbage or resurrect an earlier goal that entry replaced.
+      if (entry.type === "custom" && entry.customType === ENTRY) goal = goalFromEntry(entry.data);
     }
     render();
   }

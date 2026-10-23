@@ -51,6 +51,12 @@ export function summary(job: JobRecord, now: number): string {
   return `Subagent #${job.id} ${job.model} · ${duration(elapsed(job, now))} · ${toolCalls} tool calls · ${money(usage.cost)} · ${tokens(usage.input)} in / ${tokens(usage.output)} out`;
 }
 
+/** The live line streamed into the tool row; elapsed time keeps counting until the tool returns. */
+export function progressLine(job: JobRecord, now: number): string {
+  const { toolCalls, usage } = job.progress;
+  return `Subagent #${job.id} ${job.model} · ${duration(now - job.started)} · ${toolCalls} tool calls · ${money(usage.cost)} · ${doing(job)}`;
+}
+
 /** What the job is doing now, or how it ended. */
 export function doing(job: JobRecord): string {
   if (job.status === "ok") return "done";
@@ -72,6 +78,8 @@ function icon(job: JobRecord, frame: number, s: Style) {
   }
 }
 
+const spent = (jobs: JobRecord[]) => jobs.reduce((sum, job) => sum + job.progress.usage.cost, 0);
+
 const padStart = (text: string, width: number, s: Style) => " ".repeat(Math.max(0, width - s.width(text))) + text;
 
 /** A rule with a left title and optional right hint, e.g. `─ Subagents ───── hint ─`. */
@@ -87,7 +95,7 @@ function rule(left: string, right: string, width: number, s: Style) {
 export function widgetLines(jobs: JobRecord[], now: number, width: number, s: Style, opts: { frame: number; hint: string }): string[] {
   const running = jobs.filter((job) => job.status === "running");
   if (!running.length) return [];
-  const total = jobs.reduce((sum, job) => sum + job.progress.usage.cost, 0);
+  const total = spent(jobs);
   const shown = running.length > WIDGET_ROWS ? running.slice(0, WIDGET_ROWS - 1) : running;
   const modelW = Math.min(24, Math.max(...shown.map((job) => s.width(job.model))));
   const idW = Math.max(...shown.map((job) => `#${job.id}`.length));
@@ -233,7 +241,7 @@ export function bodyLines(job: JobRecord, view: BodyView, width: number, s: Styl
   return error.length && result.length ? [...error, "", ...result] : [...error, ...result];
 }
 
-function detail(job: JobRecord, state: PopupState, now: number, width: number, height: number, s: Style) {
+function detail(job: JobRecord, state: PopupState, width: number, height: number, s: Style) {
   const label = (name: string) => s.fg("muted", name.padEnd(6));
   const git = job.git === undefined ? s.fg("dim", "…") : job.git === null ? s.fg("dim", "not a git checkout")
     : s.fg("accent", job.git.branch) + (job.git.worktree ? s.fg("warning", " (worktree)") : "");
@@ -280,7 +288,7 @@ export function popupLines(jobs: JobRecord[], state: PopupState, now: number, wi
   const rightW = Math.max(20, width - leftW);
   const running = jobs.filter((job) => job.status === "running").length;
   const title = `${s.bold("Subagents")} ${s.fg("muted", `${running}/${jobs.length}`)}`;
-  const spend = `${running} running · ${money(jobs.reduce((n, j) => n + j.progress.usage.cost, 0))} spent `;
+  const spend = `${running} running · ${money(spent(jobs))} spent `;
 
   const listRows = paneH - 2;
   const selectedIndex = Math.max(0, jobs.findIndex((job) => job.id === state.selected));
@@ -303,10 +311,9 @@ export function popupLines(jobs: JobRecord[], state: PopupState, now: number, wi
   let rightBody: string[] = [];
   let rightTitle = "Details";
   if (job) {
-    const statusText = job.status === "running" ? "running" : job.status;
-    rightTitle = `${s.fg("accent", `#${job.id}`)} ${job.model} ${s.fg("dim", `· ${statusText} ${duration(elapsed(job, now))}`)}`;
+    rightTitle = `${s.fg("accent", `#${job.id}`)} ${job.model} ${s.fg("dim", `· ${job.status} ${duration(elapsed(job, now))}`)}`;
     // One-column gutter inside the border.
-    const rendered = detail(job, state, now, rightW - 3, paneH - 2, s);
+    const rendered = detail(job, state, rightW - 3, paneH - 2, s);
     rightBody = rendered.lines.map((line) => ` ${line}`);
     page = rendered.room;
   }
