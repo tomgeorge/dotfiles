@@ -29,7 +29,7 @@ test("rejects options that write files or run programs", () => {
     ["show", "--textconv"], ["cat-file", "--filters", "HEAD:f"], ["cat-file", "--textconv", "HEAD:f"],
     ["grep", "-Oless", "x"], ["grep", "--open-files-in-pager", "x"], ["log", "a\0b"],
   ]) {
-    assert.throws(() => buildGitArgv(args), undefined, args.join(" "));
+    assert.throws(() => buildGitArgv(args), Error, args.join(" "));
   }
 });
 

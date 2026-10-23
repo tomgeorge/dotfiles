@@ -17,7 +17,7 @@ const STDERR_TAIL = 8192;
 
 function runGit(argv: string[], cwd: string, signal?: AbortSignal) {
   return new Promise<{ code: number | null; stdout: string; stderr: string; capped: boolean }>((resolve, reject) => {
-    const env = { ...process.env, ...GIT_ENV };
+    const env: NodeJS.ProcessEnv = { ...process.env, ...GIT_ENV };
     // An inherited external diff would bypass --no-ext-diff for plumbing paths.
     delete env.GIT_EXTERNAL_DIFF;
     const child = spawn("git", argv, { cwd, env, shell: false, stdio: ["ignore", "pipe", "pipe"] });

@@ -85,8 +85,10 @@ registerHooks({
 });
 
 type Handler = (event: unknown, ctx: unknown) => unknown;
-export interface Tool { name: string; execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<unknown> }
-export interface Command { handler(args: string, ctx: unknown): unknown }
+// Narrower than Pi's AgentToolResult (no image content): these extensions' tools return text.
+export interface ToolResult { content: { type: string; text: string }[]; details?: unknown }
+export interface Tool { name: string; execute(id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown): Promise<ToolResult> }
+export interface Command { handler(args: string, ctx: unknown): Promise<void> }
 export interface Shortcut { handler(ctx: unknown): unknown }
 type Flag = boolean | string;
 

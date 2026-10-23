@@ -359,7 +359,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const model = review ? c.reviewerModel : c.workerModel;
       // Record the task before any await so parallel calls can't exceed the slot limit.
       const task: TaskRecord = {
-        id: state.nextId++, kind: params.kind, title: params.title, spec: params.spec,
+        id: state.nextId++, kind: review ? "review" : "implement", title: params.title, spec: params.spec,
         acceptance: params.acceptance ?? [], checks: review ? [] : params.checks ?? [], paths: params.paths ?? [],
         reviewOf: params.reviewOf, model: ref(model), status: "running", startedAt: Date.now(),
         cost: 0, toolCalls: 0, activity: "starting", lastEventAt: Date.now(),
