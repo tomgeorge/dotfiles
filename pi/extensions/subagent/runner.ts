@@ -198,15 +198,16 @@ export async function runSubagent(
 
     const processLine = (line: string) => {
       if (!line.trim() || failure) return;
-      let event: Record<string, unknown>;
+      let outcome: ReturnType<ChildEvents["apply"]>;
       try {
-        event = fields(JSON.parse(line));
+        // Inside the guard: a hostile event (e.g. tool args with `toString: null`) can throw while
+        // being applied, and a throw in this stream handler would crash the parent.
+        outcome = events.apply(fields(JSON.parse(line)));
       } catch {
         return stop(INVALID_EVENT);
       }
-      // Outside the parse guard so a UI callback bug isn't reported as bad JSON.
-      const outcome = events.apply(event);
       if (outcome.stop) stop(outcome.stop);
+      // Outside the guard so a UI callback bug isn't reported as bad JSON.
       if (outcome.changed) options.onProgress?.({ ...events.progress });
     };
 
