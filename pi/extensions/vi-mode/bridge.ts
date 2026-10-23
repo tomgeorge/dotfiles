@@ -1,9 +1,14 @@
 // The only file that reaches into the Pi editor's private fields. Editor has
 // no public way to move the cursor or replace text without side effects:
 // setText() drops collapsed paste markers' content, and replaying arrow keys
-// moves by wrapped rows and opens history. Checked against Pi 0.87.1.
+// moves by wrapped rows and opens history.
 
 import type { Pos } from "./chars.ts";
+
+// The Pi release whose editor internals this bridge was verified against.
+export const CHECKED_PI_VERSION = "0.87.1";
+
+export type Snapshot = { lines: string[]; cursor: Pos; pastes: Map<number, string>; pasteCounter: number };
 
 type Internals = {
   state: { lines: string[]; cursorLine: number; cursorCol: number };
@@ -60,8 +65,17 @@ export class Bridge {
 
   // One undo step. Keeps pastes, so collapsed paste markers still expand.
   applyEdit(lines: string[], cursor: Pos): void {
+    this.beginUndoStep();
+    this.replaceLines(lines, cursor);
+  }
+
+  // What the base editor does before each of its own edits.
+  private beginUndoStep(): void {
     this.e.exitHistoryBrowsing();
     this.e.pushUndoSnapshot();
+  }
+
+  private replaceLines(lines: string[], cursor: Pos): void {
     this.e.state.lines = lines;
     this.setCursor(cursor);
     this.e.onChange?.(this.e.getText());
@@ -95,14 +109,10 @@ export class Bridge {
 
   // Restore a snapshot as a new undo step.
   restore(s: Snapshot): void {
-    this.e.exitHistoryBrowsing();
-    this.e.pushUndoSnapshot();
+    // The snapshot pushed here must hold the old pastes, so undo restores them.
+    this.beginUndoStep();
     this.e.pastes = new Map(s.pastes);
     this.e.pasteCounter = s.pasteCounter;
-    this.e.state.lines = [...s.lines];
-    this.setCursor(s.cursor);
-    this.e.onChange?.(this.e.getText());
+    this.replaceLines([...s.lines], s.cursor);
   }
 }
-
-export type Snapshot = { lines: string[]; cursor: Pos; pastes: Map<number, string>; pasteCounter: number };

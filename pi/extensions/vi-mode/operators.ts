@@ -11,6 +11,7 @@ export type Edit = { lines: string[]; cursor: Pos };
 export type OpResult = Edit & { register: Register; insert: boolean };
 
 const indentOf = (line: string) => /^\s*/u.exec(line)![0];
+const lineCount = (r: Range) => r.end.line - r.start.line + 1;
 
 // The range a motion from `from` covers, with Vim's rules for exclusive
 // motions that end at the start of a line (:h exclusive).
@@ -47,7 +48,7 @@ function textOf(lines: string[], r: Range): string {
 
 function removeChars(lines: string[], r: Range): string[] {
   const joined = lines[r.start.line].slice(0, r.start.col) + lines[r.end.line].slice(r.end.col);
-  return lines.toSpliced(r.start.line, r.end.line - r.start.line + 1, joined);
+  return lines.toSpliced(r.start.line, lineCount(r), joined);
 }
 
 // d, c and y. cursor is where the command started (y on lines keeps its
@@ -60,11 +61,12 @@ export function operate(op: Operator, lines: string[], r: Range, cursor: Pos): O
   }
   if (r.linewise && op === "c") {
     const indent = indentOf(lines[r.start.line]);
-    const out = lines.toSpliced(r.start.line, r.end.line - r.start.line + 1, indent);
+    const out = lines.toSpliced(r.start.line, lineCount(r), indent);
     return { lines: out, cursor: { line: r.start.line, col: indent.length }, register, insert: true };
   }
   if (r.linewise) {
-    let out = lines.toSpliced(r.start.line, r.end.line - r.start.line + 1);
+    // The buffer always has at least one line.
+    let out = lines.toSpliced(r.start.line, lineCount(r));
     if (out.length === 0) out = [""];
     const line = Math.min(r.start.line, out.length - 1);
     return { lines: out, cursor: { line, col: firstNonBlank(out[line]) }, register, insert: false };

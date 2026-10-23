@@ -201,9 +201,10 @@ export function findChar(lines: string[], pos: Pos, find: Find, count = 1, again
   return { to: { line: pos.line, col: starts[found] }, kind: forward ? "inclusive" : "exclusive" };
 }
 
+const REVERSED_FIND = { f: "F", F: "f", t: "T", T: "t" } as const;
+
 export function reverseFind(find: Find): Find {
-  const flip = { f: "F", F: "f", t: "T", T: "t" } as const;
-  return { key: flip[find.key], char: find.char };
+  return { key: REVERSED_FIND[find.key], char: find.char };
 }
 
 const PAIRS: Record<string, string> = { "(": ")", "[": "]", "{": "}" };

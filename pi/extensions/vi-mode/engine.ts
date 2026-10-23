@@ -3,7 +3,7 @@
 // with key strings.
 
 import { charClass, BLANK, firstNonBlank, lastCol, nextCol, snapCol, type Pos, type Range } from "./chars.ts";
-import { Parser, type Command, type MotionSpec, type Operator, type Target } from "./keys.ts";
+import { Parser, type Command, type MotionKey, type MotionSpec, type Operator, type SimpleKey, type Target } from "./keys.ts";
 import * as m from "./motions.ts";
 import * as op from "./operators.ts";
 import { textObject } from "./textobjects.ts";
@@ -118,7 +118,8 @@ export class Engine {
       case "F":
       case "t":
       case "T":
-        this.lastFind = { key: spec.key, char: spec.arg! };
+        if (spec.arg === undefined) return null;
+        this.lastFind = { key: spec.key, char: spec.arg };
         return m.findChar(lines, pos, this.lastFind, n);
       case ";":
         return this.lastFind && m.findChar(lines, pos, this.lastFind, n, true);
@@ -128,7 +129,19 @@ export class Engine {
       case "{": return m.paragraph(lines, pos, n, false);
       case "}": return m.paragraph(lines, pos, n, true);
     }
-    return null;
+  }
+
+  // The range an operator acts on, or null when the target yields nothing.
+  private targetRange(opKey: Operator, target: Target, count: number | null, lines: string[], pos: Pos): Range | null {
+    if ("line" in target) return op.lineRange(lines, pos, count ?? 1);
+    if ("object" in target) return textObject(lines, pos, target.object.key, target.object.inner, count ?? 1);
+    const spec = target.motion;
+    const text = lines[pos.line];
+    const onWord = pos.col < text.length && charClass(text.slice(pos.col, nextCol(text, pos.col))) !== BLANK;
+    const motion = opKey === "c" && (spec.key === "w" || spec.key === "W") && onWord
+      ? m.changeWordEnd(lines, pos, count ?? 1, spec.key === "W")
+      : this.motion(spec, count, lines, pos, true);
+    return motion && op.motionRange(lines, pos, motion);
   }
 
   private operate(
@@ -140,20 +153,7 @@ export class Engine {
     pos: Pos,
   ): Action {
     this.want = null;
-    let range: Range | null;
-    if ("line" in target) {
-      range = op.lineRange(lines, pos, count ?? 1);
-    } else if ("object" in target) {
-      range = textObject(lines, pos, target.object.key, target.object.inner, count ?? 1);
-    } else {
-      const spec = target.motion;
-      const text = lines[pos.line];
-      const onWord = pos.col < text.length && charClass(text.slice(pos.col, nextCol(text, pos.col))) !== BLANK;
-      const motion = opKey === "c" && (spec.key === "w" || spec.key === "W") && onWord
-        ? m.changeWordEnd(lines, pos, count ?? 1, spec.key === "W")
-        : this.motion(spec, count, lines, pos, true);
-      range = motion && op.motionRange(lines, pos, motion);
-    }
+    const range = this.targetRange(opKey, target, count, lines, pos);
     if (!range) return NONE;
     const empty = !range.linewise && range.start.line === range.end.line && range.start.col === range.end.col;
     if (empty) return opKey === "c" ? { type: "insert", cursor: range.start } : NONE;
@@ -164,10 +164,10 @@ export class Engine {
     return editAction(result, result.insert);
   }
 
-  private simple(key: string, count: number | null, register: string | null, arg: string | undefined, lines: string[], pos: Pos): Action {
+  private simple(key: SimpleKey, count: number | null, register: string | null, arg: string | undefined, lines: string[], pos: Pos): Action {
     const n = count ?? 1;
     const text = lines[pos.line];
-    const motion = (k: string): Target => ({ motion: { key: k } });
+    const motion = (k: MotionKey): Target => ({ motion: { key: k } });
     switch (key) {
       case "x": return this.operate("d", register, count, motion("l"), lines, pos);
       case "X": return this.operate("d", register, count, motion("h"), lines, pos);
@@ -185,7 +185,7 @@ export class Engine {
         return this.reg ? editAction(op.put(lines, pos, this.reg, key === "p", n)) : NONE;
       case "J": return editAction(op.joinLines(lines, pos, n));
       case "~": return editAction(op.toggleCase(lines, pos, n));
-      case "r": return editAction(op.replaceChars(lines, pos, arg!, n));
+      case "r": return arg === undefined ? NONE : editAction(op.replaceChars(lines, pos, arg, n));
       case "u": return { type: "undo", count: n };
       case "<C-r>": return { type: "redo", count: n };
       case "i": return { type: "insert", cursor: pos };
@@ -196,6 +196,5 @@ export class Engine {
       case "O":
         return editAction(op.openLine(lines, pos, key === "o"), true);
     }
-    return NONE;
   }
 }
