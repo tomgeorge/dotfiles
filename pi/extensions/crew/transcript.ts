@@ -1,16 +1,13 @@
 import { open, stat } from "node:fs/promises";
 import { StringDecoder } from "node:string_decoder";
+import type { Entry, TextEntry, ToolEntry, ToolState } from "../run-panel/source.ts";
 
 // A worker's conversation for the panel's Live tab: prompt, thinking, text, and tool calls with
 // their results. Built either from the worker's JSON event stream (live, token by token) or
 // from its pi session file (finished tasks, or crews running in another session). Bounded, so a
 // long worker can't grow the planner's memory without limit; the session file keeps everything.
 
-export type ToolState = "pending" | "running" | "ok" | "error";
-
-export interface TextEntry { kind: "user" | "thinking" | "text" | "note"; text: string }
-export interface ToolEntry { kind: "tool"; id: string; name: string; args: string; result: string; state: ToolState }
-export type Entry = TextEntry | ToolEntry;
+export type { Entry, TextEntry, ToolEntry, ToolState };
 /** A thinking or text block of an assistant message. */
 type BlockEntry = TextEntry & { kind: "thinking" | "text" };
 
