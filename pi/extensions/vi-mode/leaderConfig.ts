@@ -63,7 +63,11 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
   for (const name of Object.keys(value)) if (!ENTRY_FIELDS.has(name)) fail(`unknown field "${name}"`);
 
   let keys: string[] | undefined;
+  // leader.json is hand-typed, so surrounding spaces are trimmed, but only after
+  // the raw text is checked for control characters: trimming would otherwise
+  // hide a leading or trailing newline or escape.
   if (typeof value.keys !== "string") fail(`keys must be a string of space-separated keys, such as "c l"`);
+  else if (hasControlChar(value.keys)) fail("keys must not contain control characters");
   else {
     const split = value.keys.trim().toLowerCase().split(/\s+/).filter((k) => k !== "");
     if (split.length < 1 || split.length > MAX_KEYS) fail(`keys must have 1-${MAX_KEYS} keys`);
@@ -86,7 +90,7 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
   let label: string | undefined;
   if (typeof value.label !== "string") fail("needs a label (or unbind: true)");
   else {
-    const error = labelError(value.label.trim());
+    const error = labelError(hasControlChar(value.label) ? value.label : value.label.trim());
     if (error) fail(`label ${error}`);
     else label = value.label.trim();
   }
@@ -94,6 +98,7 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
   let command: LeaderCommand | undefined;
   if (value.command !== undefined) {
     if (typeof value.command !== "string") fail(`command must be a string, such as "goal status"`);
+    else if (hasControlChar(value.command)) fail("command must not contain control characters");
     else {
       const text = value.command.trim();
       const space = text.search(/\s/);
@@ -110,7 +115,7 @@ function parseEntry(value: unknown, field: string, errors: string[]): KeymapEntr
   if (value.detail !== undefined) {
     if (typeof value.detail !== "string") fail("detail must be a string");
     else {
-      const error = detailError(value.detail.trim());
+      const error = detailError(hasControlChar(value.detail) ? value.detail : value.detail.trim());
       if (error) fail(`detail ${error}`);
       else detail = value.detail.trim();
     }
