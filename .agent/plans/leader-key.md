@@ -342,7 +342,7 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 - [x] 2026-10-23 Read IDEAS.md, the RFD, vi-mode, the four contributing extensions, Pi 1.0.2's editor wiring, and DoomPi's registry, editor, and schema; wrote this plan.
 - [x] 2026-10-23 Revised the plan after review: NORMAL-only trigger, no `ctrl+space`, chords removed, configurable leader key and keymap.
 - [x] 2026-10-23 Milestone 1: `leaderContract.ts`, `leaderRegistry.ts` (with keymap), `leaderConfig.ts`, and their tests. `keys.ts` exports `isNormalStartKey`, tested against the parser itself.
-- [ ] Milestone 2: `leader.ts`, `whichKey.ts`, and their tests.
+- [x] 2026-10-23 Milestone 2: `leader.ts`, `whichKey.ts`, and their tests.
 - [ ] Milestone 3: LEADER mode in `editor.ts`, core bindings, config loading, `/leader`, `pi/leader.json` with its `link.sh` line, the fake-pi events, and the README.
 - [ ] Milestone 4a: crew bindings, `/crews`, and the crew chord removed.
 - [ ] Milestone 4b: subagent bindings and the subagent chord removed.
@@ -377,6 +377,8 @@ Manual checks in Pi, after `./link.sh` and `/reload`, in `~/git/dotfiles`:
 - 2026-10-23 (M1): Binding ids need only be non-empty, at most 128 characters, and free of control characters, as the plan says; DoomPi's stricter id pattern isn't ported. Command args may not contain control characters.
 - 2026-10-23 (M1 review): A label-only keymap entry never destroys a leaf. If a key before its last crosses a leaf, the entry is skipped, nothing is created, and `/leader` shows a `user` diagnostic. A keymap entry with a command still replaces any leaf on its path.
 - 2026-10-23 (M1 review): `register()` checks every string exactly as sent. Lower-casing the key is its only normalisation. Labels, details, and ids with leading or trailing whitespace are rejected, and command args are stored verbatim. Contributions are code, and trimming first let `" c "` or `"crews\n"` through. A source with control characters is rejected explicitly. JS `$` without the `m` flag already refused `"crew\n"`, but the regex shouldn't be the only guard. `leader.json` is typed by hand, so it still trims spaces, but it checks the raw keys, label, detail, and command for control characters first.
+- 2026-10-23 (M2): API shapes for Milestone 3. `leaderKey(tree, path, key)` takes any `LeaderTree` (`{ group(path) }`). Backspace closes instead of descending when the parent group has vanished, and an input longer than one character (an arrow, a chord) closes with no `missed`. `WhichKeyStyle` is `{ fg(color, text), bold, inverse, visibleWidth, truncate(text, width) }`: `color` is `"accent" | "warning" | "dim" | "text"`, a subset of Pi's `ThemeColor`, so `theme.fg` passes straight through. `inverse` was added to the plan's list to draw DoomPi's key badge (Pi's theme has it). `truncate` cuts with no ellipsis (`truncateToWidth(t, w, "")`); `whichKeyLines` adds the `…` itself. `plainStyle` is exported for tests.
+- 2026-10-23 (M2): Layout details the plan left open. The panel is the header line plus the grid, with no blank rows and no inset, across the full width. The hint is dropped before the breadcrumb is cut. When even one line per row overflows 21 lines (36 keys at one column), the last line reads `… N more` instead of cutting options silently.
 - 2026-10-23: `SPC c l` runs a new `/crews` picker built on `ctx.ui.select`, not the full multicrew panel from IDEAS.md. It's the smallest thing that lists crews.
 
 ## Outcomes & Retrospective
