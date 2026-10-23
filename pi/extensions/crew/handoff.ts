@@ -91,11 +91,16 @@ export function parseHandoff(text: string): { handoff?: Handoff; error?: string 
 const list = (title: string, items: string[]) =>
   items.length ? [`${title}:`, ...items.map((item) => `- ${item}`)] : [];
 
+/** Minutes to one decimal place. */
 const minutes = (ms: number) => `${Math.round(ms / 6000) / 10}m`;
+
+/** The last `lines` lines of a check's output, indented under its verdict. */
+const indentedTail = (tail: string, lines = Infinity) =>
+  tail.trimEnd().split("\n").slice(-lines).map((l) => `    ${l}`).join("\n");
 
 /** `- exit 2: <command>` and its last `tailLines` lines of output, for each check that didn't pass. */
 export const failedChecks = (checks: CheckResult[], tailLines: number): string[] =>
-  checks.filter((c) => c.exit !== 0).map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${c.tail.trimEnd().split("\n").slice(-tailLines).map((l) => `    ${l}`).join("\n")}`);
+  checks.filter((c) => c.exit !== 0).map((c) => `- ${c.timedOut ? "timed out" : `exit ${c.exit}`}: ${c.command}\n${indentedTail(c.tail, tailLines)}`);
 
 /** The follow-up message the planner receives. */
 export function formatReport(r: TaskReport): string {
@@ -129,7 +134,7 @@ export function formatReport(r: TaskReport): string {
     for (const c of r.checks) {
       const verdict = c.timedOut ? "TIMED OUT" : c.exit === 0 ? "PASS" : `FAIL (exit ${c.exit})`;
       lines.push(`- ${verdict}: ${c.command}`);
-      if (c.exit !== 0 && c.tail.trim()) lines.push(c.tail.trimEnd().split("\n").map((l) => `    ${l}`).join("\n"));
+      if (c.exit !== 0 && c.tail.trim()) lines.push(indentedTail(c.tail));
     }
   } else if (r.kind === "implement") {
     lines.push("checks: none declared (UNVERIFIED)");

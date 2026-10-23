@@ -29,7 +29,7 @@ async function confirmed(op: Op, ctx: ExtensionContext): Promise<void> {
   if (!(await ctx.ui.confirm("Allow HEY change?", summarize(op)))) throw new Error("User declined the HEY change");
 }
 
-function text(op: Op, data: unknown) {
+function result(op: Op, data: unknown) {
   return {
     content: [{ type: "text" as const, text: `${summarize(op)}: done\n${JSON.stringify(data)}` }],
     details: undefined,
@@ -38,7 +38,7 @@ function text(op: Op, data: unknown) {
 
 async function confirmAndRun(op: Op, signal: AbortSignal | undefined, ctx: ExtensionContext) {
   await confirmed(op, ctx);
-  return text(op, await runHey(buildArgs(op), signal));
+  return result(op, await runHey(buildArgs(op), signal));
 }
 
 export default function (pi: ExtensionAPI) {
@@ -122,7 +122,7 @@ export default function (pi: ExtensionAPI) {
       // Validate before asking, so the user isn't prompted for a call that can't run.
       const args = buildArgs(op);
       await confirmed(op, ctx);
-      return text(op, await runHey(args, signal));
+      return result(op, await runHey(args, signal));
     },
   });
 

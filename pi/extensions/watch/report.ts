@@ -74,8 +74,11 @@ const firstMeaning = (watch: Watch) => watch.until === "change"
   ? "this is the baseline; it reports when the output or exit code changes"
   : "not met yet; still watching";
 
+/** `"pending"` while the first check is still running; `undefined` for loops or when none finished. */
+export type FirstCheck = RunResult | undefined | "pending";
+
 /** The first check for the `watch` tool result; empty for loops or when no check finished. */
-export function firstCheckReport(watch: Watch, first: RunResult | undefined | "pending", waitedMs: number): string {
+export function firstCheckReport(watch: Watch, first: FirstCheck, waitedMs: number): string {
   if (watch.kind !== "command" || first === undefined) return "";
   if (first === "pending") return `First check still running after ${formatDuration(waitedMs)}; fine for a command that blocks until done.`;
   return [

@@ -69,6 +69,10 @@ export async function pickModel(
   if (!all.length) throw new Error("No available models. Configure Pi authentication first.");
   const signal = options.signal;
   const taskLine = `\nTask: ${taskPreview(task)}`;
+  const pickFromAll = async (title: string): Promise<Picked | undefined> => {
+    const id = await ui.select(`${title}${taskLine}`, all, { signal });
+    return id ? split(id) : undefined;
+  };
 
   let config: RouterConfig | undefined;
   try {
@@ -76,10 +80,7 @@ export async function pickModel(
   } catch (error) {
     ui.warn?.(`Model routing off: ${(error as Error).message}`);
   }
-  if (!config) {
-    const id = await ui.select(`Subagent model${taskLine}`, all, { signal });
-    return id ? split(id) : undefined;
-  }
+  if (!config) return pickFromAll("Subagent model");
 
   let outcome: RouteOutcome;
   ui.status?.("Routing subagent task…");
@@ -89,9 +90,10 @@ export async function pickModel(
     ui.status?.(undefined);
   }
 
+  const cancelled = outcome.status === "unavailable" && outcome.reason === "cancelled";
   let picked: Picked | undefined;
   let rankedBy: string | undefined;
-  let route_: string | undefined;
+  let pickedRoute: string | undefined;
   let tookTopSuggestion = false;
   if (outcome.status === "ok") {
     const s = suggest(outcome.results, config, available);
@@ -103,23 +105,21 @@ export async function pickModel(
     if (index >= 0) {
       const c = s.choices[index];
       picked = { provider: c.provider, model: c.model };
-      route_ = c.route;
+      pickedRoute = c.route;
       tookTopSuggestion = index === 0;
     } else if (choice === ALL_MODELS) {
-      const id = await ui.select(`Subagent model — all models (router: ${s.summary})${taskLine}`, all, { signal });
-      if (id) picked = split(id);
+      picked = await pickFromAll(`Subagent model — all models (router: ${s.summary})`);
     }
-  } else if (outcome.reason !== "cancelled") {
-    const id = await ui.select(`Subagent model (${outcome.reason})${taskLine}`, all, { signal });
-    if (id) picked = split(id);
+  } else if (!cancelled) {
+    picked = await pickFromAll(`Subagent model (${outcome.reason})`);
   }
 
-  // Every routed attempt is logged, including cancellations: they show when suggestions were bad.
-  if (outcome.status === "ok" || outcome.reason !== "cancelled") {
+  // Every routed attempt is logged, including user cancellations: they show when suggestions were bad.
+  if (!cancelled) {
     try {
       await deps.logDecision({
         time: deps.now().toISOString(), via: options.via, task, outcome, rankedBy,
-        picked: picked ? { ...picked, ...(route_ ? { route: route_ } : {}) } : null,
+        picked: picked ? { ...picked, ...(pickedRoute ? { route: pickedRoute } : {}) } : null,
         tookTopSuggestion,
       });
     } catch (error) {

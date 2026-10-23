@@ -2,26 +2,23 @@
 // the Range to operate on, or null when there's no such object here.
 
 import { BLANK, charClass, graphemeStarts, type Pos, type Range } from "./chars.ts";
+import type { ObjectKey } from "./keys.ts";
 
-export function textObject(lines: string[], pos: Pos, key: string, inner: boolean, count = 1): Range | null {
+// Either bracket, or Vim's b/B aliases, selects the pair.
+const BRACKETS: Partial<Record<ObjectKey, readonly [open: string, close: string]>> = {
+  "(": ["(", ")"], ")": ["(", ")"], b: ["(", ")"],
+  "{": ["{", "}"], "}": ["{", "}"], B: ["{", "}"],
+  "[": ["[", "]"], "]": ["[", "]"],
+  "<": ["<", ">"], ">": ["<", ">"],
+};
+
+export function textObject(lines: string[], pos: Pos, key: ObjectKey, inner: boolean, count = 1): Range | null {
+  const pair = BRACKETS[key];
+  if (pair) return bracket(lines, pos, pair[0], pair[1], inner, count);
   switch (key) {
     case "w":
     case "W":
       return word(lines, pos, inner, count, key === "W");
-    case "(":
-    case ")":
-    case "b":
-      return bracket(lines, pos, "(", ")", inner, count);
-    case "{":
-    case "}":
-    case "B":
-      return bracket(lines, pos, "{", "}", inner, count);
-    case "[":
-    case "]":
-      return bracket(lines, pos, "[", "]", inner, count);
-    case "<":
-    case ">":
-      return bracket(lines, pos, "<", ">", inner, count);
     case '"':
     case "'":
     case "`":
@@ -146,21 +143,11 @@ function quote(lines: string[], pos: Pos, q: string, inner: boolean): Range | nu
     for (let j = i - 1; j >= 0 && line[j] === "\\"; j--) slashes++;
     if (slashes % 2 === 0) qs.push(i);
   }
-  let open = -1;
-  let close = -1;
-  const k = qs.indexOf(pos.col);
-  if (k >= 0) {
-    [open, close] = k % 2 === 0 ? [qs[k], qs[k + 1]] : [qs[k - 1], qs[k]];
-  } else {
-    for (let i = 0; i + 1 < qs.length; i += 2) {
-      if (qs[i] < pos.col && pos.col < qs[i + 1]) [open, close] = [qs[i], qs[i + 1]];
-    }
-    if (open < 0) {
-      const j = qs.findIndex((x) => x > pos.col);
-      if (j >= 0) [open, close] = [qs[j], qs[j + 1]];
-    }
-  }
-  if (open < 0 || close === undefined || close < 0) return null;
+  const pairs: [open: number, close: number][] = [];
+  for (let i = 0; i + 1 < qs.length; i += 2) pairs.push([qs[i], qs[i + 1]]);
+  const pair = pairs.find(([o, c]) => o <= pos.col && pos.col <= c) ?? pairs.find(([o]) => o > pos.col);
+  if (!pair) return null;
+  const [open, close] = pair;
   let start = inner ? open + 1 : open;
   let end = inner ? close : close + 1;
   if (!inner) {

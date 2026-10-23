@@ -21,6 +21,9 @@ export interface Style {
 
 export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 export const WIDGET_ROWS = 5;
+/** Task lines shown in the detail head before "… N more lines". */
+const TASK_PREVIEW_LINES = 3;
+const LABEL_WIDTH = 6;
 
 export function duration(ms: number): string {
   const secs = Math.max(0, Math.floor(ms / 1000));
@@ -185,27 +188,35 @@ export function popupKey(state: PopupState, jobs: JobRecord[], key: PopupKey, pa
   if (state.focus === "list") {
     if (key === "back") return { type: "close" };
     if (key === "enter") { if (job) state.focus = "detail"; return { type: "none" }; }
-    const last = jobs.length - 1;
-    const target = key === "up" ? index - 1 : key === "down" ? index + 1
-      : key === "top" ? 0 : key === "bottom" ? last
-      : key === "pageUp" ? index - page : key === "pageDown" ? index + page : index;
-    const next = jobs[Math.min(last, Math.max(0, target))];
-    if (next && next.id !== state.selected) {
-      state.selected = next.id;
-      state.view = undefined;
-      resetScroll(state, next);
-    }
+    moveSelection(state, jobs, index, key, page);
     return { type: "none" };
   }
   if (key === "back" || key === "enter") { state.focus = "list"; return { type: "none" }; }
-  // Detail focus: scroll the body. "end" is resolved against content length at render.
+  scrollBody(state, key, page);
+  return { type: "none" };
+}
+
+function moveSelection(state: PopupState, jobs: JobRecord[], index: number, key: PopupKey, page: number) {
+  const last = jobs.length - 1;
+  const target = key === "up" ? index - 1 : key === "down" ? index + 1
+    : key === "top" ? 0 : key === "bottom" ? last
+    : key === "pageUp" ? index - page : key === "pageDown" ? index + page : index;
+  const next = jobs[Math.min(last, Math.max(0, target))];
+  if (next && next.id !== state.selected) {
+    state.selected = next.id;
+    state.view = undefined;
+    resetScroll(state, next);
+  }
+}
+
+/** "end" is resolved against content length at render. */
+function scrollBody(state: PopupState, key: PopupKey, page: number) {
   const current = state.scroll === "end" ? Number.MAX_SAFE_INTEGER : state.scroll;
   const deltas: Partial<Record<PopupKey, number>> = { up: -1, down: 1, pageUp: -page, pageDown: page };
   const delta = deltas[key];
   if (key === "top") state.scroll = 0;
   else if (key === "bottom") state.scroll = "end";
   else if (delta !== undefined) state.scroll = Math.max(0, current + delta);
-  return { type: "none" };
 }
 
 function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style): string[] {
@@ -242,13 +253,14 @@ export function bodyLines(job: JobRecord, view: BodyView, width: number, s: Styl
 }
 
 function detail(job: JobRecord, state: PopupState, width: number, height: number, s: Style) {
-  const label = (name: string) => s.fg("muted", name.padEnd(6));
+  const label = (name: string) => s.fg("muted", name.padEnd(LABEL_WIDTH));
   const git = job.git === undefined ? s.fg("dim", "…") : job.git === null ? s.fg("dim", "not a git checkout")
     : s.fg("accent", job.git.branch) + (job.git.worktree ? s.fg("warning", " (worktree)") : "");
   const u = job.progress.usage;
-  const taskLines = s.wrap(job.task, width - 7);
+  const taskLines = s.wrap(job.task, width - LABEL_WIDTH - 1);
   const taskExpanded = state.expandTask ?? false;
-  const taskRows = (taskExpanded ? taskLines : taskLines.slice(0, 3)).map((line, i) => `${label(i ? "" : "task")} ${line}`);
+  const hiddenTaskLines = taskExpanded ? 0 : Math.max(0, taskLines.length - TASK_PREVIEW_LINES);
+  const taskRows = (taskExpanded ? taskLines : taskLines.slice(0, TASK_PREVIEW_LINES)).map((line, i) => `${label(i ? "" : "task")} ${line}`);
   const head = [
     `${label("cwd")} ${tildify(job.cwd)}`,
     `${label("git")} ${git}`,
@@ -257,7 +269,7 @@ function detail(job: JobRecord, state: PopupState, width: number, height: number
     `${label("calls")} ${job.progress.toolCalls} ${s.fg("dim", `· ${doing(job)}`)}`,
     // Expanded, the task can be taller than the pane, so it scrolls with the body instead.
     ...(taskExpanded ? [] : taskRows),
-    ...(taskLines.length > 3 && !taskExpanded ? [`${label("")} ${s.fg("dim", `… ${taskLines.length - 3} more lines · ctrl+o to expand`)}`] : []),
+    ...(hiddenTaskLines ? [`${label("")} ${s.fg("dim", `… ${hiddenTaskLines} more lines · ctrl+o to expand`)}`] : []),
   ];
   const view = bodyView(state, job);
   const other = view === "activity" ? "result" : "activity";

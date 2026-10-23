@@ -10,5 +10,7 @@ export function loadAllowlist(path: string): string[] {
   return tools;
 }
 
-export const allowed = (patterns: string[], tool: string) =>
-  patterns.some((p) => (p.endsWith("*") ? tool.startsWith(p.slice(0, -1)) : tool === p));
+/** Whether a tool name matches any allowlist pattern. */
+export function allowed(patterns: string[], tool: string): boolean {
+  return patterns.some((p) => (p.endsWith("*") ? tool.startsWith(p.slice(0, -1)) : tool === p));
+}

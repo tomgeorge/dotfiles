@@ -16,7 +16,8 @@ function runMutate(mutantsJson: string | undefined) {
     copyFileSync(join(here, "mutate.ts"), join(root, "test-support", "mutate.ts"));
     mkdirSync(join(root, "ext"));
     if (mutantsJson !== undefined) writeFileSync(join(root, "ext", "mutants.json"), mutantsJson);
-    return spawnSync(process.execPath, [join(root, "test-support", "mutate.ts"), "ext"], { encoding: "utf8" });
+    // --no-warnings: Node 24.1 still prints a type-stripping ExperimentalWarning, and stderr is asserted exactly.
+    return spawnSync(process.execPath, ["--no-warnings", join(root, "test-support", "mutate.ts"), "ext"], { encoding: "utf8" });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

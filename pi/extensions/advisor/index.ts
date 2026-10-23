@@ -15,17 +15,17 @@ const TOOL = "advisor";
 export default function (pi: ExtensionAPI) {
   let config: AdvisorConfig | undefined;
 
-  function load(ctx?: ExtensionContext) {
+  function load(ctx: ExtensionContext) {
     try {
       config = readConfig(CONFIG);
     } catch (error) {
       config = undefined;
-      ctx?.ui.notify(`advisor: ${error instanceof Error ? error.message : String(error)}`, "error");
+      ctx.ui.notify(`advisor: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
     // Declare the tool only when there's an advisor to call.
     const active = pi.getActiveTools().filter((t) => t !== TOOL);
     pi.setActiveTools(config ? [...active, TOOL] : active);
-    if (ctx?.hasUI) ctx.ui.setStatus("advisor", config ? `advisor: ${config.model}` : undefined);
+    if (ctx.hasUI) ctx.ui.setStatus("advisor", config ? `advisor: ${config.model}` : undefined);
   }
 
   pi.registerTool({

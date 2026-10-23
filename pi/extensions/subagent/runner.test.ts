@@ -94,6 +94,11 @@ test("malformed message content is a bad event; non-object events are ignored", 
   assert.deepEqual(result, { status: "ok", text: "Final", error: null });
 });
 
+test("tool args that can't be shown are a bad event, not a crash", async () => {
+  const result = await run(emit({ type: "tool_execution_start", toolName: "git", args: { args: [{ toString: null }] } }) + emit(message("Final")));
+  assert.deepEqual([result.status, result.error], ["error", "Invalid JSON event from subagent"]);
+});
+
 test("spawn failures are returned", async () => {
   const result = await runSubagent(job, { command: "/nonexistent-pi-subagent-test" });
   assert.equal(result.status, "error");

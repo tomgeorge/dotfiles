@@ -74,7 +74,7 @@ export function buildGitArgv(args: readonly string[]): string[] {
   for (const arg of rest) {
     if (arg.includes("\0")) throw new Error("git: arguments must not contain NUL");
     const name = optionName(arg);
-    if (FORBIDDEN_OPTIONS.has(name) || /^-O/.test(arg)) throw new Error(`git ${sub}: option ${name} is not allowed`);
+    if (FORBIDDEN_OPTIONS.has(name) || arg.startsWith("-O")) throw new Error(`git ${sub}: option ${name} is not allowed`);
   }
 
   const allowed = LIST_OPTIONS[sub];

@@ -10,12 +10,12 @@ import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
   mergeBranch, outsidePaths, removeWorktree, repoInfo, runChecks, worktreePath,
 } from "./git.ts";
-import { failedChecks, formatReport, parseHandoff, type TaskReport } from "./handoff.ts";
+import { failedChecks, formatReport, parseHandoff, type Outcome, type TaskReport } from "./handoff.ts";
 import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
   formatStatus, formatWidget, listCrews, loadState, money, ref, runningTasks, saveState, sessionPath, slugify, spent,
-  type CrewState, type ModelRef, type TaskRecord,
+  type CrewConfig, type CrewState, type ModelRef, type TaskRecord, type TaskStatus,
 } from "./state.ts";
 import { SessionCache, Transcript, type TranscriptView } from "./transcript.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
@@ -75,9 +75,24 @@ function panelEvent(data: string): PanelInput | undefined {
   return char ? { char } : undefined;
 }
 
+/** A finished implement task with the worktree and base a review needs. */
+type ReviewableTask = TaskRecord & { worktree: string; base: string };
+/** What crew_dispatch sets up before the worker starts. */
+interface Prepared { prompt: string; worktree: string }
+
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
 const addError = (report: TaskReport, error: string) => {
   report.error = [report.error, error].filter(Boolean).join("; ");
+};
+/** A report with nothing observed yet; the harness fills in what it can. */
+const emptyReport = (task: TaskRecord, outcome: Outcome, cost: number): TaskReport => ({
+  id: task.id, kind: task.kind, title: task.title, outcome, model: task.model,
+  commits: [], diffStat: "", outOfScope: [], autoCommitted: false, checks: [],
+  cost, durationMs: Date.now() - task.startedAt,
+});
+const endTask = (task: TaskRecord, status: TaskStatus) => {
+  task.status = status;
+  task.endedAt = Date.now();
 };
 /** Planner-tool checks stop with the crew or with the tool call. */
 const checkSignal = (crewSignal: AbortSignal, toolSignal: AbortSignal | undefined) =>
@@ -122,6 +137,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   let closePanel: (() => void) | undefined;
 
   const isActive = () => crew?.status === "active";
+  const withoutCrewTools = () => pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t));
 
   function warn(message: string) {
     if (ui?.hasUI) ui.ui.notify(message, "warning");
@@ -171,7 +187,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   }
 
   function activate() {
-    toolsBefore ??= pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t));
+    toolsBefore ??= withoutCrewTools();
     crewAbort = new AbortController();
     // The planner gets read tools and crew tools only. Cursor's executor broke down
     // when it also edited, merged, and judged.
@@ -185,7 +201,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
 
   function deactivate() {
     crewAbort.abort();
-    pi.setActiveTools(toolsBefore ?? pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));
+    pi.setActiveTools(toolsBefore ?? withoutCrewTools());
     toolsBefore = undefined;
     stopTimers();
     render();
@@ -232,44 +248,49 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     return crew;
   }
 
-  async function buildReport(task: TaskRecord, result: WorkerResult, signal: AbortSignal): Promise<TaskReport> {
-    const outcome = result.status === "ok" ? "submitted" : result.status === "error" ? "failed" : result.status;
-    const parsed = parseHandoff(result.text);
-    const report: TaskReport = {
-      id: task.id, kind: task.kind, title: task.title, outcome, model: task.model,
-      handoff: parsed.handoff, parseError: parsed.error, branch: task.branch, base: task.base,
-      commits: [], diffStat: "", outOfScope: [], autoCommitted: false, checks: [],
-      cost: result.progress.usage.cost, durationMs: Date.now() - task.startedAt,
-      error: result.error ?? undefined,
-      partial: parsed.handoff ? undefined : result.text.slice(-3000) || undefined,
-    };
-    if (task.kind !== "implement" || !task.worktree || !task.base) return report;
+  /** What the branch says, independent of the worker's claims. */
+  async function observeBranch(task: TaskRecord, worktree: string, base: string, report: TaskReport) {
     try {
-      report.autoCommitted = await commitAll(task.worktree, `crew: uncommitted changes left by task #${task.id}`);
-      const facts = await branchFacts(task.worktree, task.base);
+      report.autoCommitted = await commitAll(worktree, `crew: uncommitted changes left by task #${task.id}`);
+      const facts = await branchFacts(worktree, base);
       report.commits = facts.commits;
       report.diffStat = facts.diffStat;
       report.outOfScope = outsidePaths(facts.files, task.paths);
     } catch (error) {
       addError(report, `harness: ${(error as Error).message}`);
     }
-    // Checks are the harness's own evidence, so run them even when the worker timed out.
-    if (outcome !== "cancelled" && !shuttingDown) {
-      report.checks = await runChecks(task.worktree, task.checks, CHECK_TIMEOUT_MS, signal);
-      // npm install, lint --fix: a pass may depend on files that never reach the branch.
-      if (report.checks.length) {
-        try {
-          report.dirtyAfterChecks = await dirtyFiles(task.worktree);
-        } catch (error) {
-          addError(report, `harness: ${(error as Error).message}`);
-        }
-      }
-      // Cancel or shutdown while checks ran: report what ran, don't present it as verified.
-      if (signal.aborted) {
-        report.outcome = "cancelled";
-        addError(report, "cancelled while the harness checks were running");
+  }
+
+  async function runTaskChecks(task: TaskRecord, worktree: string, report: TaskReport, signal: AbortSignal) {
+    report.checks = await runChecks(worktree, task.checks, CHECK_TIMEOUT_MS, signal);
+    // npm install, lint --fix: a pass may depend on files that never reach the branch.
+    if (report.checks.length) {
+      try {
+        report.dirtyAfterChecks = await dirtyFiles(worktree);
+      } catch (error) {
+        addError(report, `harness: ${(error as Error).message}`);
       }
     }
+    // Cancel or shutdown while checks ran: report what ran, don't present it as verified.
+    if (signal.aborted) {
+      report.outcome = "cancelled";
+      addError(report, "cancelled while the harness checks were running");
+    }
+  }
+
+  async function buildReport(task: TaskRecord, result: WorkerResult, signal: AbortSignal): Promise<TaskReport> {
+    const outcome = result.status === "ok" ? "submitted" : result.status === "error" ? "failed" : result.status;
+    const parsed = parseHandoff(result.text);
+    const report: TaskReport = {
+      ...emptyReport(task, outcome, result.progress.usage.cost),
+      handoff: parsed.handoff, parseError: parsed.error, branch: task.branch, base: task.base,
+      error: result.error ?? undefined,
+      partial: parsed.handoff ? undefined : result.text.slice(-3000) || undefined,
+    };
+    if (task.kind !== "implement" || !task.worktree || !task.base) return report;
+    await observeBranch(task, task.worktree, task.base, report);
+    // Checks are the harness's own evidence, so run them even when the worker timed out.
+    if (outcome !== "cancelled" && !shuttingDown) await runTaskChecks(task, task.worktree, report, signal);
     return report;
   }
 
@@ -297,17 +318,12 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
         // /crew-stop, and shutdown can still stop them.
         report = await buildReport(task, result, controller.signal);
       } catch (error) {
-        report = {
-          id: task.id, kind: task.kind, title: task.title, outcome: "failed", model: task.model,
-          commits: [], diffStat: "", outOfScope: [], autoCommitted: false, checks: [], cost: task.cost,
-          durationMs: Date.now() - task.startedAt, error: (error as Error).message,
-        };
+        report = { ...emptyReport(task, "failed", task.cost), error: (error as Error).message };
       }
       // A later crew may reuse this id after a stop.
       if (controllers.get(task.id) === controller) controllers.delete(task.id);
       task.report = report;
-      task.endedAt = Date.now();
-      task.status = shuttingDown ? "interrupted" : report.outcome;
+      endTask(task, shuttingDown ? "interrupted" : report.outcome);
       persist();
       render();
       tell("crew-handoff", formatReport(report), !quietCancels.delete(task.id));
@@ -317,6 +333,40 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   }
 
   // ---- tools -------------------------------------------------------------
+
+  /** The finished implement task a review reads; undefined for an implement dispatch. */
+  function reviewTarget(state: CrewState, params: { kind: string; reviewOf?: number }): ReviewableTask | undefined {
+    if (params.kind !== "review") {
+      if (params.reviewOf) throw new Error("reviewOf is only for kind review");
+      return undefined;
+    }
+    const target = state.tasks.find((t) => t.id === params.reviewOf);
+    if (!target || target.kind !== "implement" || !target.worktree || !target.base || target.status === "running") {
+      throw new Error("reviewOf must name a finished implement task");
+    }
+    return target as ReviewableTask;
+  }
+
+  /** A reviewer works in the reviewed task's worktree; its prompt carries the diff. */
+  async function prepareReview(c: CrewConfig, task: TaskRecord, target: ReviewableTask): Promise<Prepared> {
+    const { worktree, base } = target;
+    task.worktree = worktree;
+    task.base = base;
+    task.branch = target.branch;
+    const facts = await branchFacts(worktree, base);
+    const prompt = reviewerPrompt(c, task, target, facts.diffStat, await diffText(worktree, base, REVIEW_DIFF_BYTES));
+    return { prompt, worktree };
+  }
+
+  /** A fresh branch and worktree from the integration branch's current tip. */
+  async function prepareWorktree(c: CrewConfig, task: TaskRecord): Promise<Prepared> {
+    task.branch = `${c.integrationBranch}-t${task.id}`;
+    const worktree = worktreePath(c.repoName, task.branch);
+    task.worktree = worktree;
+    task.base = (await gitOk(c.integrationPath, ["rev-parse", "HEAD"])).trim();
+    await addWorktree(c.repoRoot, worktree, task.branch, task.base);
+    return { prompt: workerPrompt(c, task), worktree };
+  }
 
   pi.registerTool({
     name: "crew_dispatch",
@@ -342,12 +392,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       if (runningTasks(state).length >= c.maxConcurrent) {
         throw new Error(`${c.maxConcurrent} workers already running. End your turn; the next handoff will wake you.`);
       }
+      const target = reviewTarget(state, params);
       const review = params.kind === "review";
-      const target = review ? state.tasks.find((t) => t.id === params.reviewOf) : undefined;
-      if (review && (!target || target.kind !== "implement" || !target.worktree || !target.base || target.status === "running")) {
-        throw new Error("reviewOf must name a finished implement task");
-      }
-      if (!review && params.reviewOf) throw new Error("reviewOf is only for kind review");
       const model = review ? c.reviewerModel : c.workerModel;
       // Record the task before any await so parallel calls can't exceed the slot limit.
       const task: TaskRecord = {
@@ -357,47 +403,51 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
         cost: 0, toolCalls: 0, activity: "starting", lastEventAt: Date.now(),
       };
       state.tasks.push(task);
-      let prompt: string;
+      let prepared: Prepared;
       try {
         // Outside every worktree, beside the ledger, so the transcript survives /crew-clean.
         task.session = sessionPath(c.commonDir, c.slug, task.id);
         mkdirSync(dirname(task.session), { recursive: true, mode: 0o700 });
-        if (review) {
-          task.worktree = target!.worktree;
-          task.base = target!.base;
-          task.branch = target!.branch;
-          const facts = await branchFacts(task.worktree!, task.base!);
-          prompt = reviewerPrompt(c, task, target!, facts.diffStat, await diffText(task.worktree!, task.base!, REVIEW_DIFF_BYTES));
-        } else {
-          task.branch = `${c.integrationBranch}-t${task.id}`;
-          task.worktree = worktreePath(c.repoName, task.branch);
-          task.base = (await gitOk(c.integrationPath, ["rev-parse", "HEAD"])).trim();
-          await addWorktree(c.repoRoot, task.worktree, task.branch, task.base);
-          prompt = workerPrompt(c, task);
-        }
+        prepared = target ? await prepareReview(c, task, target) : await prepareWorktree(c, task);
       } catch (error) {
-        task.status = "failed";
-        task.endedAt = Date.now();
+        endTask(task, "failed");
         persist();
         throw error;
       }
       // /crew-stop (and maybe a resume) while the worktree was set up: no controller existed to abort.
       if (crew !== state || !isActive()) {
-        task.status = "cancelled";
-        task.endedAt = Date.now();
+        endTask(task, "cancelled");
         saveState(state);
         throw new Error(`Crew was stopped while #${task.id} was being set up; it was not started (worktree ${task.worktree} kept).`);
       }
       persist();
       render();
+      const { prompt, worktree } = prepared;
       launch(task, {
-        provider: model.provider, model: model.model, cwd: task.worktree!, prompt,
+        provider: model.provider, model: model.model, cwd: worktree, prompt,
         tools: review ? READ_TOOLS : WRITE_TOOLS, extensions: [...CHILD_EXTENSIONS, GUARD],
-        env: { ...GIT_ENV, PI_CREW_ROOT: task.worktree! }, session: task.session,
+        env: { ...GIT_ENV, PI_CREW_ROOT: worktree }, session: task.session,
       }, (params.timeoutMinutes ?? c.taskTimeoutMin) * 60_000);
       return text(`Dispatched #${task.id} (${task.kind}) "${task.title}" to ${task.model}${review ? ` reviewing #${task.reviewOf}` : ` on ${task.branch}`}. Its handoff will arrive as a message. Don't poll: dispatch other independent work or end your turn.`);
     })()),
   });
+
+  /**
+   * Re-run the task's checks after its merge. Informational, not a gate (Cursor: per-merge
+   * perfection serializes everything); it catches clean merges that still break each other.
+   */
+  async function postMergeChecks(c: CrewConfig, task: TaskRecord, signal: AbortSignal): Promise<string> {
+    const checks = await runChecks(c.integrationPath, task.checks, CHECK_TIMEOUT_MS, signal);
+    // Leftovers would make the next merge fail as a false conflict.
+    const dirty = await discardChanges(c.integrationPath);
+    const failed = failedChecks(checks, 15);
+    const summary = signal.aborted ? "Post-merge checks were cancelled (merge kept)."
+      : !checks.length ? "No task checks to re-run."
+      : failed.length ? `Post-merge checks FAILED on the integration branch (merge kept):\n${failed.join("\n")}\nDispatch a fix task.`
+      : `Post-merge checks passed on the integration branch: ${task.checks.join("; ")}`;
+    const note = dirty.length ? `\nThe checks modified files in the integration worktree; the harness reverted them: ${dirty.join(", ")}. If a check needs them (lockfile, generated code), dispatch a task to commit them.` : "";
+    return summary + note;
+  }
 
   pi.registerTool({
     name: "crew_integrate",
@@ -419,25 +469,15 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       if (!result.ok) {
         task.status = "conflict";
         persist();
-        return text(`Merge of #${task.id} (${task.branch}) into ${state.config.integrationBranch} CONFLICTED and was aborted.\nConflicting files:\n${result.conflicts.map((f) => `- ${f}`).join("\n") || "(none reported)"}\n${result.output.slice(-1500)}\n\nTo repair: dispatch an implement task whose worker runs \`git merge ${task.branch}\` in its fresh worktree (branched from the current integration branch), resolves the conflicts preserving both intents, runs the checks, and commits. Then integrate that task instead.`);
+        const conflicts = result.conflicts.map((f) => `- ${f}`).join("\n") || "(none reported)";
+        return text(`Merge of #${task.id} (${task.branch}) into ${state.config.integrationBranch} CONFLICTED and was aborted.\nConflicting files:\n${conflicts}\n${result.output.slice(-1500)}\n\nTo repair: dispatch an implement task whose worker runs \`git merge ${task.branch}\` in its fresh worktree (branched from the current integration branch), resolves the conflicts preserving both intents, runs the checks, and commits. Then integrate that task instead.`);
       }
       task.status = "integrated";
       persist();
       render();
       const head = (await gitOk(state.config.integrationPath, ["log", "--oneline", "-1"])).trim();
-      // Informational, not a gate (Cursor: per-merge perfection serializes everything).
-      // It catches clean merges that still break each other.
-      const signal = checkSignal(crewSignal, toolSignal);
-      const checks = await runChecks(state.config.integrationPath, task.checks, CHECK_TIMEOUT_MS, signal);
-      // Leftovers would make the next merge fail as a false conflict.
-      const dirty = await discardChanges(state.config.integrationPath);
-      const failed = failedChecks(checks, 15);
-      const summary = signal.aborted ? "Post-merge checks were cancelled (merge kept)."
-        : !checks.length ? "No task checks to re-run."
-        : failed.length ? `Post-merge checks FAILED on the integration branch (merge kept):\n${failed.join("\n")}\nDispatch a fix task.`
-        : `Post-merge checks passed on the integration branch: ${task.checks.join("; ")}`;
-      const note = dirty.length ? `\nThe checks modified files in the integration worktree; the harness reverted them: ${dirty.join(", ")}. If a check needs them (lockfile, generated code), dispatch a task to commit them.` : "";
-      return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${summary}${note}`);
+      const verdict = await postMergeChecks(state.config, task, checkSignal(crewSignal, toolSignal));
+      return text(`Integrated #${task.id} into ${state.config.integrationBranch} (now at ${head}). New workers branch from here.\n${verdict}`);
     })()),
   });
 
@@ -586,6 +626,51 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
         if (!task.session) return { state: "unavailable", message: "No transcript: this task started before workers recorded sessions." };
         return sessions.get(task.session, () => tui.requestRender());
       };
+      const cancelTask = (id: number, live: boolean) => {
+        const controller = live ? controllers.get(id) : undefined;
+        // Not quiet: the planner should hear that the human stopped a task.
+        controller?.abort();
+        state.flash = controller ? { text: `Cancelling #${id}; its handoff will wake the planner`, tone: "warning" }
+          : { text: `#${id} is no longer running`, tone: "dim" };
+      };
+      const copyWorktree = (task: TaskRecord | undefined, id: number) => {
+        if (!task?.worktree) {
+          state.flash = { text: `#${id} has no worktree`, tone: "warning" };
+          return;
+        }
+        const path = task.worktree;
+        state.flash = { text: path, tone: "accent" };
+        void copyPath(path).then((message) => {
+          if (state.flash?.text === path) state.flash = { text: message, tone: "accent" };
+          tui.requestRender();
+        });
+      };
+      const exportTask = (task: TaskRecord | undefined, id: number) => {
+        const session = task?.session;
+        if (!session || !existsSync(session)) {
+          state.flash = { text: `#${id} has no session file yet: the worker hasn't finished its first message`, tone: "warning" };
+          return;
+        }
+        if (exporting.has(session)) {
+          state.flash = { text: `#${id} is already being exported`, tone: "dim" };
+          return;
+        }
+        const output = session.replace(/\.jsonl$/, "") + ".html";
+        const tag = `Exporting #${id}\u2026`;
+        exporting.add(session);
+        state.flash = { text: tag, tone: "dim" };
+        // A running worker's export is a snapshot of the messages it has finished.
+        void exportSession(session, output)
+          .then(() => ({ text: `Exported #${id} to ${output}`, tone: "success" as const }))
+          .catch((error: unknown) => ({ text: `Export of #${id} failed: ${(error as Error).message}`, tone: "error" as const }))
+          .then((flash) => {
+            exporting.delete(session);
+            // A later key press cleared or replaced the flash: notify instead of clobbering it.
+            if (state.flash?.text === tag) state.flash = flash;
+            else ctx.ui.notify(flash.text, flash.tone === "error" ? "error" : "info");
+            tui.requestRender();
+          });
+      };
       return {
         render(width: number) {
           const height = Math.max(12, Math.floor(tui.terminal.rows * 0.85));
@@ -600,49 +685,10 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
           const live = shown === crew && isActive();
           const action = panelInput(state, shown.tasks, event, { page, live });
           if (action.type === "close") return done();
-          if (action.type === "cancel") {
-            const controller = live ? controllers.get(action.id) : undefined;
-            // Not quiet: the planner should hear that the human stopped a task.
-            controller?.abort();
-            state.flash = controller ? { text: `Cancelling #${action.id}; its handoff will wake the planner`, tone: "warning" }
-              : { text: `#${action.id} is no longer running`, tone: "dim" };
-          }
-          if (action.type === "open") {
-            const task = shown.tasks.find((t) => t.id === action.id);
-            if (!task?.worktree) state.flash = { text: `#${action.id} has no worktree`, tone: "warning" };
-            else {
-              const path = task.worktree;
-              state.flash = { text: path, tone: "accent" };
-              void copyPath(path).then((text) => {
-                if (state.flash?.text === path) state.flash = { text, tone: "accent" };
-                tui.requestRender();
-              });
-            }
-          }
-          if (action.type === "export") {
-            const session = shown.tasks.find((t) => t.id === action.id)?.session;
-            if (!session || !existsSync(session)) {
-              state.flash = { text: `#${action.id} has no session file yet: the worker hasn't finished its first message`, tone: "warning" };
-            } else if (exporting.has(session)) {
-              state.flash = { text: `#${action.id} is already being exported`, tone: "dim" };
-            } else {
-              const output = session.replace(/\.jsonl$/, "") + ".html";
-              const tag = `Exporting #${action.id}\u2026`;
-              exporting.add(session);
-              state.flash = { text: tag, tone: "dim" };
-              // A running worker's export is a snapshot of the messages it has finished.
-              void exportSession(session, output)
-                .then(() => ({ text: `Exported #${action.id} to ${output}`, tone: "success" as const }))
-                .catch((error: unknown) => ({ text: `Export of #${action.id} failed: ${(error as Error).message}`, tone: "error" as const }))
-                .then((flash) => {
-                  exporting.delete(session);
-                  // A later key press cleared or replaced the flash: notify instead of clobbering it.
-                  if (state.flash?.text === tag) state.flash = flash;
-                  else ctx.ui.notify(flash.text, flash.tone === "error" ? "error" : "info");
-                  tui.requestRender();
-                });
-            }
-          }
+          const task = "id" in action ? shown.tasks.find((t) => t.id === action.id) : undefined;
+          if (action.type === "cancel") cancelTask(action.id, live);
+          else if (action.type === "open") copyWorktree(task, action.id);
+          else if (action.type === "export") exportTask(task, action.id);
           tui.requestRender();
         },
         invalidate() {},
@@ -747,7 +793,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const state = args.trim() ? crews.find((s) => s.config.slug === args.trim()) : crews[0];
       if (!state) throw new Error("No resumable crew in this repository");
       // Processes from a previous session are gone; keep their worktrees as evidence.
-      for (const t of runningTasks(state)) { t.status = "interrupted"; t.endedAt = Date.now(); }
+      for (const t of runningTasks(state)) endTask(t, "interrupted");
       state.status = "active";
       crew = state;
       persist();
@@ -781,7 +827,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   pi.on("session_start", (_event, ctx) => {
     ui = ctx;
     // Registered tools start active; crew tools exist only in planner mode.
-    if (!isActive()) pi.setActiveTools(pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));
+    if (!isActive()) pi.setActiveTools(withoutCrewTools());
   });
 
   pi.on("session_shutdown", async () => {
