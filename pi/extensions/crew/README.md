@@ -17,6 +17,7 @@ It is independent of the [`subagent`](../subagent/) extension, which stays read-
 /crew <goal>       # start: pick worker and reviewer models, concurrency, and budget
 /crew              # no goal: open the panel of the current or last unfinished crew
 /crew-status       # open the crew panel; prints the text ledger in print mode
+/crews             # pick any crew in this repo and open its panel; lists them in print mode
 /crew-stop         # cancel running workers (worktrees kept) and leave planner mode
 /crew-resume [slug]  # resume a stopped or interrupted crew in this repo
 /crew-clean        # delete the worktrees and branches of finished tasks
@@ -26,6 +27,9 @@ It is independent of the [`subagent`](../subagent/) extension, which stays read-
 `~/git/worktrees/<repo>/crew-<slug>`. When the planner finishes, you review that branch and
 merge it yourself. Nothing is ever pushed or merged into your branch.
 
+With vi-mode's leader key, in NORMAL mode, `SPC c` offers the same commands: `l` list (`/crews`),
+`s` status, `r` resume, `c` clean, and, while a crew runs in this session, `x` stop.
+
 Uncommitted changes in your checkout are not included. `/crew` warns you about them.
 
 Before merging, `/review-loop crew` (from [`pi/prompts`](../../prompts/review-loop.md)) can review
@@ -34,9 +38,9 @@ repeat. Its fixes are left uncommitted in the integration worktree.
 
 ## Panel
 
-`ctrl+shift+c` or `/crew-status` opens a panel over the session, on the crew in this session or
+`SPC c s` or `/crew-status` opens a panel over the session, on the crew in this session or
 else the newest one in this repository's ledger. `/crew` with no goal does the same for an
-unfinished crew.
+unfinished crew. `/crews` (`SPC c l`) opens any crew you pick. `q` closes the panel.
 
 ```text
  Crew add-theme-2zw1 active · Add a lazygit-like theme to every panel
@@ -85,16 +89,13 @@ The keys are the shared panel's ([`run-panel`](../run-panel/)), the same in `/su
 | `e` | Export the selected worker's session to HTML, beside the session file, as `/export` does |
 | `?` | Help, generated from the tabs and actions above |
 | `esc` | Clear the filter, leave the details, leave zoom, then close |
-| `q`, `ctrl+shift+c` | Close |
+| `q` | Close |
 
 The panel is read-only apart from `x` and `e`: integrating and dispatching stay with the planner. While
 the crew runs in this session, the panel reads its in-memory state, which is fresher than the
 ledger for running tasks. A crew from the ledger is re-read every 2 seconds. Diffs are loaded
 only for the task and tab on screen, and cached per branch tip. The panel never waits on the
 planner, so handoffs keep waking it while the panel is open.
-
-`ctrl+shift+c` needs a terminal that reports modifier keys (kitty keyboard protocol, as in
-Ghostty). On Linux, many terminals bind it to copy; use `/crew` there.
 
 ## How it works
 
