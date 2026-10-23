@@ -11,3 +11,50 @@ Not committed to yet; promote to TODO.md once one is worth doing.
 - **Show that crew work is in progress.** Starting a big crew and running
   `/crew-clean` give no notification while they work (worktree setup, branch
   and worktree removal), so it looks like nothing is happening.
+- **Multicrew support.** Today it's one crew per session; parallel crews need
+  separate sessions, and bare `/crew-resume`, `/crew-clean`, and the panel fall
+  back to the newest ledger crew, which can be one still active elsewhere
+  (resume would mark its running tasks interrupted). At minimum, skip `active`
+  crews in those fallbacks; ideally, run and switch between crews in one session.
+- **Suspend the crew when it goes over budget, and say by how much.** Today the
+  budget only refuses new dispatches: running workers finish, the planner is
+  told once, and the crew stays active, often ending above the budget. Suspend
+  it instead, and report the overspend (e.g. "$11.40 of $10.00, $1.40 over").
+- **Raise the budget and resume a crew that stopped on budget.** Today that means
+  `/crew-stop`, hand-editing `config.budgetUsd` and `budgetReported` in the
+  ledger, then `/crew-resume`. Add a command such as `/crew-budget <usd>`, or a
+  budget prompt in `/crew-resume`, that resumes where the crew left off.
+- **Make crews durable.** The ledger and transcripts survive restarts, but
+  workers are child processes of the session: closing Pi kills them and marks
+  them `interrupted`, and their in-flight work is lost. Crews should keep running,
+  or pick up cleanly, across Pi restarts and crashes.
+
+## Pi UI
+
+- **One panel for every source (`/runs`).** After
+  `.agent/plans/unified-agent-panel.md`, list crew tasks, subagent jobs,
+  watches, and loops together, each with its own tabs and actions. Also covers
+  the crew README's "crew workers in `/subagents`" follow-up. Pi loads each
+  extension with `moduleCache: false`, so a module-level registry won't be
+  shared; extensions would announce their sources over `pi.events` in answer to
+  a discover event (so load order doesn't matter), and one extension owns the
+  command. Only worth it once several kinds of work often run at once.
+- **Doom-style leader key, from [doompi](https://github.com/AgiFlow/doompi).**
+  `SPC` on an empty prompt (and `ctrl+space` anywhere) opens a which-key map of
+  commands: `SPC c l` lists crews, `SPC c s` crew status, `SPC a l` subagents,
+  `SPC w l` watches. Keys narrow the map step by step; backspace goes up a
+  level; esc or an unknown key cancels. Each extension contributes bindings to
+  one registry instead of claiming its own `ctrl+shift+*` chord. A binding is a
+  path of one-character segments with labels, plus a slash command or a named
+  action. doompi's editor (`packages/foundations/doompi-ui/src/tui/doomEditor.ts`)
+  and registry (`src/services/leaderRegistry/`) are the model to copy. Open
+  questions:
+  - **Where the leader lives.** vi-mode owns the editor through
+    `setEditorComponent`, and Pi allows only one, so the leader goes in vi-mode
+    or a shared editor.
+  - **Space in NORMAL mode.** Should `SPC` be the leader there too, and does
+    that clash with any vi binding?
+  - **How bindings get registered.** Contributions cross extensions, so they
+    go over `pi.events` like the `/runs` registry.
+  - **Listing crews.** `SPC c l` needs a picker over the repo's ledger; today
+    `/crew-status` opens a single crew.
