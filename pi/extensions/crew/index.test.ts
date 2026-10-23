@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { fakePi } from "../test-support/fake-pi.ts";
 
 // Worktrees go under $HOME/git/worktrees; keep them out of the real home.
@@ -93,14 +93,24 @@ async function started(opts: Parameters<typeof boot>[1] = {}) {
   return { ...e, slug, stateFile, integ, state: () => JSON.parse(readFileSync(stateFile, "utf8")) };
 }
 
+// A broken drain or abort hangs rather than fails; bound each test so the suite reports it.
+const BOUND = { timeout: 20_000 };
+
+/** A timed-out test's body never reaches its finally; clean up anyway, or the extension's timers keep the file running. */
+const onCancel = (t: TestContext, cleanup: () => Promise<unknown>) =>
+  t.signal.addEventListener("abort", () => void cleanup(), { once: true });
+
 /** Run a test body and always shut the extension down so no timers outlive it. */
 const crewTest = (name: string, body: (e: Awaited<ReturnType<typeof started>>) => Promise<void>, opts: Parameters<typeof boot>[1] = {}) =>
-  // A broken drain or abort hangs rather than fails; bound it so the suite reports it.
-  test(name, { timeout: 20_000 }, async () => {
+  test(name, BOUND, async (t) => {
     const e = await started(opts);
-    try { await body(e); } finally {
+    const cleanup = async () => {
       for (const worker of e.w.list) worker.finish(result("cancelled", ""));
       await e.shutdown();
+    };
+    onCancel(t, cleanup);
+    try { await body(e); } finally {
+      await cleanup();
     }
   });
 
@@ -123,19 +133,20 @@ crewTest("starting a crew shows the planner prompt, wakes the planner, and limit
   assert.deepEqual([...e.f.active()].sort(), [...READ, ...CREW].sort());
 });
 
-test("crew tools are hidden until a crew starts, and the tools come back after /crew-stop", async () => {
+test("crew tools are hidden until a crew starts, and the tools come back after /crew-stop", BOUND, async (t) => {
   const root = makeRepo();
   const e = boot(root);
+  onCancel(t, e.shutdown);
   try {
     await e.f.emit("session_start", {}, e.ctx);
-    for (const t of CREW) assert.ok(!e.f.active().includes(t), `${t} hidden outside crew mode`);
+    for (const tool of CREW) assert.ok(!e.f.active().includes(tool), `${tool} hidden outside crew mode`);
     assert.ok(e.f.active().includes("bash"));
     await e.f.command("crew", "goal two", e.ctx);
     assert.ok(e.f.active().includes("crew_dispatch"));
     assert.ok(!e.f.active().includes("bash"));
     await e.f.command("crew-stop", "", e.ctx);
     assert.ok(e.f.active().includes("bash") && e.f.active().includes("edit"));
-    for (const t of CREW) assert.ok(!e.f.active().includes(t));
+    for (const tool of CREW) assert.ok(!e.f.active().includes(tool));
   } finally {
     await e.shutdown();
   }
@@ -314,9 +325,13 @@ crewTest("a dispatch racing /crew-stop is refused rather than started for a stop
   assert.equal(e.state().tasks[0].status, "cancelled");
 });
 
-test("resuming after a crash marks dead tasks interrupted, re-sends the planner prompt, and integrates their commits", async () => {
+test("resuming after a crash marks dead tasks interrupted, re-sends the planner prompt, and integrates their commits", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root, { ignoreAbort: true });
+  onCancel(t, async () => {
+    for (const worker of a.w.list) worker.finish(result("cancelled", ""));
+    await a.shutdown();
+  });
   await a.f.emit("session_start", {}, a.ctx);
   await a.f.command("crew", "crashy", a.ctx);
   await a.dispatch();
@@ -324,6 +339,7 @@ test("resuming after a crash marks dead tasks interrupted, re-sends the planner 
   const down = a.shutdown(); // the old process goes away without ever reporting
 
   const b = boot(root);
+  onCancel(t, b.shutdown);
   try {
     await b.f.emit("session_start", {}, b.ctx);
     await b.f.command("crew-resume", "", b.ctx);
@@ -403,14 +419,34 @@ crewTest("a dispatch still setting up when the crew stops never launches its wor
 
 /** Capture the component ctx.ui.custom builds, with a plain-text theme and a fixed terminal. */
 function panelUi(ctx: any) {
-  const opened: { component: any; closed: boolean; renders: number }[] = [];
+  const opened: { component: any; closed: boolean; renders: number; close: () => void }[] = [];
   ctx.ui.custom = (factory: any) => new Promise<void>((resolve) => {
-    const panel = { component: undefined as any, closed: false, renders: 0 };
+    const panel = { component: undefined as any, closed: false, renders: 0, close: () => {} };
     const tui = { terminal: { rows: 40 }, requestRender: () => { panel.renders++; } };
     const theme = { fg: (_tone: string, text: string) => text, bold: (text: string) => text, bg: (_tone: string, text: string) => text };
-    panel.component = factory(tui, theme, {}, () => { panel.closed = true; panel.component.dispose?.(); resolve(); });
+    panel.close = () => {
+      if (panel.closed) return;
+      panel.closed = true;
+      panel.component.dispose?.();
+      resolve();
+    };
+    panel.component = factory(tui, theme, {}, panel.close);
     opened.push(panel);
   });
+  const closeAll = () => { for (const panel of opened) panel.close(); };
+  // Pi blocks the editor while a command handler runs, so a command must return with the panel
+  // still open. A handler that waits for the panel would hang the test; close it and fail instead.
+  const returnsOpen = async (command: Promise<unknown>) => {
+    // Generous: a returning command wins at once, and a loaded machine can take seconds to get there.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const returned = await Promise.race([command.then(() => true), new Promise((r) => { timer = setTimeout(() => r(false), 5000); })]);
+    clearTimeout(timer);
+    if (!returned) {
+      closeAll();
+      await command;
+    }
+    assert.equal(returned, true, "the command returned while the panel is still open");
+  };
   const screen = () => opened.at(-1)!.component.render(120).join("\n") as string;
   // Pi doesn't await shortcut handlers; neither does this.
   const shortcut = async (f: any, context: any) => {
@@ -418,7 +454,7 @@ function panelUi(ctx: any) {
     await waitFor(() => opened.length > 0, "the panel");
   };
   const type = (...keys: string[]) => { for (const k of keys) opened.at(-1)!.component.handleInput(k); };
-  return { opened, screen, type, shortcut };
+  return { opened, screen, type, shortcut, closeAll, returnsOpen };
 }
 
 crewTest("/crew with no goal opens the panel on live, in-memory task state without blocking", async (e) => {
@@ -428,11 +464,8 @@ crewTest("/crew with no goal opens the panel on live, in-memory task state witho
   await e.dispatch({ title: "paint the panel" });
   // Fresher than the ledger on disk: progress isn't persisted on every event.
   e.w.list[0].opts.onProgress({ toolCalls: 7, activity: "edit theme.ts", usage: { input: 0, output: 0, cost: 0.37 }, lastEventAt: Date.now() });
-  const command = e.f.command("crew", "", e.ctx);
   try {
-    // Pi blocks the editor while a command handler runs, so it must return with the panel open.
-    const returned = await Promise.race([command.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]);
-    assert.equal(returned, true, "the command returned while the panel is still open");
+    await ui.returnsOpen(e.f.command("crew", "", e.ctx));
     assert.equal(ui.opened.length, 1);
     assert.equal(edited, false, "no goal prompt for a running crew");
     const text = ui.screen();
@@ -440,70 +473,80 @@ crewTest("/crew with no goal opens the panel on live, in-memory task state witho
     assert.match(text, /#1 impl paint the panel .*\$0\.37 +edit theme\.ts/);
     assert.match(text, /1\/3 running · \$0\.37\/\$10\.00/);
     // One panel at a time.
-    await e.f.command("crew", "", e.ctx);
+    await ui.returnsOpen(e.f.command("crew", "", e.ctx));
     assert.equal(ui.opened.length, 1);
+    ui.type("q");
+    assert.ok(ui.opened[0].closed);
   } finally {
-    if (ui.opened.length) ui.type("q");
-    await command;
+    ui.closeAll();
   }
-  assert.ok(ui.opened[0].closed);
 });
 
 crewTest("cancelling from the panel asks first, then stops the worker and wakes the planner", async (e) => {
   const ui = panelUi(e.ctx);
   await e.dispatch();
   await ui.shortcut(e.f, e.ctx);
-  ui.type("x");
-  assert.match(ui.screen(), /Cancel #1 "do it"\?/);
-  ui.type("n");
-  assert.equal(e.w.list[0].opts.signal.aborted, false, "n keeps it running");
-  ui.type("x", "y");
-  assert.equal(e.w.list[0].opts.signal.aborted, true);
-  await waitFor(() => e.handoffs().length === 1, "handoff");
-  assert.equal(e.handoffs()[0].options?.triggerTurn, true, "the planner hears about a human cancel");
-  assert.match(ui.screen(), /Cancelling #1/);
+  try {
+    ui.type("x");
+    assert.match(ui.screen(), /Cancel #1 "do it"\?/);
+    ui.type("n");
+    assert.equal(e.w.list[0].opts.signal.aborted, false, "n keeps it running");
+    ui.type("x", "y");
+    assert.equal(e.w.list[0].opts.signal.aborted, true);
+    await waitFor(() => e.handoffs().length === 1, "handoff");
+    assert.equal(e.handoffs()[0].options?.triggerTurn, true, "the planner hears about a human cancel");
+    assert.match(ui.screen(), /Cancelling #1/);
+  } finally {
+    ui.closeAll();
+  }
 });
 
 crewTest("the live tab streams the worker's events; a crew from the ledger falls back to its session file", async (e) => {
   const ui = panelUi(e.ctx);
-  await e.dispatch({ title: "paint" });
-  const emit = e.w.list[0].opts.onEvent;
-  emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "pondering the theme" } });
-  emit({ type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: { command: "npm test" } });
-  await ui.shortcut(e.f, e.ctx);
-  ui.type("6");
-  let text = ui.screen();
-  assert.match(text, /streaming from the worker/);
-  assert.match(text, /∴ pondering the theme/);
-  assert.match(text, /▸ bash npm test/);
-  // Streamed, not polled: the next render shows a new event at once.
-  emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "all green" } });
-  assert.match(ui.screen(), /all green/);
-  ui.type("q");
-
-  // Another session sees the same crew through the ledger, so it reads the session file.
-  const session = e.state().tasks[0].session;
-  writeFileSync(session, `${JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: "from the file" }] } })}\n`);
-  const b = boot(e.root);
-  const other = panelUi(b.ctx);
   try {
-    await b.f.emit("session_start", {}, b.ctx);
-    await other.shortcut(b.f, b.ctx);
-    other.type("6");
-    await waitFor(() => /from the file/.test(other.screen()), "the session file");
-    assert.match(other.screen(), /from the session file/);
-    other.type("q");
+    await e.dispatch({ title: "paint" });
+    const emit = e.w.list[0].opts.onEvent;
+    emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "pondering the theme" } });
+    emit({ type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: { command: "npm test" } });
+    await ui.shortcut(e.f, e.ctx);
+    ui.type("6");
+    let text = ui.screen();
+    assert.match(text, /streaming from the worker/);
+    assert.match(text, /∴ pondering the theme/);
+    assert.match(text, /▸ bash npm test/);
+    // Streamed, not polled: the next render shows a new event at once.
+    emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "all green" } });
+    assert.match(ui.screen(), /all green/);
+    ui.type("q");
+
+    // Another session sees the same crew through the ledger, so it reads the session file.
+    const session = e.state().tasks[0].session;
+    writeFileSync(session, `${JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: "from the file" }] } })}\n`);
+    const b = boot(e.root);
+    const other = panelUi(b.ctx);
+    try {
+      await b.f.emit("session_start", {}, b.ctx);
+      await other.shortcut(b.f, b.ctx);
+      other.type("6");
+      await waitFor(() => /from the file/.test(other.screen()), "the session file");
+      assert.match(other.screen(), /from the session file/);
+      other.type("q");
+    } finally {
+      other.closeAll();
+      await b.shutdown();
+    }
   } finally {
-    await b.shutdown();
+    ui.closeAll();
   }
 });
 
-test("e exports the selected task's session next to it, and reports a missing file or a failure", async () => {
+test("e exports the selected task's session next to it, and reports a missing file or a failure", BOUND, async (t) => {
   const calls: [string, string][] = [];
   let fail = false;
   const e = await started({ exportSession: async (session, output) => { calls.push([session, output]); if (fail) throw new Error("pi exploded"); } });
+  onCancel(t, e.shutdown);
+  const ui = panelUi(e.ctx);
   try {
-    const ui = panelUi(e.ctx);
     await e.dispatch();
     await ui.shortcut(e.f, e.ctx);
     ui.type("e");
@@ -522,13 +565,15 @@ test("e exports the selected task's session next to it, and reports a missing fi
     await waitFor(() => /Export of #1 failed: pi exploded/.test(ui.screen()), "the failure");
     ui.type("q");
   } finally {
+    ui.closeAll();
     await e.shutdown();
   }
 });
 
-test("the shortcut opens a stopped crew from the ledger in a new session, read-only", async () => {
+test("the shortcut opens a stopped crew from the ledger in a new session, read-only", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root);
+  onCancel(t, a.shutdown);
   await a.f.emit("session_start", {}, a.ctx);
   await a.f.command("crew", "ledger goal", a.ctx);
   await a.dispatch({ title: "left behind" });
@@ -537,9 +582,13 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
   await a.shutdown();
 
   const b = boot(root);
+  const ui = panelUi(b.ctx);
+  onCancel(t, async () => {
+    ui.closeAll();
+    await b.shutdown();
+  });
   try {
     await b.f.emit("session_start", {}, b.ctx);
-    const ui = panelUi(b.ctx);
     await ui.shortcut(b.f, b.ctx);
     const text = ui.screen();
     assert.match(text, /stopped · ledger goal/);
@@ -552,7 +601,7 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
     // /crew with no goal opens it too, while it's unfinished.
     let asked = false;
     b.ctx.ui.editor = async () => { asked = true; return undefined; };
-    await b.f.command("crew", "", b.ctx);
+    await ui.returnsOpen(b.f.command("crew", "", b.ctx));
     assert.equal(ui.opened.length, 2);
     assert.equal(asked, false);
     ui.type("q");
@@ -565,12 +614,14 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
     assert.ok(asked);
     assert.equal(ui.opened.length, 2);
   } finally {
+    ui.closeAll();
     await b.shutdown();
   }
 });
 
-test("the shortcut says so when the repository has no crews", async () => {
+test("the shortcut says so when the repository has no crews", BOUND, async (t) => {
   const e = boot(makeRepo());
+  onCancel(t, e.shutdown);
   try {
     const ui = panelUi(e.ctx);
     await e.f.shortcuts.get("ctrl+shift+c").handler(e.ctx);
@@ -584,10 +635,14 @@ test("the shortcut says so when the repository has no crews", async () => {
 crewTest("/crew-status opens the panel, and prints the text ledger without a UI", async (e) => {
   const ui = panelUi(e.ctx);
   await e.dispatch({ title: "status me" });
-  await e.f.command("crew-status", "", e.ctx);
-  assert.equal(ui.opened.length, 1);
-  assert.match(ui.screen(), /#1 impl status me/);
-  ui.type("q");
+  try {
+    await ui.returnsOpen(e.f.command("crew-status", "", e.ctx));
+    assert.equal(ui.opened.length, 1);
+    assert.match(ui.screen(), /#1 impl status me/);
+    ui.type("q");
+  } finally {
+    ui.closeAll();
+  }
   const logged: string[] = [];
   const log = console.log;
   console.log = (text: string) => { logged.push(text); };

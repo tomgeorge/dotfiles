@@ -106,14 +106,34 @@ export function runWorker(
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Kill the process group so bash/test grandchildren die with the worker.
-    const signalGroup = (sig: NodeJS.Signals) => {
-      try { process.kill(-child.pid!, sig); } catch { try { child.kill(sig); } catch { /* gone */ } }
+    // The child leads its group (detached), but it can leave it (setsid/setpgid), so when the
+    // group looks gone and the child hasn't exited, signal the child directly.
+    // Takes the ending to annotate so it needn't re-check the shared `ending` variable.
+    const signalGroup = (sig: NodeJS.Signals, end: { error: string }) => {
+      if (child.pid === undefined) return; // never spawned; its error event ends the run
+      // A worker we can't stop must not crash Pi; say so in its result instead.
+      const report = (error: unknown) => { end.error += `; could not send ${sig} to the worker: ${(error as Error).message}`; };
+      // Gone: ESRCH, or EPERM, which macOS returns when the group's remaining members are exiting or zombies.
+      const gone = (error: unknown) => {
+        const code = (error as NodeJS.ErrnoException).code;
+        return code === "ESRCH" || code === "EPERM";
+      };
+      try {
+        process.kill(-child.pid, sig);
+      } catch (error) {
+        if (!gone(error)) return report(error);
+        if (child.exitCode !== null || child.signalCode !== null) return;
+        // child.kill reports EPERM and the like as an 'error' event, not a throw; the error handler
+        // drops it because `ending` is already set: the worker is being stopped either way.
+        try { child.kill(sig); } catch (childError) { if (!gone(childError)) report(childError); }
+      }
     };
     const stop = (status: WorkerResult["status"], error: string) => {
       if (ending) return;
-      ending = { status, error };
-      signalGroup("SIGTERM");
-      killTimer = setTimeout(() => signalGroup("SIGKILL"), 2000);
+      const end = { status, error };
+      ending = end;
+      signalGroup("SIGTERM", end);
+      killTimer = setTimeout(() => signalGroup("SIGKILL", end), 2000);
     };
     const abort = () => stop("cancelled", "cancelled");
     const timer = setTimeout(() => stop("timeout", `timed out after ${Math.round(options.timeoutMs / 60000)} min`), options.timeoutMs);
@@ -173,6 +193,7 @@ export function runWorker(
     });
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-8192); });
+    // An error after `ending` is set (e.g. a failed kill while stopping) is dropped: the result already says why it ended.
     child.on("error", (error) => { ending ??= { status: "error", error: error.message }; });
     child.on("close", (code, sig) => {
       if (buffer.trim()) handle(buffer);

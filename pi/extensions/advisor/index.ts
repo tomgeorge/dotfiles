@@ -4,7 +4,8 @@ import { type Message, uuidv7 } from "@earendil-works/pi-ai";
 import { convertToLlm, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
-  ADVISOR_SYSTEM_PROMPT, readConfig, serializeTranscript, trimTranscript, writeConfig, type AdvisorConfig,
+  ADVISOR_SYSTEM_PROMPT, advisorPrompt, modelRef, parseModelRef, readConfig, serializeTranscript, textOf, trimTranscript,
+  writeConfig, type AdvisorConfig,
 } from "./advisor.ts";
 
 const CONFIG = join(homedir(), ".pi", "agent", "advisor.json");
@@ -19,7 +20,7 @@ export default function (pi: ExtensionAPI) {
       config = readConfig(CONFIG);
     } catch (error) {
       config = undefined;
-      ctx?.ui.notify(`advisor: ${(error as Error).message}`, "error");
+      ctx?.ui.notify(`advisor: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
     // Declare the tool only when there's an advisor to call.
     const active = pi.getActiveTools().filter((t) => t !== TOOL);
@@ -39,27 +40,29 @@ export default function (pi: ExtensionAPI) {
       question: Type.String({ minLength: 1, description: "What you want advice on. Broad questions (\"what should I do next?\") work well." }),
     }),
     async execute(_id, params, signal, _onUpdate, ctx) {
-      if (!config) throw new Error("No advisor configured. Ask the user to pick one with /advisor.");
-      const model = ctx.modelRegistry.getAvailable().find((m) => m.provider === config!.provider && m.id === config!.model);
-      if (!model) throw new Error(`Advisor model ${config.provider}/${config.model} is unavailable. Ask the user to run /advisor.`);
+      // Pin the config for this call so the reply is labelled with the model that gave it.
+      const advisor = config;
+      if (!advisor) throw new Error("No advisor configured. Ask the user to pick one with /advisor.");
+      const model = ctx.modelRegistry.getAvailable().find((m) => m.provider === advisor.provider && m.id === advisor.model);
+      if (!model) throw new Error(`Advisor model ${modelRef(advisor)} is unavailable. Ask the user to run /advisor.`);
       // Exactly the messages Pi sends the agent's model: compaction, context edits,
       // branch summaries, and custom messages applied the same way.
       const messages = ctx.sessionManager.buildSessionProjection().messages;
       const transcript = trimTranscript(serializeTranscript(convertToLlm(messages)), MAX_TRANSCRIPT_CHARS);
       const message: Message = {
         role: "user",
-        content: [{ type: "text", text: `## Conversation so far\n\n${transcript}\n\n## The agent's question\n\n${params.question}` }],
+        content: [{ type: "text", text: advisorPrompt(transcript, params.question) }],
         timestamp: Date.now(),
       };
       const response = await ctx.modelRegistry.complete(model, { systemPrompt: ADVISOR_SYSTEM_PROMPT, messages: [message] },
         { signal, cacheRetention: "none", sessionId: uuidv7() });
       if (response.stopReason === "aborted") throw new Error("Advisor call cancelled");
       if (response.stopReason === "error") throw new Error(`Advisor failed: ${response.errorMessage ?? "unknown error"}`);
-      const text = response.content.filter((c): c is { type: "text"; text: string } => c.type === "text").map((c) => c.text).join("\n").trim();
+      const text = textOf(response.content).trim();
       if (!text) throw new Error("Advisor returned no text");
       return {
-        content: [{ type: "text" as const, text: `Advisor (${config.provider}/${config.model}):\n\n${text}` }],
-        details: { provider: config.provider, model: config.model, cost: response.usage?.cost?.total },
+        content: [{ type: "text" as const, text: `Advisor (${modelRef(advisor)}):\n\n${text}` }],
+        details: { provider: advisor.provider, model: advisor.model, cost: response.usage?.cost?.total },
       };
     },
   });
@@ -70,19 +73,18 @@ export default function (pi: ExtensionAPI) {
       const available = ctx.modelRegistry.getAvailable().map((m) => `${m.provider}/${m.id}`);
       let choice = args.trim();
       if (!choice) {
-        if (!ctx.hasUI) return console.log(config ? `${config.provider}/${config.model}` : "off");
-        choice = (await ctx.ui.select(`Advisor model (now: ${config ? `${config.provider}/${config.model}` : "off"})`, ["off", ...available])) ?? "";
+        if (!ctx.hasUI) return console.log(modelRef(config));
+        choice = (await ctx.ui.select(`Advisor model (now: ${modelRef(config)})`, ["off", ...available])) ?? "";
         if (!choice) return;
       }
       if (choice === "off") {
         writeConfig(CONFIG, undefined);
       } else {
         if (!available.includes(choice)) return ctx.ui.notify(`Unavailable model: ${choice}`, "error");
-        const cut = choice.indexOf("/");
-        writeConfig(CONFIG, { provider: choice.slice(0, cut), model: choice.slice(cut + 1) });
+        writeConfig(CONFIG, parseModelRef(choice));
       }
       load(ctx);
-      ctx.ui.notify(config ? `Advisor set to ${config.provider}/${config.model}` : "Advisor off", "info");
+      ctx.ui.notify(config ? `Advisor set to ${modelRef(config)}` : "Advisor off", "info");
     },
   });
 

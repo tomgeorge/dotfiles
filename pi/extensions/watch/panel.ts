@@ -1,3 +1,4 @@
+import { count, exitText, outputText } from "./report.ts";
 import { formatDuration, tail, type EndReason, type RunResult, type Watch } from "./watcher.ts";
 
 // Session record of every watch, plus rendering for the below-editor widget and
@@ -18,7 +19,7 @@ export interface Style {
   wrap(text: string, width: number): string[];
 }
 
-export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 export const WIDGET_ROWS = 5;
 export const LOG_LIMIT = 200;
 /** Ended watches kept for the popup; the oldest go first. */
@@ -37,21 +38,21 @@ export interface LogEntry {
   signature?: string;
 }
 
+export interface Ended { at: number; reason: EndReason; detail?: string }
+
 export interface WatchRecord {
   /** Unique for the session; watch ids are reused once a watch ends. */
   key: number;
   /** Live object: the Registry mutates it until the watch ends. */
   watch: Watch;
-  ended?: { at: number; reason: EndReason; detail?: string };
+  ended?: Ended;
   log: LogEntry[];
   /** The last check result already logged. */
   logged?: RunResult;
 }
 
-export const exitText = (result: RunResult) => result.killed ? "killed" : `exit ${result.code}`;
-
 /** Expand tabs to 8-column stops: the width helpers count a tab as one column. */
-export function expandTabs(text: string): string {
+function expandTabs(text: string): string {
   return text.split("\n").map((line) => {
     let out = "";
     for (const part of line.split("\t").entries()) {
@@ -125,8 +126,7 @@ export class WatchStore {
     if (!record || record.ended) return;
     this.sync(watch, now);
     record.ended = { at: now, reason, detail };
-    const tone: Tone = reason === "met" ? "success" : reason === "error" ? "error" : reason === "timeout" ? "warning" : "muted";
-    this.push(record, { at: now, text: endText(record)!, tone, repeat: 1 });
+    this.push(record, { at: now, text: endText(watch, record.ended), tone: END_MARK[reason].tone, repeat: 1 });
     const ended = this.records.filter((r) => r.ended);
     for (const old of ended.slice(0, Math.max(0, ended.length - ENDED_LIMIT))) {
       this.records.splice(this.records.indexOf(old), 1);
@@ -157,7 +157,7 @@ export class WatchStore {
 
 // ── Formatting ───────────────────────────────────────────────────────────
 
-export function duration(ms: number): string {
+function duration(ms: number): string {
   const secs = Math.max(0, Math.floor(ms / 1000));
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
@@ -172,9 +172,7 @@ export function clock(ms: number): string {
 
 const kindLabel = (watch: Watch) => watch.kind === "prompt" ? "loop" : "watch";
 
-function endText(record: WatchRecord): string | undefined {
-  const { ended, watch } = record;
-  if (!ended) return undefined;
+function endText(watch: Watch, ended: Ended): string {
   switch (ended.reason) {
     case "met": return "condition met";
     case "stopped": return "stopped";
@@ -184,28 +182,29 @@ function endText(record: WatchRecord): string | undefined {
 }
 
 /** What the watch is doing now, or how it ended. */
-export function status(record: WatchRecord, now: number): string {
+function status(record: WatchRecord, now: number): string {
   const { watch } = record;
-  if (record.ended) return endText(record)!;
+  if (record.ended) return endText(watch, record.ended);
   if (watch.state === "running") return "checking…";
   if (watch.state === "due") return "due when idle";
   return watch.nextAt ? `next in ${duration(watch.nextAt - now)}` : "waiting";
 }
 
 /** `3 checks` / `2 runs`. */
-function counter(watch: Watch) {
-  const [n, noun] = watch.kind === "prompt" ? [watch.fires, "run"] : [watch.checks, "check"];
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
-}
+const counter = (watch: Watch) => watch.kind === "prompt" ? count(watch.fires, "run") : count(watch.checks, "check");
+
+/** How an ended watch shows in the list and its log. */
+const END_MARK: Record<EndReason, { tone: Tone; icon: string }> = {
+  met: { tone: "success", icon: "✓" },
+  error: { tone: "error", icon: "✗" },
+  timeout: { tone: "warning", icon: "⊘" },
+  stopped: { tone: "muted", icon: "⊘" },
+};
 
 function icon(record: WatchRecord, frame: number, s: Style) {
   if (record.ended) {
-    switch (record.ended.reason) {
-      case "met": return s.fg("success", "✓");
-      case "error": return s.fg("error", "✗");
-      case "timeout": return s.fg("warning", "⊘");
-      case "stopped": return s.fg("muted", "⊘");
-    }
+    const mark = END_MARK[record.ended.reason];
+    return s.fg(mark.tone, mark.icon);
   }
   switch (record.watch.state) {
     case "running": return s.fg("accent", SPINNER[frame % SPINNER.length]);
@@ -232,7 +231,7 @@ function summary(records: WatchRecord[]) {
   const active = records.filter((r) => !r.ended);
   const loops = active.filter((r) => r.watch.kind === "prompt").length;
   const watches = active.length - loops;
-  return [watches && `${watches} watching`, loops && `${loops} loop${loops === 1 ? "" : "s"}`].filter(Boolean).join(" · ") || "none active";
+  return [watches && `${watches} watching`, loops && count(loops, "loop")].filter(Boolean).join(" · ") || "none active";
 }
 
 // ── Widget ───────────────────────────────────────────────────────────────
@@ -347,7 +346,7 @@ const home = process.env.HOME ?? "";
 const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
 
 /** Body lines (event log or last output) for the detail pane. */
-export function bodyLines(record: WatchRecord, view: BodyView, width: number, s: Style): string[] {
+function bodyLines(record: WatchRecord, view: BodyView, width: number, s: Style): string[] {
   const { watch } = record;
   if (view === "activity") {
     return record.log.map((entry) => {
@@ -358,7 +357,7 @@ export function bodyLines(record: WatchRecord, view: BodyView, width: number, s:
   const error = record.ended?.reason === "error" && record.ended.detail ? [...s.wrap(s.fg("error", record.ended.detail), width), ""] : [];
   if (watch.kind === "prompt") return [...error, ...s.wrap(expandTabs(watch.text), width)];
   if (!watch.last) return [...error, s.fg("dim", "No check has finished yet")];
-  const out = [watch.last.stdout.trimEnd(), watch.last.stderr.trimEnd()].filter(Boolean).join("\n");
+  const out = outputText(watch.last);
   const head = s.fg("muted", `Last check ${exitText(watch.last)}`);
   return [...error, head, "", ...(out ? s.wrap(expandTabs(tail(out, 500, 50_000)), width) : [s.fg("dim", "(no output)")])];
 }

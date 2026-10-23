@@ -3,6 +3,13 @@ import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { buildSpec, parseArgs, parseDuration, Registry, tail, type EndReason, type RunResult, type Watch, type WatchSpec } from "./watcher.ts";
 
+/** Poll rather than sleep a fixed time, so a loaded machine only makes it slower. */
+async function until(done: () => boolean, ms = 5_000) {
+  for (const end = Date.now() + ms; !done(); await sleep(5)) {
+    if (Date.now() > end) throw new Error("timed out waiting");
+  }
+}
+
 const result = (code: number, stdout = ""): RunResult => ({ code, stdout, stderr: "", killed: false });
 
 function harness(results: RunResult[] | (() => Promise<RunResult>)) {
@@ -13,6 +20,7 @@ function harness(results: RunResult[] | (() => Promise<RunResult>)) {
     async () => typeof results === "function" ? results() : results[Math.min(calls++, results.length - 1)],
     {
       onFire: (w, r) => fired.push({ id: w.id, result: r }),
+      onDue: (w) => fired.push({ id: w.id }),
       onEnd: (w, reason, detail) => ended.push({ id: w.id, reason, detail }),
       onUpdate: () => {},
     },
@@ -28,7 +36,7 @@ const spec = (over: Partial<WatchSpec> = {}): WatchSpec => ({
 test("success: keeps checking until exit 0, then fires once and ends", async () => {
   const h = harness([result(8, "pending"), result(8, "pending"), result(0, "pass")]);
   h.registry.start(spec());
-  await sleep(60);
+  await until(() => h.ended.length > 0);
   assert.equal(h.calls(), 3);
   assert.deepEqual(h.fired.map((f) => f.result?.stdout), ["pass"]);
   assert.deepEqual(h.ended.map((e) => e.reason), ["met"]);
@@ -37,8 +45,9 @@ test("success: keeps checking until exit 0, then fires once and ends", async () 
 
 test("change: baseline is silent, each change fires, runs until timeout", async () => {
   const h = harness([result(0, "ok"), result(0, "ok"), result(1, "ALERT"), result(1, "ALERT"), result(0, "ok")]);
-  h.registry.start(spec({ until: "change", timeoutMs: 80 }));
-  await sleep(150);
+  // Long enough for all five results even when loaded; the last one repeats, so extra checks are silent.
+  h.registry.start(spec({ until: "change", timeoutMs: 500 }));
+  await until(() => h.ended.length > 0);
   assert.deepEqual(h.fired.map((f) => f.result?.stdout), ["ALERT", "ok"]);
   assert.deepEqual(h.ended.map((e) => e.reason), ["timeout"]);
 });
@@ -58,7 +67,7 @@ test("stop aborts a running check and suppresses its result", async () => {
   const ended: EndReason[] = [];
   const registry = new Registry(
     (_c, _cwd, s) => { signal = s; return sleep(30).then(() => result(0)); },
-    { onFire: (w) => fired.push(w), onEnd: (_w, r) => ended.push(r), onUpdate: () => {} },
+    { onFire: (w) => fired.push(w), onDue: (w) => fired.push(w), onEnd: (_w, r) => ended.push(r), onUpdate: () => {} },
   );
   const watch = registry.start(spec());
   assert.ok(registry.stop(watch.id));
@@ -139,6 +148,9 @@ test("buildSpec validates and applies defaults", () => {
   assert.equal(buildSpec({ prompt: "check slack" }, "/").intervalMs, 600_000);
   assert.throws(() => buildSpec({}, "/"), /exactly one/);
   assert.throws(() => buildSpec({ command: "a", prompt: "b" }, "/"), /exactly one/);
+  // Blank fields count as missing, so a blank command with a prompt is a loop.
+  const blank = buildSpec({ command: "   ", prompt: "x" }, "/");
+  assert.deepEqual([blank.kind, blank.text], ["prompt", "x"]);
   assert.throws(() => buildSpec({ command: "a", interval: "1s" }, "/"), /at least 5s/);
   assert.throws(() => buildSpec({ prompt: "a", interval: "30s" }, "/"), /at least 1m/);
   assert.throws(() => buildSpec({ prompt: "a", deliver: "steer" }, "/"), /only to command/);

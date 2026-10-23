@@ -56,6 +56,32 @@ test("pending states and invalid keys", () => {
   assert.equal(parse("dz"), null);
   assert.equal(parse("gz"), null);
   assert.equal(parse("diz"), null);
+  assert.equal(parse("dgz"), null);
+  assert.equal(parse("dr"), null);
+  assert.equal(parse('"a"'), null); // one register only
+  assert.equal(parse("gd"), null); // no operator after g
+});
+
+test("edge cases of the grammar", () => {
+  assert.deepEqual(parse('3"a2p'), { type: "simple", key: "p", count: 32, register: "a" });
+  assert.deepEqual(parse("2d0"), { type: "operator", op: "d", count: 2, register: null, target: { motion: { key: "0" } } });
+  assert.deepEqual(parse("d10w"), { type: "operator", op: "d", count: 10, register: null, target: { motion: { key: "w" } } });
+  assert.deepEqual(parse("2d3d"), { type: "operator", op: "d", count: 6, register: null, target: { line: true } });
+  assert.deepEqual(parse("dc"), null);
+  assert.deepEqual(parse("dgE"), { type: "operator", op: "d", count: null, register: null, target: { motion: { key: "gE" } } });
+  assert.deepEqual(parse("y2Fx"), { type: "operator", op: "y", count: 2, register: null, target: { motion: { key: "F", arg: "x" } } });
+  assert.deepEqual(parse("ya)"), { type: "operator", op: "y", count: null, register: null, target: { object: { key: ")", inner: false } } });
+  assert.deepEqual(parse("2r<C-r>"), { type: "simple", key: "r", count: 2, register: null, arg: "<C-r>" });
+});
+
+test("a finished command resets everything", () => {
+  const p = new Parser();
+  for (const k of ['"', "a", "3", "d", "2", "a", "w"]) p.feed(k);
+  assert.deepEqual(p.feed("x"), { done: true, command: { type: "simple", key: "x", count: null, register: null } });
+  p.feed("d");
+  p.feed("i");
+  p.reset();
+  assert.deepEqual(p.feed("w"), { done: true, command: { type: "motion", motion: { key: "w" }, count: null } });
 });
 
 test("pending shows what was typed and clears when done", () => {

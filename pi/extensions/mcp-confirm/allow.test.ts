@@ -17,6 +17,11 @@ test("exact names and trailing-* prefixes; nothing else", () => {
 test("the checked-in allowlist loads, and bad files are rejected", () => {
   assert.ok(loadAllowlist(fileURLToPath(new URL("./readonly.json", import.meta.url))).length > 0);
   const bad = join(mkdtempSync(join(tmpdir(), "mcpc-")), "r.json");
-  writeFileSync(bad, '{"tools": ["*"]}');
-  assert.throws(() => loadAllowlist(bad), /mcp__/);
+  for (const text of ['{"tools": ["*"]}', '{"tools": ["mcp__a", 1]}', '{"tools": "mcp__a"}', "{}", "[]", "null", '"mcp__a"']) {
+    writeFileSync(bad, text);
+    assert.throws(() => loadAllowlist(bad), /mcp__/, text);
+  }
+  writeFileSync(bad, "{");
+  assert.throws(() => loadAllowlist(bad), SyntaxError);
+  assert.throws(() => loadAllowlist(join(bad, "missing")), /ENOENT|ENOTDIR/);
 });

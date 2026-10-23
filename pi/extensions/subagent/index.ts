@@ -8,10 +8,10 @@ import { Type } from "typebox";
 import { JobStore, readGitInfo } from "./jobs.ts";
 import { glowRenderer } from "./markdown.ts";
 import {
-  doing, duration, initialPopup, money, popupKey, popupLines, summary, widgetLines,
+  initialPopup, popupKey, popupLines, progressLine, summary, widgetLines,
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
-import { pickModel, type PickerUI } from "./picker.ts";
+import { parseCommandArgs, pickModel, type PickerUI } from "./picker.ts";
 import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
@@ -187,17 +187,14 @@ export default function (pi: ExtensionAPI) {
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     const id = nextId++;
-    const started = Date.now();
     const record = store.add({
-      id, provider: job.provider, model: job.model, task: job.task, cwd: job.cwd, tools: job.tools, started,
+      id, provider: job.provider, model: job.model, task: job.task, cwd: job.cwd, tools: job.tools, started: Date.now(),
       progress: { toolCalls: 0, activity: "starting", phase: "starting", usage: { input: 0, output: 0, cost: 0 } },
     });
     readGitInfo(job.cwd).then((git) => store.setGit(id, git));
     // The tool row streams one line; the widget and popup read the store.
     const report = () => {
-      const { progress } = record;
-      const line = `Subagent #${id} ${job.model} · ${duration(Date.now() - started)} · ${progress.toolCalls} tool calls · ${money(progress.usage.cost)} · ${doing(record)}`;
-      onUpdate?.({ content: [{ type: "text", text: line }], details: undefined });
+      onUpdate?.({ content: [{ type: "text", text: progressLine(record, Date.now()) }], details: undefined });
     };
     const done = runSubagent(job, {
       signal: controller.signal,
@@ -284,30 +281,21 @@ export default function (pi: ExtensionAPI) {
       try {
         // Fail before the picker rather than after the user has typed a task.
         checkCapacity();
-        const available = ctx.modelRegistry.getAvailable();
-        const providers = new Set(available.map((m) => m.provider));
-        let modelName: string | undefined;
-        let task: string | undefined;
-        const [, first = "", rest = ""] = args.trim().match(/^(\S+)\s*([\s\S]*)$/) ?? [];
-        const slash = first.indexOf("/");
-        if (slash > 0 && available.some((m) => `${m.provider}/${m.id}` === first)) {
-          modelName = first;
-          task = rest;
-          if (!task.trim()) throw new Error("Usage: /subagent [provider/model] task");
-        } else if (slash > 0 && providers.has(first.slice(0, slash))) {
-          // Looks like a model for a known provider: a typo, not the start of a task.
-          throw new Error(`Unavailable model: ${first}. Use /subagent without a model to pick one.`);
-        } else {
+        const parsed = parseCommandArgs(args, ctx.modelRegistry.getAvailable());
+        /** Ask for a task (unless given) and a model. `undefined` if the user cancels either. */
+        const pickInteractively = async (given: string) => {
           if (!ctx.hasUI) throw new Error("Specify provider/model and task in non-interactive mode");
-          task = args.trim() || await ctx.ui.editor("Subagent task (read-only)");
-          if (!task?.trim()) return;
+          const task = given || await ctx.ui.editor("Subagent task (read-only)");
+          if (!task?.trim()) return undefined;
           const picked = await confirmModel(task, ctx, "command");
-          if (!picked) return;
-          modelName = `${picked.provider}/${picked.model}`;
-        }
-        const cut = modelName.indexOf("/");
+          return picked ? { picked, task } : undefined;
+        };
+        const chosen = parsed.type === "model" ? parsed : await pickInteractively(parsed.task);
+        if (!chosen) return;
+        const { picked, task } = chosen;
+        const modelName = `${picked.provider}/${picked.model}`;
         const job: Job = {
-          provider: modelName.slice(0, cut), model: modelName.slice(cut + 1),
+          provider: picked.provider, model: picked.model,
           task, cwd: ctx.cwd, tools: [...ALLOWED_TOOLS],
         };
         const pending = run(job, ctx);

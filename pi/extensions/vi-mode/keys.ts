@@ -11,6 +11,9 @@ export type Operator = "d" | "c" | "y";
 export type MotionSpec = { key: string; arg?: string };
 export type ObjectSpec = { key: string; inner: boolean };
 
+// What an operator acts on: a motion, a text object, or (dd, cc, yy) lines.
+export type Target = { motion: MotionSpec } | { object: ObjectSpec } | { line: true };
+
 export type Command =
   | { type: "motion"; motion: MotionSpec; count: number | null }
   | {
@@ -19,11 +22,11 @@ export type Command =
       // null when neither count was given; counts multiply (2d3w = 6).
       count: number | null;
       register: string | null;
-      target: { motion: MotionSpec } | { object: ObjectSpec } | { line: true };
+      target: Target;
     }
   | { type: "simple"; key: string; count: number | null; register: string | null; arg?: string };
 
-export type Feed = { done: true; command: Command | null } | { done: false };
+type Feed = { done: true; command: Command | null } | { done: false };
 
 const MOTIONS = new Set(["h", "l", "j", "k", "0", "^", "$", "w", "b", "e", "W", "B", "E", "G", ";", ",", "%", "{", "}"]);
 const G_MOTIONS = new Set(["g", "e", "E"]); // gg ge gE
@@ -32,24 +35,26 @@ const OPERATORS = new Set(["d", "c", "y"]);
 const SIMPLE = new Set(["x", "X", "D", "C", "s", "S", "Y", "p", "P", "J", "~", "u", "<C-r>", "i", "a", "I", "A", "o", "O"]);
 const OBJECTS = new Set(["w", "W", "(", ")", "b", "{", "}", "B", "[", "]", "<", ">", '"', "'", "`", "p"]);
 
+const isOperator = (key: string): key is Operator => OPERATORS.has(key);
+
+// Each stage carries what it has collected beyond the counts and register.
 type Stage =
-  | "start" // counts and a register may still come
-  | "register" // after "
-  | "g" // after g, before an operator
-  | "char" // f/F/t/T/r waiting for its character, before an operator
-  | "operator" // after d/c/y
-  | "op-g"
-  | "op-char"
-  | "op-object"; // after d i / d a
+  | { type: "start" } // counts and a register may still come
+  | { type: "register" } // after "
+  | { type: "g" } // after g, before an operator
+  | { type: "char"; key: string } // f/F/t/T/r waiting for its character, before an operator
+  | { type: "operator"; op: Operator } // after d/c/y
+  | { type: "op-g"; op: Operator }
+  | { type: "op-char"; op: Operator; key: string }
+  | { type: "op-object"; op: Operator; inner: boolean }; // after d i / d a
+
+const START: Stage = { type: "start" };
 
 export class Parser {
-  private stage: Stage = "start";
+  private stage: Stage = START;
   private count1 = "";
   private count2 = "";
   private register: string | null = null;
-  private op: Operator | null = null;
-  private charKey = "";
-  private inner = false;
   private typed = "";
 
   // What's been typed of the current command, for the mode line.
@@ -58,10 +63,9 @@ export class Parser {
   }
 
   reset(): void {
-    this.stage = "start";
+    this.stage = START;
     this.count1 = this.count2 = "";
-    this.register = this.op = null;
-    this.charKey = "";
+    this.register = null;
     this.typed = "";
   }
 
@@ -73,10 +77,11 @@ export class Parser {
   }
 
   private step(key: string): Feed {
-    switch (this.stage) {
+    const stage = this.stage;
+    switch (stage.type) {
       case "register":
         this.register = key;
-        this.stage = "start";
+        this.stage = START;
         return { done: false };
 
       case "start":
@@ -85,21 +90,19 @@ export class Parser {
           return { done: false };
         }
         if (key === '"' && this.register === null) {
-          this.stage = "register";
+          this.stage = { type: "register" };
           return { done: false };
         }
         if (key === "g") {
-          this.stage = "g";
+          this.stage = { type: "g" };
           return { done: false };
         }
         if (CHAR_MOTIONS.has(key) || key === "r") {
-          this.charKey = key;
-          this.stage = "char";
+          this.stage = { type: "char", key };
           return { done: false };
         }
-        if (OPERATORS.has(key)) {
-          this.op = key as Operator;
-          this.stage = "operator";
+        if (isOperator(key)) {
+          this.stage = { type: "operator", op: key };
           return { done: false };
         }
         if (MOTIONS.has(key)) return this.done({ type: "motion", motion: { key }, count: this.count(this.count1) });
@@ -111,41 +114,39 @@ export class Parser {
         return this.done(null);
 
       case "char":
-        if (this.charKey === "r") return this.simple("r", key);
-        return this.done({ type: "motion", motion: { key: this.charKey, arg: key }, count: this.count(this.count1) });
+        if (stage.key === "r") return this.simple("r", key);
+        return this.done({ type: "motion", motion: { key: stage.key, arg: key }, count: this.count(this.count1) });
 
       case "operator":
         if (/[1-9]/.test(key) || (key === "0" && this.count2 !== "")) {
           this.count2 += key;
           return { done: false };
         }
-        if (key === this.op) return this.operator({ line: true });
+        if (key === stage.op) return this.operator(stage.op, { line: true });
         if (key === "i" || key === "a") {
-          this.inner = key === "i";
-          this.stage = "op-object";
+          this.stage = { type: "op-object", op: stage.op, inner: key === "i" };
           return { done: false };
         }
         if (key === "g") {
-          this.stage = "op-g";
+          this.stage = { type: "op-g", op: stage.op };
           return { done: false };
         }
         if (CHAR_MOTIONS.has(key)) {
-          this.charKey = key;
-          this.stage = "op-char";
+          this.stage = { type: "op-char", op: stage.op, key };
           return { done: false };
         }
-        if (MOTIONS.has(key)) return this.operator({ motion: { key } });
+        if (MOTIONS.has(key)) return this.operator(stage.op, { motion: { key } });
         return this.done(null);
 
       case "op-g":
-        if (G_MOTIONS.has(key)) return this.operator({ motion: { key: "g" + key } });
+        if (G_MOTIONS.has(key)) return this.operator(stage.op, { motion: { key: "g" + key } });
         return this.done(null);
 
       case "op-char":
-        return this.operator({ motion: { key: this.charKey, arg: key } });
+        return this.operator(stage.op, { motion: { key: stage.key, arg: key } });
 
       case "op-object":
-        if (OBJECTS.has(key)) return this.operator({ object: { key, inner: this.inner } });
+        if (OBJECTS.has(key)) return this.operator(stage.op, { object: { key, inner: stage.inner } });
         return this.done(null);
     }
   }
@@ -162,10 +163,10 @@ export class Parser {
     return this.done({ type: "simple", key, count: this.count(this.count1), register: this.register, ...(arg === undefined ? {} : { arg }) });
   }
 
-  private operator(target: { motion: MotionSpec } | { object: ObjectSpec } | { line: true }): Feed {
+  private operator(op: Operator, target: Target): Feed {
     const a = this.count(this.count1);
     const b = this.count(this.count2);
     const count = a === null && b === null ? null : (a ?? 1) * (b ?? 1);
-    return this.done({ type: "operator", op: this.op!, count, register: this.register, target });
+    return this.done({ type: "operator", op, count, register: this.register, target });
   }
 }

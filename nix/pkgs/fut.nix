@@ -52,8 +52,8 @@ rustPlatform.buildRustPackage (finalAttrs: {
   src = fetchFromGitHub {
     owner = "tomgeorge";
     repo = "fut";
-    rev = "a48d05675e48e1f0f7dd1efedac7b6f8b1dfa241";
-    hash = "sha256-iQHoh+QoQ7iBykwRGp7A/qcesz/RI5lYRo3WUqAf6YM=";
+    rev = "055c67399a923722974c142360695af1fc4a3851";
+    hash = "sha256-onymKAsjc0MNOeYh8B+7iTkoOkyaP17iblqMn+Q5UZk=";
   };
 
   cargoHash = "sha256-ytWlP6Q4CAR+b/qXRzq8aQMMByz+pU3cT53ShnnoI+0=";

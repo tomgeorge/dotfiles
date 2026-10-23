@@ -3,7 +3,7 @@
 // with key strings.
 
 import { charClass, BLANK, firstNonBlank, lastCol, nextCol, snapCol, type Pos, type Range } from "./chars.ts";
-import { Parser, type Command, type MotionSpec, type Operator } from "./keys.ts";
+import { Parser, type Command, type MotionSpec, type Operator, type Target } from "./keys.ts";
 import * as m from "./motions.ts";
 import * as op from "./operators.ts";
 import { textObject } from "./textobjects.ts";
@@ -26,12 +26,22 @@ export function clampNormal(lines: string[], pos: Pos): Pos {
   return { line, col: Math.min(snapCol(text, pos.col), lastCol(text)) };
 }
 
+// INSERT may put the cursor past the last character; NORMAL may not.
+function editAction(e: op.Edit | null, insert = false): Action {
+  if (!e) return NONE;
+  return { type: "edit", lines: e.lines, cursor: insert ? e.cursor : clampNormal(e.lines, e.cursor), insert };
+}
+
 export class Engine {
   private parser = new Parser();
-  register: op.Register | null = null;
+  private reg: op.Register | null = null;
   private lastFind: m.Find | null = null;
   // Sticky column for j/k; Infinity after $.
   private want: number | null = null;
+
+  get register(): op.Register | null {
+    return this.reg;
+  }
 
   get pending(): string {
     return this.parser.pending;
@@ -125,7 +135,7 @@ export class Engine {
     opKey: Operator,
     register: string | null,
     count: number | null,
-    target: { motion: MotionSpec } | { object: { key: string; inner: boolean } } | { line: true },
+    target: Target,
     lines: string[],
     pos: Pos,
   ): Action {
@@ -149,21 +159,15 @@ export class Engine {
     if (empty) return opKey === "c" ? { type: "insert", cursor: range.start } : NONE;
 
     const result = op.operate(opKey, lines, range, pos);
-    if (register !== "_") this.register = result.register;
+    if (register !== "_") this.reg = result.register;
     if (opKey === "y") return { type: "move", cursor: clampNormal(lines, result.cursor) };
-    const cursor = result.insert ? result.cursor : clampNormal(result.lines, result.cursor);
-    return { type: "edit", lines: result.lines, cursor, insert: result.insert };
-  }
-
-  private edit(e: op.Edit | null, insert = false): Action {
-    if (!e) return NONE;
-    return { type: "edit", lines: e.lines, cursor: insert ? e.cursor : clampNormal(e.lines, e.cursor), insert };
+    return editAction(result, result.insert);
   }
 
   private simple(key: string, count: number | null, register: string | null, arg: string | undefined, lines: string[], pos: Pos): Action {
     const n = count ?? 1;
     const text = lines[pos.line];
-    const motion = (k: string) => ({ motion: { key: k } });
+    const motion = (k: string): Target => ({ motion: { key: k } });
     switch (key) {
       case "x": return this.operate("d", register, count, motion("l"), lines, pos);
       case "X": return this.operate("d", register, count, motion("h"), lines, pos);
@@ -178,10 +182,10 @@ export class Engine {
       }
       case "p":
       case "P":
-        return this.register ? this.edit(op.put(lines, pos, this.register, key === "p", n)) : NONE;
-      case "J": return this.edit(op.joinLines(lines, pos, n));
-      case "~": return this.edit(op.toggleCase(lines, pos, n));
-      case "r": return this.edit(op.replaceChars(lines, pos, arg!, n));
+        return this.reg ? editAction(op.put(lines, pos, this.reg, key === "p", n)) : NONE;
+      case "J": return editAction(op.joinLines(lines, pos, n));
+      case "~": return editAction(op.toggleCase(lines, pos, n));
+      case "r": return editAction(op.replaceChars(lines, pos, arg!, n));
       case "u": return { type: "undo", count: n };
       case "<C-r>": return { type: "redo", count: n };
       case "i": return { type: "insert", cursor: pos };
@@ -190,7 +194,7 @@ export class Engine {
       case "A": return { type: "insert", cursor: { line: pos.line, col: text.length } };
       case "o":
       case "O":
-        return this.edit(op.openLine(lines, pos, key === "o"), true);
+        return editAction(op.openLine(lines, pos, key === "o"), true);
     }
     return NONE;
   }
