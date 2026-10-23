@@ -165,6 +165,7 @@ export default function (pi: ExtensionAPI) {
     const done = runSubagent(job, {
       signal: controller.signal,
       onProgress: (p: Progress) => store.update(id, p),
+      onEvent: (event) => store.event(id, event),
     });
     active.set(id, { controller, done });
     syncWidget(ctx);

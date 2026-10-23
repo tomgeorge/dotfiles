@@ -144,6 +144,18 @@ test("reports child tool calls as progress", async () => {
   ]);
 });
 
+test("hands every event to onEvent; a throwing callback doesn't fail the job", async () => {
+  const types: unknown[] = [];
+  const result = await run(
+    emit({ type: "tool_execution_start", toolCallId: "1", toolName: "grep", args: { pattern: "foo" } }) +
+    emit({ type: "tool_execution_end", toolCallId: "1", toolName: "grep", result: { content: [] } }) +
+    emit(message("Final")),
+    { onEvent: (event: Record<string, unknown>) => { types.push(event.type); throw new Error("display bug"); } },
+  );
+  assert.equal(result.status, "ok");
+  assert.deepEqual(types, ["tool_execution_start", "tool_execution_end", "message_end"]);
+});
+
 test("reports phase and usage summed across turns", async () => {
   const seen: Progress[] = [];
   const usage = (input: number, output: number, total: number) =>

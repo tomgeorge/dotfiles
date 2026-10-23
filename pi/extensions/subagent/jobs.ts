@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { Transcript } from "../crew/transcript.ts";
 import type { Progress } from "./runner.ts";
 
 // Session-lifetime record of every job, for the widget and the /subagents popup.
@@ -32,6 +33,8 @@ export interface JobRecord {
   /** `null` once looked up and cwd isn't a git checkout; `undefined` while pending. */
   git?: GitInfo | null;
   log: LogEntry[];
+  /** The child's conversation as it streams: thinking, text, and tool calls with results. */
+  transcript: Transcript;
   result?: string;
   error?: string;
 }
@@ -42,8 +45,8 @@ export class JobStore {
   private readonly jobs = new Map<number, JobRecord>();
   private readonly listeners = new Set<() => void>();
 
-  add(job: Omit<JobRecord, "status" | "log" | "ended">): JobRecord {
-    const record: JobRecord = { ...job, status: "running", log: [] };
+  add(job: Omit<JobRecord, "status" | "log" | "ended" | "transcript">): JobRecord {
+    const record: JobRecord = { ...job, status: "running", log: [], transcript: new Transcript() };
     this.jobs.set(job.id, record);
     this.emit();
     return record;
@@ -59,6 +62,15 @@ export class JobStore {
     }
     job.progress = progress;
     this.emit();
+  }
+
+  /** One raw event from the child's JSON stream. */
+  event(id: number, event: Record<string, unknown>) {
+    const job = this.jobs.get(id);
+    if (!job) return;
+    const before = job.transcript.version;
+    job.transcript.applyEvent(event);
+    if (job.transcript.version !== before) this.emit();
   }
 
   setGit(id: number, git: GitInfo | null) {

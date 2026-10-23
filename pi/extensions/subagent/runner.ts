@@ -162,6 +162,8 @@ export async function runSubagent(
     signal?: AbortSignal;
     timeoutMs?: number;
     onProgress?: (progress: Progress) => void;
+    /** Every parsed event from the child, for the panel's Live transcript. */
+    onEvent?: (event: Record<string, unknown>) => void;
     // Injection point for tests; production uses pi from PATH.
     command?: string;
     prefixArgs?: string[];
@@ -199,12 +201,19 @@ export async function runSubagent(
     const processLine = (line: string) => {
       if (!line.trim() || failure) return;
       let outcome: ReturnType<ChildEvents["apply"]>;
+      let event: Record<string, unknown>;
       try {
         // Inside the guard: a hostile event (e.g. tool args with `toString: null`) can throw while
         // being applied, and a throw in this stream handler would crash the parent.
-        outcome = events.apply(fields(JSON.parse(line)));
+        event = fields(JSON.parse(line));
+        outcome = events.apply(event);
       } catch {
         return stop(INVALID_EVENT);
+      }
+      try {
+        options.onEvent?.(event);
+      } catch {
+        // A display bug must not kill the child or lose its result.
       }
       if (outcome.stop) stop(outcome.stop);
       // Outside the guard so a UI callback bug isn't reported as bad JSON.

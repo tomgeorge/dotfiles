@@ -4,7 +4,7 @@ import type { JobRecord, JobStatus, JobStore } from "./jobs.ts";
 import { doing, elapsed, tokens } from "./panel.ts";
 
 // Subagent jobs as a source for the shared panel (run-panel/): one item per job this session,
-// Overview, Task, Activity, and Result tabs, and a confirmed cancel. Layout and keys live in
+// Overview, Task, Activity, Live, and Result tabs, and a confirmed cancel. Layout and keys live in
 // run-panel.
 
 const STATUS_TONE: Record<JobStatus, Tone> = { running: "accent", ok: "success", error: "error", cancelled: "warning" };
@@ -33,6 +33,13 @@ function overview(job: JobRecord, now: number, s: Style): Content {
 function activity(job: JobRecord, s: Style): Content {
   if (!job.log.length) return { kind: "lines", lines: [s.fg("dim", "No tool calls yet")] };
   return { kind: "lines", lines: job.log.map((entry) => `${s.fg("dim", elapsedClock(entry.at))} ${oneLine(entry.text)}`) };
+}
+
+function live(job: JobRecord): Content {
+  const { transcript } = job;
+  if (!transcript.entries.length) return { kind: "message", text: job.status === "running" ? "Waiting for the first event…" : "Nothing was streamed" };
+  const note = job.status === "running" ? "streaming from the subagent" : "as streamed in this session";
+  return { kind: "transcript", note, dropped: transcript.dropped, entries: transcript.entries };
 }
 
 function result(job: JobRecord): Content {
@@ -65,8 +72,8 @@ export function subagentSource(store: JobStore, cancel: (id: number) => boolean,
     glyph: job.status === "running" ? undefined : { text: STATUS_GLYPH[job.status], tone: STATUS_TONE[job.status] },
     running: job.status === "running",
     title: [{ text: `#${job.id}`, tone: "accent" }, { text: ` ${job.model} ` }, { text: `· ${job.status}`, tone: "dim" }],
-    // Today's default: follow a running job's tool calls, then show what it found.
-    defaultView: job.status === "running" ? "activity" : "result",
+    // Follow a running job's conversation, then show what it found.
+    defaultView: job.status === "running" ? "live" : "result",
   });
 
   return {
@@ -93,6 +100,7 @@ export function subagentSource(store: JobStore, cancel: (id: number) => boolean,
       { id: "overview", label: "Overview", render: (job, ctx) => overview(job, ctx.now, ctx.style) },
       { id: "task", label: "Task", render: (job) => ({ kind: "markdown", text: job.task }) },
       { id: "activity", label: "Activity", tail: true, render: (job, ctx) => activity(job, ctx.style) },
+      { id: "live", label: "Live", tail: true, render: (job) => live(job) },
       { id: "result", label: "Result", render: (job) => result(job) },
     ],
     actions: [

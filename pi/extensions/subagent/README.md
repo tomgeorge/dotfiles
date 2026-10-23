@@ -57,16 +57,20 @@ then `+N more`):
 
 `SPC a l` (the vi-mode leader) or `/subagents` opens the shared panel ([`run-panel`](../run-panel/)),
 with the crew panel's layout and keys: jobs on the left (stacked above the details
-below 100 columns), and the selected job's details in four tabs:
+below 100 columns), and the selected job's details in five tabs:
 
 1. **Overview**: cwd, git branch and whether it is a linked worktree, tools, spend and
    tokens, tool calls and current activity, status and elapsed time.
 2. **Task**: the whole task, as markdown.
 3. **Activity**: one timestamped line per tool call. It follows new calls; `k` or
    `ctrl+u` pauses and `G` follows again.
-4. **Result**: the answer as markdown, with any error first.
+4. **Live**: the child's conversation as it streams, like crew's Live tab: thinking,
+   text, and each tool call with its result. Built from the child's JSON events
+   (`Transcript` in [`crew/transcript.ts`](../crew/transcript.ts)) and bounded the same
+   way. It follows new output like Activity.
+5. **Result**: the answer as markdown, with any error first.
 
-A job opens on Activity while it runs and on Result once it ends, until you pick a
+A job opens on Live while it runs and on Result once it ends, until you pick a
 tab yourself. Finished jobs stay listed for the session.
 
 | Key | Action |
@@ -74,7 +78,7 @@ tab yourself. Finished jobs stay listed for the session.
 | type, `/` | Filter by id, model, status, activity, or task. `enter` keeps the filter, `esc` clears it |
 | `j`/`k`, arrows | Move; in the details, scroll |
 | `enter`, `l` / `h` | Focus the details / back to the list |
-| `tab`/`shift+tab`, `1`-`4` | Switch tab |
+| `tab`/`shift+tab`, `1`-`5` | Switch tab |
 | `g`/`G` | Top/bottom. On Activity, `G` follows new tool calls again |
 | `ctrl+d`/`ctrl+u` | Page the details, from either pane |
 | `ctrl+o` | Zoom the details to the full panel |
@@ -184,7 +188,8 @@ Shutdown/reload cancels all children. SIGTERM escalates to SIGKILL after one sec
 - Results are capped at 2000 lines / 50 KiB. Oversized successful answers are saved
   to a private temporary directory, with the file path included in the result.
   These files are not automatically removed by the extension.
-- No persistent child session or full event transcript is retained.
+- No persistent child session is kept. The Live transcript lives in memory for the
+  parent session only, capped like crew's (older entries are dropped).
 
 ## Checks
 

@@ -45,24 +45,24 @@ function panel(store: JobStore, cancel: (id: number) => boolean = () => true) {
 
 const ran = (command: Command<any> | undefined) => (command?.type === "run" ? `${command.action.id} ${command.item.id}` : command?.type);
 
-test("opens on the newest running job, on Activity; a finished job opens on Result", () => {
+test("opens on the newest running job, on Live; a finished job opens on Result", () => {
   const store = storeWith(3);
   store.finish(3, "ok", { result: "done" });
   const p = panel(store);
   assert.equal(p.state.selected, "2");
-  assert.equal(p.state.view, "activity");
+  assert.equal(p.state.view, "live");
   p.press("j");
   p.render();
   assert.equal(p.state.view, "result");
   assert.match(p.screen(), /md:done/);
 });
 
-test("a selected job moves from Activity to Result when it finishes, unless a tab was picked", () => {
+test("a selected job moves from Live to Result when it finishes, unless a tab was picked", () => {
   const store = storeWith(2);
   const p = panel(store);
-  assert.match(p.screen(), /\[3 Activity\]/);
+  assert.match(p.screen(), /\[4 Live\]/);
   store.finish(2, "ok", { result: "**found it**" });
-  assert.match(p.screen(), /\[4 Result\][^]*md:\*\*found it\*\*/);
+  assert.match(p.screen(), /\[5 Result\][^]*md:\*\*found it\*\*/);
   // Picking a tab sticks.
   p.press("k", "2");
   store.finish(1, "ok", { result: "other" });
@@ -121,9 +121,22 @@ test("the task tab shows the whole task as markdown", () => {
   assert.match(p.screen(), /step 39/);
 });
 
+test("live streams the child's thinking, text, and tool calls with results", () => {
+  const store = storeWith(1);
+  const p = panel(store);
+  assert.match(p.screen(), /Waiting for the first event/);
+  store.event(1, { type: "message_start", message: { role: "assistant" } });
+  store.event(1, { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "pondering auth" } });
+  store.event(1, { type: "tool_execution_start", toolCallId: "t1", toolName: "read", args: { path: "src/auth.ts" } });
+  store.event(1, { type: "tool_execution_end", toolCallId: "t1", toolName: "read", result: { content: [{ type: "text", text: "export const secret" }] } });
+  const text = p.screen();
+  for (const want of [/streaming from the subagent/, /pondering auth/, /read/, /src\/auth\.ts/, /export const secret/]) assert.match(text, want);
+});
+
 test("activity lists one line per tool call with elapsed time and follows new calls", () => {
   const store = storeWith(1);
   const p = panel(store);
+  p.press("3");
   assert.match(p.screen(), /No tool calls yet/);
   for (let i = 1; i <= 40; i++) store.update(1, progress({ toolCalls: i, activity: `read file${i}`, phase: "tool" }), 60_000 + i * 1000);
   const text = p.screen(120, 20);
@@ -134,7 +147,7 @@ test("activity lists one line per tool call with elapsed time and follows new ca
 test("the result says it's still running, then shows errors in the error tone above any output", () => {
   const store = storeWith(2);
   const p = panel(store);
-  p.press("4");
+  p.press("5");
   assert.match(p.screen(), /Still running/);
   store.finish(2, "error", { error: "child exited 1", result: "partial **notes**" });
   const text = p.screen(120, 30, { ...md, fg: toned.fg, width: toned.width, truncate: toned.truncate });
