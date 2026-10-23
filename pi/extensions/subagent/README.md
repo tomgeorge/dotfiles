@@ -27,7 +27,7 @@ results in the panel; without it, Pi's built-in markdown renderer is used.
 /subagent anthropic/claude-sonnet-4-6 Review src/auth.ts for security problems
 /subagent-cancel      # cancel all running jobs
 /subagent-cancel 2    # cancel job #2
-/subagents            # browse jobs (also ctrl+shift+s)
+/subagents            # browse jobs (also SPC a l)
 ```
 
 With no arguments, enter a task, then choose a model (see [Model suggestions](#model-suggestions)).
@@ -49,13 +49,13 @@ While jobs run, a widget below the input box lists them, one row each (up to fiv
 then `+N more`):
 
 ```text
-─ Subagents · 3 running · $0.42 ──────────────────────────── ctrl+shift+s ─
+─ Subagents · 3 running · $0.42 ────────────────────────────── /subagents ─
  ⠋  #1  claude-sonnet-4-6    12s    4 tools   $0.03  read runner.ts
  ⠙  #2  gpt-6.1-sol          19s    3 tools   $0.11  grep setStatus
  ⠹  #3  claude-opus-5-5    1m04s   12 tools   $0.28  thinking…
 ```
 
-`ctrl+shift+s` or `/subagents` opens the shared panel ([`run-panel`](../run-panel/)),
+`SPC a l` (the vi-mode leader) or `/subagents` opens the shared panel ([`run-panel`](../run-panel/)),
 with the crew panel's layout and keys: jobs on the left (stacked above the details
 below 100 columns), and the selected job's details in four tabs:
 
@@ -81,13 +81,12 @@ tab yourself. Finished jobs stay listed for the session.
 | `x` | Cancel the selected running job, after a `y` to confirm |
 | `?` | Help |
 | `esc` | Clear the filter, leave the details, leave zoom, then close |
-| `q`, `ctrl+shift+s` | Close |
+| `q` | Close |
 
 Spend is the provider-reported cost from the child's usage events, summed over its
 turns. The tool result ends with a one-line summary (elapsed, tool calls, spend,
 tokens), so spend stays in the transcript after the job ends. Failed jobs append it
-to the error; successful ones also carry it in `details.usage`. `ctrl+shift+s` needs a terminal that reports modifier keys (kitty keyboard
-protocol: Ghostty, kitty, WezTerm); elsewhere use `/subagents`. The widget
+to the error; successful ones also carry it in `details.usage`. The widget
 (`panel.ts`), the panel source (`source.ts`), and job state (`jobs.ts`) are separate
 from Pi so they can be tested with injected styling.
 
