@@ -33,7 +33,7 @@ Or start one yourself:
 /watch 1m --timeout 30m kubectl rollout status deploy/api -n staging --timeout=50s
 /watch 2m --change --notify gcloud alpha monitoring policies describe POLICY --format='value(enabled)'
 /loop 15m check #incidents in Slack for anything about payments
-/watches            # browse watches and loops (also ctrl+shift+w)
+/watches            # browse watches and loops (also SPC w l)
 /unwatch 2          # stop #2; no id stops all
 ```
 
@@ -47,7 +47,7 @@ While watches are active, a widget below the input box lists them, one row each
 (up to five, then `+N more`):
 
 ```text
-─ Watches · 1 watching · 1 loop ─────────────────────────── ctrl+shift+w ─
+─ Watches · 1 watching · 1 loop ─────────────────────────────── /watches ─
  ◷  #1  watch  CI for PR 123      3 checks  exit 8  next in 25s
  ●  #2  loop   slack incidents      2 runs          due when idle
 ```
@@ -55,9 +55,10 @@ While watches are active, a widget below the input box lists them, one row each
 `◷` waits for its next check, a spinner means a check is running, and `●` is a
 loop iteration waiting for Pi to go idle.
 
-`ctrl+shift+w` or `/watches` opens the shared panel ([`run-panel`](../run-panel/)),
-with the crew panel's layout and keys: watches on the left (stacked above the
-details below 100 columns), and the selected one's details in three tabs:
+`SPC w l` (the vi-mode leader, from NORMAL mode) or `/watches` opens the shared
+panel ([`run-panel`](../run-panel/)), with the crew panel's layout and keys:
+watches on the left (stacked above the details below 100 columns), and the
+selected one's details in three tabs:
 
 1. **Overview**: kind and mode, cwd, interval, timeout and time left, counts,
    status, and the whole command or prompt.
@@ -81,11 +82,9 @@ Ended watches stay listed for the session (the last 50), with how they ended.
 | `x` | Stop the selected watch or loop, at once (no confirmation) |
 | `?` | Help |
 | `esc` | Clear the filter, leave the details, leave zoom, then close |
-| `q`, `ctrl+shift+w` | Close |
+| `q` | Close |
 
-`ctrl+shift+w` needs a terminal that reports modifier keys (kitty keyboard
-protocol); elsewhere use `/watches`. Without a UI, `/watches` prints the list.
-The widget (`panel.ts`), the panel source (`source.ts`), and the session record
+Without a UI, `/watches` prints the list. The widget (`panel.ts`), the panel source (`source.ts`), and the session record
 (`store.ts`) are separate from Pi so they can be tested with injected styling.
 
 ### Conditions
