@@ -47,9 +47,10 @@ if (unknown.length) usageError(`unknown mutant: ${unknown.join("; ")}`);
 const mutants = all.filter((m) => !only.length || only.includes(m.name));
 
 const work = mkdtempSync(join(tmpdir(), `mutate-${extension}-`));
+// Copy the whole extensions tree, not just this extension: tests import siblings such as
+// ../run-panel/ and ../test-support/ by relative path, so the layout must be preserved.
+cpSync(extensions, work, { recursive: true, filter: (path) => !/[\\/](node_modules|\.git)$/.test(path) });
 const copy = join(work, extension);
-cpSync(source, copy, { recursive: true });
-cpSync(here, join(work, "test-support"), { recursive: true });
 const tests = readdirSync(copy).filter((f) => f.endsWith(".test.ts"));
 
 type Outcome = "pass" | "fail" | "error";
