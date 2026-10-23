@@ -94,7 +94,30 @@ type Flag = boolean | string;
 
 export interface Sent { message: { customType: string; content: string }; options?: { triggerTurn?: boolean; deliverAs?: string } }
 
-export function fakePi() {
+// Same shape as Pi's EventBus. Handlers run synchronously, unlike Pi's, so tests see effects at once.
+export interface EventBus {
+  emit(channel: string, data: unknown): void;
+  on(channel: string, handler: (data: unknown) => void): () => void;
+}
+
+export function createEventBus(): EventBus {
+  const listeners = new Map<string, Set<(data: unknown) => void>>();
+  return {
+    // Iterates a copy, so a handler that unsubscribes (or subscribes) mid-emit doesn't skew the loop.
+    emit(channel, data) { for (const handler of [...(listeners.get(channel) ?? [])]) handler(data); },
+    on(channel, handler) {
+      // A fresh wrapper per subscription, so the same function subscribed twice unsubscribes independently.
+      const wrapped = (data: unknown) => handler(data);
+      const set = listeners.get(channel) ?? new Set();
+      set.add(wrapped);
+      listeners.set(channel, set);
+      return () => { set.delete(wrapped); };
+    },
+  };
+}
+
+/** Pass one `events` bus to two fakes to simulate two extensions talking over `pi.events`. */
+export function fakePi({ events = createEventBus() }: { events?: EventBus } = {}) {
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, Tool>();
   const commands = new Map<string, Command>();
@@ -108,6 +131,8 @@ export function fakePi() {
   const pi = {
     registerTool(tool: Tool) { tools.set(tool.name, tool); active.push(tool.name); },
     registerCommand(name: string, command: Command) { commands.set(name, command); },
+    getCommands: () => [...commands.keys()].map((name) => ({ name })),
+    events,
     registerShortcut(key: string, shortcut: Shortcut) { shortcuts.set(key, shortcut); },
     registerFlag(name: string, options: { default?: Flag }) {
       if (options.default !== undefined && !flags.has(name)) flags.set(name, options.default);
@@ -138,7 +163,7 @@ export function fakePi() {
   }
   return {
     // Only part of ExtensionAPI; extensions calling anything else fail loudly with a TypeError.
-    pi: pi as unknown as ExtensionAPI, tools, commands, shortcuts, flags, sent, entries, notes, ctx,
+    pi: pi as unknown as ExtensionAPI, events, tools, commands, shortcuts, flags, sent, entries, notes, ctx,
     active: () => [...active],
     /** Runs the event's handlers in order, as Pi does, and returns what each one returned. */
     async emit(event: string, payload: unknown, context: unknown): Promise<unknown[]> {
