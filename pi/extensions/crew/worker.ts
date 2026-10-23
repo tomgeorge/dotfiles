@@ -35,6 +35,18 @@ export interface WorkerResult {
 
 const ZERO: Usage = { input: 0, output: 0, cost: 0 };
 
+/** Untyped JSON from the child's event stream. */
+type Raw = Record<string, any>;
+
+/** Tails kept of streamed text, stderr, and the final text: evidence when a worker dies mid-task. */
+const STREAM_TAIL = 16_384;
+const STDERR_TAIL = 8_192;
+const RESULT_TAIL = 8_192;
+/** One JSON event can't reasonably exceed this; past it the stream is treated as broken. */
+const MAX_EVENT_BYTES = 8 * 1024 * 1024;
+/** Grace after SIGTERM before SIGKILL. */
+const KILL_GRACE_MS = 2_000;
+
 function readUsage(raw: unknown): Usage {
   const u = (raw ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -75,7 +87,7 @@ export function runWorker(
     timeoutMs: number;
     onProgress?: (progress: WorkerProgress) => void;
     /** Every parsed stream event, for the panel's Live tab. */
-    onEvent?: (event: Record<string, any>) => void;
+    onEvent?: (event: Raw) => void;
     command?: string;
     prefixArgs?: string[];
   },
@@ -133,7 +145,7 @@ export function runWorker(
       const end = { status, error };
       ending = end;
       signalGroup("SIGTERM", end);
-      killTimer = setTimeout(() => signalGroup("SIGKILL", end), 2000);
+      killTimer = setTimeout(() => signalGroup("SIGKILL", end), KILL_GRACE_MS);
     };
     const abort = () => stop("cancelled", "cancelled");
     const timer = setTimeout(() => stop("timeout", `timed out after ${Math.round(options.timeoutMs / 60000)} min`), options.timeoutMs);
@@ -142,7 +154,7 @@ export function runWorker(
     const handle = (line: string) => {
       if (!line.trim()) return;
       progress.lastEventAt = Date.now();
-      let event: Record<string, any>;
+      let event: Raw;
       try {
         event = JSON.parse(line);
       } catch {
@@ -161,7 +173,7 @@ export function runWorker(
         const update = event.assistantMessageEvent ?? {};
         if (update.type === "thinking_start" || update.type === "thinking_delta") progress.phase = "thinking";
         if (update.type === "text_start") { progress.phase = "writing"; streaming = ""; }
-        if (update.type === "text_delta" && typeof update.delta === "string") streaming = (streaming + update.delta).slice(-16_384);
+        if (update.type === "text_delta" && typeof update.delta === "string") streaming = (streaming + update.delta).slice(-STREAM_TAIL);
         if (event.usage) progress.usage = add(finished, readUsage(event.usage));
       } else if (event.type === "message_end" && event.message?.role === "assistant") {
         const message = event.message;
@@ -171,7 +183,8 @@ export function runWorker(
           stop("error", `child used ${message.provider}/${message.model}, not the requested ${job.provider}/${job.model}`);
           return;
         }
-        const text = (message.content ?? []).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+        const parts: Raw[] = Array.isArray(message.content) ? message.content : [];
+        const text = parts.filter((p) => p.type === "text").map((p) => p.text).join("\n");
         if (text.trim()) lastText = text;
         finalText = text;
         streaming = "";
@@ -189,10 +202,10 @@ export function runWorker(
         handle(buffer.slice(0, nl));
         buffer = buffer.slice(nl + 1);
       }
-      if (buffer.length > 8 * 1024 * 1024) { buffer = ""; stop("error", "worker JSON event exceeded 8 MiB"); }
+      if (buffer.length > MAX_EVENT_BYTES) { buffer = ""; stop("error", "worker JSON event exceeded 8 MiB"); }
     });
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-8192); });
+    child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-STDERR_TAIL); });
     // An error after `ending` is set (e.g. a failed kill while stopping) is dropped: the result already says why it ended.
     child.on("error", (error) => { ending ??= { status: "error", error: error.message }; });
     child.on("close", (code, sig) => {
@@ -201,7 +214,7 @@ export function runWorker(
       clearTimeout(killTimer);
       options.signal?.removeEventListener("abort", abort);
       // Keep whatever the worker said last; a killed worker's partial output is evidence.
-      const partial = [lastText, streaming].filter((s) => s.trim()).join("\n").slice(-8192);
+      const partial = [lastText, streaming].filter((s) => s.trim()).join("\n").slice(-RESULT_TAIL);
       if (ending) return resolve({ status: ending.status, text: partial, error: ending.error, progress });
       if (code !== 0 || stopReason !== "stop" || !finalText.trim()) {
         return resolve({
