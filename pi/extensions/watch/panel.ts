@@ -1,197 +1,17 @@
+import { box, duration, expandTabs, padStart, SPINNER, tildify, wallClock, type Style } from "../run-panel/format.ts";
 import { count, exitText, outputText } from "./report.ts";
-import { formatDuration, tail, type EndReason, type RunResult, type Watch } from "./watcher.ts";
+import { END_MARK, endText, type WatchRecord } from "./store.ts";
+import { formatDuration, tail, type Watch } from "./watcher.ts";
 
-// Session record of every watch, plus rendering for the below-editor widget and
-// the /watches popup. Mirrors subagent/panel.ts; each extension is linked on its
-// own, so the shared bits are copied rather than imported. Styling is injected
-// (Pi's theme and pi-tui in production) so layout is testable without Pi.
+// Rendering for the below-editor widget and the /watches popup; the records come from
+// store.ts. Styling is injected (Pi's theme and pi-tui in production) so layout is
+// testable without Pi.
 
-export type Tone = "accent" | "muted" | "dim" | "success" | "error" | "warning" | "border" | "borderAccent" | "text";
-
-export interface Style {
-  fg(tone: Tone, text: string): string;
-  bold(text: string): string;
-  /** Highlight for the selected list row. */
-  selected(text: string): string;
-  width(text: string): number;
-  /** Cut to `width` columns with an ellipsis; `pad` fills short text with spaces. */
-  truncate(text: string, width: number, pad?: boolean): string;
-  wrap(text: string, width: number): string[];
-}
-
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const TAB_WIDTH = 8;
 export const WIDGET_ROWS = 5;
-export const LOG_LIMIT = 200;
-/** Ended watches kept for the popup; the oldest go first. */
-export const ENDED_LIMIT = 50;
-
-// ── Store ────────────────────────────────────────────────────────────────
-
-export interface LogEntry {
-  /** Epoch ms of the latest occurrence. */
-  at: number;
-  text: string;
-  tone?: Tone;
-  /** Identical consecutive checks collapse into one entry. */
-  repeat: number;
-  /** Set on check entries, to detect repeats. */
-  signature?: string;
-}
-
-export interface Ended { at: number; reason: EndReason; detail?: string }
-
-export interface WatchRecord {
-  /** Unique for the session; watch ids are reused once a watch ends. */
-  key: number;
-  /** Live object: the Registry mutates it until the watch ends. */
-  watch: Watch;
-  ended?: Ended;
-  log: LogEntry[];
-  /** The last check result already logged. */
-  logged?: RunResult;
-}
-
-/** Expand tabs to 8-column stops: the width helpers count a tab as one column. */
-function expandTabs(text: string): string {
-  return text.split("\n").map((line) => {
-    let out = "";
-    for (const [i, part] of line.split("\t").entries()) {
-      if (i > 0) out += " ".repeat(TAB_WIDTH - ([...out].length % TAB_WIDTH));
-      out += part;
-    }
-    return out;
-  }).join("\n");
-}
-
-const outputLines = (result: RunResult) =>
-  expandTabs(`${result.stdout}\n${result.stderr}`).split("\n").map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
-
-/** The line worth showing for a check: the first one new since `previous`, else the last (where status usually is). */
-function summaryLine(result: RunResult, previous: RunResult | undefined) {
-  const lines = outputLines(result);
-  if (previous) {
-    const before = new Set(outputLines(previous));
-    const fresh = lines.find((line) => !before.has(line));
-    if (fresh) return fresh;
-  }
-  return lines.at(-1) ?? "";
-}
-
-export class WatchStore {
-  private readonly records: WatchRecord[] = [];
-  private readonly byWatch = new Map<Watch, WatchRecord>();
-  private nextKey = 1;
-  private readonly listeners = new Set<() => void>();
-
-  add(watch: Watch, now = Date.now()): WatchRecord {
-    const record: WatchRecord = { key: this.nextKey++, watch, log: [] };
-    this.records.push(record);
-    this.byWatch.set(watch, record);
-    this.push(record, { at: now, text: "started", tone: "dim", repeat: 1 });
-    // A command's first check may have finished before the record existed.
-    this.sync(watch, now);
-    return record;
-  }
-
-  /** Log a finished check that isn't logged yet. Safe to call on every registry event. */
-  sync(watch: Watch, now = Date.now()) {
-    const record = this.byWatch.get(watch);
-    if (!record) return;
-    const last = watch.last;
-    if (last && last !== record.logged) {
-      this.logCheck(record, last, now);
-      record.logged = last;
-    }
-    this.emit();
-  }
-
-  private logCheck(record: WatchRecord, result: RunResult, now: number) {
-    // Whole output, as the Registry compares for `change`: the shown line alone can hide a change.
-    const signature = `${exitText(result)}\n${result.stdout.trim()}\n${result.stderr.trim()}`;
-    const prev = record.log.at(-1);
-    if (prev?.signature === signature) {
-      prev.repeat++;
-      prev.at = now;
-      return;
-    }
-    const line = summaryLine(result, record.logged);
-    const text = `check · ${exitText(result)}${line ? ` · ${line}` : ""}`;
-    const tone: Tone | undefined = result.code === 0 && !result.killed ? undefined : "dim";
-    this.push(record, { at: now, text, tone, repeat: 1, signature });
-  }
-
-  note(watch: Watch, text: string, tone?: Tone, now = Date.now()) {
-    const record = this.byWatch.get(watch);
-    if (!record) return;
-    this.push(record, { at: now, text, tone, repeat: 1 });
-    this.emit();
-  }
-
-  end(watch: Watch, reason: EndReason, detail?: string, now = Date.now()) {
-    const record = this.byWatch.get(watch);
-    if (!record || record.ended) return;
-    this.sync(watch, now);
-    record.ended = { at: now, reason, detail };
-    this.push(record, { at: now, text: endText(watch, record.ended), tone: END_MARK[reason].tone, repeat: 1 });
-    this.pruneEnded();
-    this.emit();
-  }
-
-  /** Drop the oldest ended records beyond ENDED_LIMIT; active ones are never pruned. */
-  private pruneEnded() {
-    const ended = this.records.filter((r) => r.ended);
-    for (const old of ended.slice(0, Math.max(0, ended.length - ENDED_LIMIT))) {
-      this.records.splice(this.records.indexOf(old), 1);
-      this.byWatch.delete(old.watch);
-    }
-  }
-
-  list(): WatchRecord[] { return [...this.records]; }
-  active(): WatchRecord[] { return this.records.filter((record) => !record.ended); }
-  get(key: number) { return this.records.find((record) => record.key === key); }
-
-  /** Returns an unsubscribe function. */
-  subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  private push(record: WatchRecord, entry: LogEntry) {
-    record.log.push(entry);
-    if (record.log.length > LOG_LIMIT) record.log.splice(0, record.log.length - LOG_LIMIT);
-  }
-
-  private emit() {
-    for (const listener of this.listeners) listener();
-  }
-}
 
 // ── Formatting ───────────────────────────────────────────────────────────
 
-function duration(ms: number): string {
-  const secs = Math.max(0, Math.floor(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m${String(secs % 60).padStart(2, "0")}s`;
-  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m`;
-}
-
-export function clock(ms: number): string {
-  const d = new Date(ms);
-  return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
-}
-
 const kindLabel = (watch: Watch) => watch.kind === "prompt" ? "loop" : "watch";
-
-function endText(watch: Watch, ended: Ended): string {
-  switch (ended.reason) {
-    case "met": return "condition met";
-    case "stopped": return "stopped";
-    case "timeout": return `timed out after ${formatDuration(watch.timeoutMs)}`;
-    case "error": return `error: ${ended.detail?.split("\n")[0] || "failed"}`;
-  }
-}
 
 /** What the watch is doing now, or how it ended. */
 function status(record: WatchRecord, now: number): string {
@@ -205,14 +25,6 @@ function status(record: WatchRecord, now: number): string {
 /** `3 checks` / `2 runs`. */
 const counter = (watch: Watch) => watch.kind === "prompt" ? count(watch.fires, "run") : count(watch.checks, "check");
 
-/** How an ended watch shows in the list and its log. */
-const END_MARK: Record<EndReason, { tone: Tone; icon: string }> = {
-  met: { tone: "success", icon: "✓" },
-  error: { tone: "error", icon: "✗" },
-  timeout: { tone: "warning", icon: "⊘" },
-  stopped: { tone: "muted", icon: "⊘" },
-};
-
 function icon(record: WatchRecord, frame: number, s: Style) {
   if (record.ended) {
     const mark = END_MARK[record.ended.reason];
@@ -224,11 +36,6 @@ function icon(record: WatchRecord, frame: number, s: Style) {
     default: return s.fg("muted", "◷");
   }
 }
-
-/** True while any check runs: the caller animates the spinner faster then. */
-export const anyChecking = (records: WatchRecord[]) => records.some((r) => !r.ended && r.watch.state === "running");
-
-const padStart = (text: string, width: number, s: Style) => " ".repeat(Math.max(0, width - s.width(text))) + text;
 
 /** A rule with a left title and optional right hint, e.g. `─ Watches ───── hint ─`. */
 function rule(left: string, right: string, width: number, s: Style) {
@@ -354,27 +161,13 @@ export function popupKey(state: PopupState, records: WatchRecord[], key: PopupKe
   return { type: "none" };
 }
 
-function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style): string[] {
-  const tone: Tone = focused ? "borderAccent" : "border";
-  const inner = Math.max(1, width - 2);
-  const head = s.truncate(` ${title} `, Math.max(0, inner - 1));
-  const top = s.fg(tone, "┌─") + head + s.fg(tone, `${"─".repeat(Math.max(0, inner - 1 - s.width(head)))}┐`);
-  const lines = [top];
-  for (let i = 0; i < height - 2; i++) lines.push(s.fg(tone, "│") + s.truncate(body[i] ?? "", inner, true) + s.fg(tone, "│"));
-  lines.push(s.fg(tone, `└${"─".repeat(inner)}┘`));
-  return lines;
-}
-
-const home = process.env.HOME ?? "";
-const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
-
 /** Body lines (event log or last output) for the detail pane. */
 function bodyLines(record: WatchRecord, view: BodyView, width: number, s: Style): string[] {
   const { watch } = record;
   if (view === "activity") {
     return record.log.map((entry) => {
       const text = entry.tone ? s.fg(entry.tone, entry.text) : entry.text;
-      return `${s.fg("dim", clock(entry.at))} ${text}${entry.repeat > 1 ? s.fg("muted", ` ×${entry.repeat}`) : ""}`;
+      return `${s.fg("dim", wallClock(entry.at))} ${text}${entry.repeat > 1 ? s.fg("muted", ` ×${entry.repeat}`) : ""}`;
     });
   }
   const error = record.ended?.reason === "error" && record.ended.detail ? [...s.wrap(s.fg("error", record.ended.detail), width), ""] : [];
@@ -389,7 +182,7 @@ function detail(record: WatchRecord, state: PopupState, now: number, width: numb
   const { watch } = record;
   const label = (name: string) => s.fg("muted", name.padEnd(6));
   const left = record.ended
-    ? `ended ${clock(record.ended.at)}`
+    ? `ended ${wallClock(record.ended.at)}`
     : `${duration(watch.deadline - now)} left`;
   const mode = watch.kind === "prompt"
     ? "loop · runs when idle"

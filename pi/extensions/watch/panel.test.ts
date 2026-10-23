@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  clock, ENDED_LIMIT, initialPopup, LOG_LIMIT, popupKey, popupLines, widgetLines, WatchStore, WIDGET_ROWS, type Style,
-} from "./panel.ts";
+import { wallClock, type Style } from "../run-panel/format.ts";
+import { initialPopup, popupKey, popupLines, widgetLines, WIDGET_ROWS } from "./panel.ts";
+import { ENDED_LIMIT, LOG_LIMIT, WatchStore } from "./store.ts";
 import type { RunResult, Watch } from "./watcher.ts";
 
 // Plain text: one column per code point, no colors, so assertions read like the screen.
@@ -142,7 +142,7 @@ test("popup shows the check log and toggles to the last output", () => {
   const records = store.list();
   const state = initialPopup(records);
   const screen = () => popupLines(records, state, 0, 100, 20, plain, 0).lines.join("\n");
-  assert.ok(screen().includes(`${clock(61_000)} check · exit 1 · gh: not logged in`));
+  assert.ok(screen().includes(`${wallClock(61_000)} check · exit 1 · gh: not logged in`));
   assert.match(screen(), /kind {3}command · until success · deliver wake/);
   assert.match(screen(), /cmd {4}check 1/);
   popupKey(state, records, "toggle", 5);

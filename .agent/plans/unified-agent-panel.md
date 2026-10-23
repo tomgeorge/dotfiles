@@ -348,18 +348,23 @@ Manual checks in Pi, after `/reload` or a restart, in `~/git/dotfiles`:
 - [x] (2026-10-22 23:12) Researched the crew and subagent panels and their wiring; recorded the baseline (200 pass).
 - [x] (2026-10-22 23:12) Prototyped a cross-directory import through a symlinked extension (see Surprises).
 - [x] (2026-10-22 23:40) Read the watch panel; researched telescope.nvim (developer guide, `entry_display`, previewers) and mini.pick (`:h mini.pick`); checked how Pi loads extensions and shares state between them.
-- [ ] Milestone 1: `run-panel/format.ts` and tests; `watch/store.ts`; all three panels import the helpers.
+- [x] (2026-10-22 23:29) Milestone 1: `run-panel/format.ts` and tests; `watch/store.ts`; all three panels import the helpers. Suite: `ℹ tests 205`, `ℹ pass 205`, `ℹ fail 0` (baseline 200, minus crew's `clean` test, plus 6 in `format.test.ts`, which now also holds that test and the duration/money assertions from subagent's format test). `rg 'from "\.\./(crew|subagent|watch)/' pi/extensions/run-panel` prints nothing.
+- [ ] Manual check in Pi for Milestone 1 (each panel looks unchanged): pending for the user.
 - [ ] Milestone 2: source interface, presenter, crew source; crew panel test split; manual check.
 - [ ] Milestone 3: subagent source; popup code removed; manual check.
 - [ ] Milestone 4: watch source; popup code removed; manual check.
 - [ ] Milestone 5: READMEs and `IDEAS.md`.
 
-No commits yet. Commit at each verified milestone only if the user says commits are fine.
+Work is committed per milestone on the crew branch (`crew/carry-out-the-execplan-in-agent-*`).
 
 ## Surprises & Discoveries
 
 - 2026-10-22: **Shared imports work through the symlinks.** Pi loads an extension that imports `../shared/x.ts` through a symlinked directory. The prototype was `/tmp/proto/link/ext` → `/tmp/proto/real/ext`, whose `index.ts` imports `../shared/x.ts`, run with `pi --no-extensions -e /tmp/proto/link/ext -p hi`. It wrote `shared-ok`, so imports resolve from the real path. This is what lets `run-panel/` exist without its own `link.sh` line, and it removes the reason `watch/panel.ts` gives for copying code.
 - 2026-10-22: **No module-level singletons across extensions.** Pi loads each extension with `createJiti(..., { moduleCache: false })` (`dist/core/extensions/loader.js`, around line 477). Two extensions importing `run-panel/pi.ts` get two copies of it, so module-level state can't be shared. Pi does provide a shared bus, `pi.events` (`emit(channel, data)`, `on(channel, handler)`, in `dist/core/event-bus.d.ts`). A combined panel across extensions would need it; that's now an idea in `IDEAS.md`, not part of this plan.
+- 2026-10-22 (M1): **The crew panel's `money` is the ledger's, not subagent's.** `crew/panel.ts` imported `money` from `crew/state.ts`, which prints `$0.00` for tiny amounts. Switching it to the shared `money` would have shown `<$0.01` in the crew list and overview, a visible change, so the crew panel keeps the ledger `money` and the shared one is used by subagent only for now.
+- 2026-10-22 (M1): **The three `box` functions differed only in the bottom border.** Crew's drew the bottom as two colour spans even with no bottom text; subagent's and watch's drew one. The shared `box` draws one span when there's no bottom text, so subagent and watch output is byte-identical and crew's is identical on screen (only where ANSI colour runs split changes; no test depended on it).
+- 2026-10-22 (M1): **`WatchStore` needs `END_MARK` and `endText`.** Its `end()` logs the end text in the end tone, so both moved to `watch/store.ts` with it, and `watch/panel.ts` imports them. `anyChecking` (a query over records) moved too.
+- 2026-10-22 (M1): **`sed` in the worker environment was BSD sed**, not GNU sed as Context says; `sed -i 's/…/…/' file` failed. Use the edit tool or `sed -i ''` there.
 - 2026-10-22: **The crew panel is already close to this shape.** It isolates its data behind `deps.diff` and `deps.transcript`, so most of Milestone 2 moves code rather than redesigning it.
 
 ## Decision Log
@@ -374,6 +379,11 @@ No commits yet. Commit at each verified milestone only if the user says commits 
 - 2026-10-22: **One key scheme.** Subagent's `a`, `t`, and `ctrl+o` (expand) and watch's `a` give way to numbered tabs, and `ctrl+o` means zoom everywhere. Consistency across panels is the point of the change.
 - 2026-10-22: **One panel for every source (`/runs`) moved to `IDEAS.md`.** It was Milestone 5. Nothing else depends on it, and the user hasn't needed it yet. The source interface keeps it cheap later: string ids, and each item carries its own record, views, and actions.
 - 2026-10-22: **Deferred:** the widgets below the editor (they could render from the same items and columns later), marking and acting on several items (mini.pick's `choose_marked`), refine, query syntax, user key maps, and resume. Each is useful but independent, and listed in `IDEAS.md` by Milestone 5.
+
+- 2026-10-22 (M1): **Clock helpers are `wallClock` (watch's `hh:mm:ss` time of day) and `elapsedClock` (subagent's `mm:ss` since start).** Distinct names because they mean different things.
+- 2026-10-22 (M1): **`Style.markdown` is optional in the shared `Style`; `subagent/panel.ts` exports `Style = BaseStyle & Required<Pick<BaseStyle, "markdown">>`.** Crew and watch styles don't provide markdown, and the subagent panel calls it unconditionally, so its own type keeps it required until Milestone 3 supplies markdown everywhere.
+- 2026-10-22 (M1): **Only the listed helpers moved.** The identical `rule()` in subagent and watch and their popup state/key code stay put: Milestones 3 and 4 delete them with the popups.
+- 2026-10-22 (M1): **Watch store tests stay in `watch/panel.test.ts`, importing from `store.ts`.** The popup tests there build records through `WatchStore`, and Milestone 4 rewrites that file anyway.
 
 ## Outcomes & Retrospective
 
