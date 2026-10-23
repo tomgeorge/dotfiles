@@ -7,27 +7,41 @@ import type { Source } from "./source.ts";
 
 const { openPanel, panelEvent } = await import("./pi.ts");
 
-/** A ctx whose ui.custom captures the component, with a plain-text theme and a fixed terminal. */
-function fakeCtx(hasUI = true) {
-  const opened: { component: any; closed: boolean; renders: number; options: any; close: () => void }[] = [];
+/**
+ * A ctx whose ui.custom captures the component, with a plain-text theme and a fixed terminal.
+ * Like Pi's showExtensionCustom, it installs the component in a later microtask and disposes
+ * only an installed one. `deferFactory` also calls the factory in a later microtask.
+ */
+function fakeCtx(hasUI = true, { deferFactory = false } = {}) {
+  const opened: { component: any; installed: boolean; closed: boolean; renders: number; options: any; close: () => void }[] = [];
   const notes: string[] = [];
   const ctx: any = {
     hasUI,
     ui: {
       notify: (message: string, type = "info") => { notes.push(`${type}: ${message}`); },
-      custom: (factory: any, options: any) => new Promise<void>((resolve) => {
-        const panel = { component: undefined as any, closed: false, renders: 0, options, close: () => {} };
+      custom: (factory: any, options: any) => new Promise<void>((resolve, reject) => {
+        const panel = { component: undefined as any, installed: false, closed: false, renders: 0, options, close: () => {} };
         const tui = { terminal: { rows: 40 }, requestRender: () => { panel.renders++; } };
         const theme = { fg: (_tone: string, text: string) => text, bold: (text: string) => text, bg: (_tone: string, text: string) => text };
         const done = () => {
           if (panel.closed) return;
           panel.closed = true;
-          panel.component.dispose?.();
           resolve();
+          if (panel.installed) panel.component.dispose?.();
         };
         panel.close = done;
         opened.push(panel);
-        panel.component = factory(tui, theme, {}, done);
+        const build = () => {
+          panel.component = factory(tui, theme, {}, done);
+          return panel.component;
+        };
+        (deferFactory ? Promise.resolve().then(build) : Promise.resolve(build()))
+          .then(() => {
+            if (!panel.closed) panel.installed = true;
+          })
+          .catch((error) => {
+            if (!panel.closed) reject(error);
+          });
       }),
     },
   };
@@ -38,6 +52,29 @@ function fakeCtx(hasUI = true) {
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+
+/** Counts intervals started and not cleared while `fn` runs. */
+async function liveTimers(fn: () => Promise<void>): Promise<number> {
+  const live = new Set<unknown>();
+  const { setInterval: set, clearInterval: clear } = globalThis;
+  globalThis.setInterval = ((...args: Parameters<typeof set>) => {
+    const id = set(...args);
+    live.add(id);
+    return id;
+  }) as typeof set;
+  globalThis.clearInterval = ((id: Parameters<typeof clear>[0]) => {
+    live.delete(id);
+    clear(id);
+  }) as typeof clear;
+  try {
+    await fn();
+  } finally {
+    globalThis.setInterval = set;
+    globalThis.clearInterval = clear;
+    for (const id of live) clear(id as any);
+  }
+  return live.size;
+}
 
 let opens = 0;
 
@@ -195,4 +232,72 @@ test("the tick animates spinners and re-renders", async () => {
     handle.close();
   }
   await handle.closed;
+});
+
+test("closing before Pi installs the component still stops the tick, unsubscribes, and disposes once", async () => {
+  for (const deferFactory of [false, true]) {
+    let subscribed = 0;
+    let disposed = 0;
+    const leaked = await liveTimers(async () => {
+      const f = fakeCtx(true, { deferFactory });
+      const source = fixtureSource([job(1)], {
+        subscribe: () => { subscribed++; return () => { subscribed--; }; },
+        disposed: () => { disposed++; },
+      });
+      const handle = openPanel(f.ctx, source, { id: `early close ${deferFactory}` })!;
+      try {
+        // Before the factory runs (deferred) or before Pi installs what it returned.
+        handle.close();
+      } finally {
+        await handle.closed;
+      }
+      assert.equal(f.opened[0].installed, false, "closed before it was installed");
+      assert.ok(f.opened[0].closed);
+    });
+    assert.equal(leaked, 0, `no ticker left running (deferFactory ${deferFactory})`);
+    assert.equal(subscribed, 0, `unsubscribed (deferFactory ${deferFactory})`);
+    assert.equal(disposed, 1, `disposed once (deferFactory ${deferFactory})`);
+  }
+});
+
+test("an installed panel cleans up once, though Pi disposes it too", async () => {
+  let disposed = 0;
+  const leaked = await liveTimers(async () => {
+    const p = open([job(1)], { disposed: () => { disposed++; } });
+    try {
+      await tick();
+      assert.ok(p.last().installed);
+      p.type("q");
+    } finally {
+      p.handle.close();
+      await p.handle.closed;
+    }
+  });
+  assert.equal(leaked, 0);
+  assert.equal(disposed, 1);
+});
+
+test("a subscribe that throws stops the tick, notifies, and frees the guard", async () => {
+  let disposed = 0;
+  const f = fakeCtx();
+  const leaked = await liveTimers(async () => {
+    const source = fixtureSource([job(1)], {
+      subscribe: () => { throw new Error("no feed"); },
+      disposed: () => { disposed++; },
+    });
+    const handle = openPanel(f.ctx, source, { id: "throwing subscribe" })!;
+    try {
+      assert.ok(handle);
+    } finally {
+      handle.close();
+      await handle.closed;
+    }
+  });
+  assert.equal(leaked, 0);
+  assert.equal(disposed, 1);
+  assert.deepEqual(f.notes, ["error: Tasks panel: no feed"]);
+  const again = openPanel(f.ctx, fixtureSource([job(1)]), { id: "throwing subscribe" });
+  assert.ok(again, "the guard was released");
+  again!.close();
+  await again!.closed;
 });

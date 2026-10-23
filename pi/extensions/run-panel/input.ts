@@ -73,7 +73,9 @@ export function visible<T>(state: PanelState, source: Source<T>, items: Item<T>[
     index = 0;
     select(state, source, shown[0]);
   }
-  return { shown, item: shown[index], index };
+  const item = shown[index];
+  if (item && !state.viewPicked) followDefault(state, source, item);
+  return { shown, item, index };
 }
 
 function select<T>(state: PanelState, source: Source<T>, item: Item<T>) {
@@ -82,7 +84,19 @@ function select<T>(state: PanelState, source: Source<T>, item: Item<T>) {
   state.scroll = 0;
   state.cursor = 0;
   state.follow = true;
-  if (item.defaultView && source.views.some((v) => v.id === item.defaultView)) state.view = item.defaultView;
+  state.viewPicked = false;
+  followDefault(state, source, item);
+}
+
+/** Show the item's default view, unless the user picked one; it can change on a refresh. */
+function followDefault<T>(state: PanelState, source: Source<T>, item: Item<T>) {
+  if (item.defaultView && source.views.some((v) => v.id === item.defaultView)) setView(state, item.defaultView);
+}
+
+/** A view the user asked for sticks until they select another item. */
+function pickView(state: PanelState, view: string) {
+  state.viewPicked = true;
+  setView(state, view);
 }
 
 function setView(state: PanelState, view: string) {
@@ -109,9 +123,21 @@ export function input<T>(state: PanelState, source: Source<T>, event: PanelInput
     state.confirm = undefined;
     const action = source.actions.find((a) => a.id === id);
     const item = items.find((i) => i.id === itemId);
-    if ((char === "y" || char === "Y") && action && item) return { type: "run", action, item };
-    state.flash = { text: action && item ? "Nothing done" : "That item is gone", tone: "dim" };
-    return NONE;
+    if (!action || !item) {
+      state.flash = { text: "That item is gone", tone: "dim" };
+      return NONE;
+    }
+    if (char !== "y" && char !== "Y") {
+      state.flash = { text: "Nothing done", tone: "dim" };
+      return NONE;
+    }
+    // The item may have changed while the question was up, e.g. the run finished.
+    const ok = action.available ? action.available(item.value) : true;
+    if (ok !== true) {
+      state.flash = { text: ok, tone: "warning" };
+      return NONE;
+    }
+    return { type: "run", action, item };
   }
   if (state.help) {
     state.help = false;
@@ -136,7 +162,7 @@ export function input<T>(state: PanelState, source: Source<T>, event: PanelInput
     case "tab": case "backTab": {
       const views = source.views;
       const i = views.findIndex((v) => v.id === state.view) + (key === "tab" ? 1 : -1);
-      setView(state, views[(i + views.length) % views.length].id);
+      pickView(state, views[(i + views.length) % views.length].id);
       return NONE;
     }
     case "zoom": state.zoom = !state.zoom; return NONE;
@@ -154,7 +180,7 @@ export function input<T>(state: PanelState, source: Source<T>, event: PanelInput
 /** A printable key outside the filter: a view number, an action, a vi key, or the start of a filter. */
 function pressChar<T>(state: PanelState, source: Source<T>, items: Item<T>[], char: string): Command<T> {
   if (/^[1-9]$/.test(char) && Number(char) <= source.views.length) {
-    setView(state, source.views[Number(char) - 1].id);
+    pickView(state, source.views[Number(char) - 1].id);
     return NONE;
   }
   if (char === "?") { state.help = true; return NONE; }
@@ -217,6 +243,8 @@ function move<T>(state: PanelState, source: Source<T>, items: Item<T>[], key: Pa
 function moveCursor<T>(state: PanelState, item: Item<T>, open: boolean[], key: PanelKey) {
   const count = open.length;
   if (!count) return;
+  // Entries may have gone since the cursor was placed.
+  state.cursor = Math.min(count - 1, Math.max(0, state.cursor));
   if (key === "enter") {
     const id = `${item.id}:${state.view}:${state.cursor}`;
     state.expanded[id] = !(state.expanded[id] ?? open[state.cursor]);

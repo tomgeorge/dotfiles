@@ -90,16 +90,38 @@ export function openPanel<T>(ctx: ExtensionContext, source: Source<T>, opts: Pan
   let closeRequested = false;
   const closeKeys = opts.closeKey ? [opts.closeKey] : [];
   const closeHint = opts.closeKey ? `${opts.closeKey} close` : undefined;
+  // Pi installs the component in a later microtask and disposes only an installed one, so a
+  // close before then (or a throw while building it) would skip dispose(). Every close path
+  // and the settled promise run this instead; it runs once.
+  let ticker: ReturnType<typeof setInterval> | undefined;
+  let unsubscribe: (() => void) | undefined;
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    clearInterval(ticker);
+    try {
+      unsubscribe?.();
+    } finally {
+      source.dispose?.();
+    }
+  };
 
-  const closed = ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-    finish = () => done();
+  const closed = ctx.ui.custom<void>((tui, theme, _keybindings, piDone) => {
+    const done = () => { cleanup(); piDone(); };
+    finish = done;
     const style = (opts.style ?? makeStyle)(theme);
     const rerender = () => tui.requestRender();
     let frame = 0;
     // Counts key presses, so a slow action's result doesn't clobber a newer flash.
     let keys = 0;
-    const ticker = setInterval(() => { frame++; rerender(); }, opts.tickMs ?? TICK_MS);
-    const unsubscribe = source.subscribe?.(rerender);
+    ticker = setInterval(() => { frame++; rerender(); }, opts.tickMs ?? TICK_MS);
+    try {
+      unsubscribe = source.subscribe?.(rerender);
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
 
     const run = (action: Action<T>, item: Item<T>) => {
       const started = keys;
@@ -149,15 +171,14 @@ export function openPanel<T>(ctx: ExtensionContext, source: Source<T>, opts: Pan
         rerender();
       },
       invalidate() {},
-      dispose() {
-        clearInterval(ticker);
-        unsubscribe?.();
-        source.dispose?.();
-      },
+      dispose: cleanup,
     };
   }, { overlay: true, overlayOptions: opts.overlay ?? OVERLAY })
     .catch((error: unknown) => ctx.ui.notify(`${source.name} panel: ${(error as Error).message}`, "error"))
-    .finally(() => { open.delete(id); });
+    .finally(() => {
+      open.delete(id);
+      cleanup();
+    });
 
   return {
     close() {

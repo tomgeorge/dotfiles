@@ -517,3 +517,86 @@ test("views get the time, a style, and a way to ask for a re-render", () => {
   assert.match(text, /MD # hi/);
   assert.match(renderPanel(source, state, NOW, 120, 30, plain, { frame: 0 }).lines.join("\n"), /│ # hi/, "markdown falls back to plain text");
 });
+
+test("a selected item's default view follows it as it changes, until the user picks a view", () => {
+  const jobs = [job(1, { status: "done" }), job(2)];
+  const base = fixtureSource(jobs);
+  const source: Source<Job> = { ...base, items: () => base.items().map((i) => ({ ...i, defaultView: i.running ? "live" : "spec" })) };
+  const state = initialState(source);
+  const screen = () => renderPanel(source, state, NOW, 120, 30, plain, { frame: 0 }).lines.join("\n");
+  assert.equal(state.selected, "2");
+  assert.equal(state.view, "live");
+  screen();
+  state.scroll = 3;
+  state.follow = false;
+  // #2 finishes while selected: same id, new default view.
+  jobs[1].status = "done";
+  assert.match(screen(), /\[2 Spec\]/);
+  assert.equal(state.view, "spec");
+  assert.equal(state.scroll, 0, "scroll resets with the view");
+  assert.equal(state.follow, true);
+
+  // A view the user picks sticks through a change.
+  jobs[1].status = "running";
+  screen();
+  assert.equal(state.view, "live");
+  input(state, source, { char: "1" });
+  jobs[1].status = "done";
+  screen();
+  assert.equal(state.view, "overview");
+  // Selecting another item follows its default again.
+  input(state, source, { char: "k" });
+  assert.equal(state.view, "spec");
+  jobs[0].status = "running";
+  screen();
+  assert.equal(state.view, "live");
+});
+
+test("y re-checks the action against the item as it is now", () => {
+  const jobs = [job(1), job(2)];
+  const p = panel(jobs);
+  p.press("x");
+  assert.ok(p.state.confirm);
+  // #2 finished while the question was up.
+  jobs[1].status = "done";
+  assert.equal(ran(p.press("y")), "none");
+  assert.deepEqual(p.state.flash, { text: "#2 is not running", tone: "warning" });
+  assert.equal(p.state.confirm, undefined);
+
+  // The item disappears while the question is up.
+  p.press("k", "x");
+  assert.equal(p.state.confirm?.item, "1");
+  jobs.splice(0, 1);
+  assert.equal(ran(p.press("y")), "none");
+  assert.deepEqual(p.state.flash, { text: "That item is gone", tone: "dim" });
+});
+
+test("a collapsible list that shrinks keeps the cursor on an entry", () => {
+  const check = (i: number) => ({ command: `check ${i}`, exit: 1, tail: `out ${i}` });
+  const jobs = [job(1, { status: "done", checks: [0, 1, 2, 3].map(check) })];
+  const p = panel(jobs);
+  p.press("3");
+  p.render();
+  p.press(key("enter"), "G");
+  assert.equal(p.state.cursor, 3);
+  jobs[0].checks = [0, 1].map(check);
+  assert.match(p.screen(), /›▾ FAIL 1 +check 1/);
+  assert.equal(p.state.cursor, 1);
+  p.press(key("enter"));
+  assert.ok(!p.screen().includes("out 1"), "enter closed the last remaining entry");
+  assert.deepEqual(Object.keys(p.state.expanded), ["1:checks:1"]);
+
+  // Shrinks again with no render between: enter clamps against what was drawn last.
+  p.press("G");
+  p.state.cursor = 9;
+  p.press(key("enter"));
+  assert.equal(p.state.cursor, 1);
+  assert.ok(p.screen().includes("out 1"), "it toggled the last entry, not a missing one");
+
+  const checks = p.source.views.find((v) => v.id === "checks")!;
+  checks.render = () => ({ kind: "collapsible", items: [], note: "All gone" });
+  assert.match(p.screen(), /All gone/);
+  assert.equal(p.state.cursor, 0, "an empty list resets the cursor");
+  p.press(key("enter"));
+  assert.deepEqual(Object.keys(p.state.expanded), ["1:checks:1"], "enter on an empty list toggles nothing");
+});

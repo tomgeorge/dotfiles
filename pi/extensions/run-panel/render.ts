@@ -186,6 +186,8 @@ interface Place { state: PanelState; key: string }
 function collapsibleBody(content: Extract<Content, { kind: "collapsible" }>, place: Place, width: number, s: Style): Body {
   const { state, key } = place;
   state.collapsible = { key, open: content.items.map((i) => i.open) };
+  // A refresh can drop entries from under the cursor.
+  state.cursor = Math.min(Math.max(0, content.items.length - 1), Math.max(0, state.cursor));
   if (!content.items.length) return { lines: content.note ? wrapAll(content.note, width, s) : [] };
   const lines: string[] = [];
   let anchor = 0;
