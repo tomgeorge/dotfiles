@@ -1,3 +1,4 @@
+import { box, clean, duration, oneLine, padStart, SPINNER, tildify, type Style, type Tone } from "../run-panel/format.ts";
 import { git as runGit, type GitResult } from "./git.ts";
 import type { CheckResult, TaskReport } from "./handoff.ts";
 import { money, ref, runningTasks, spent, type CrewState, type TaskRecord, type TaskStatus } from "./state.ts";
@@ -7,19 +8,6 @@ import type { Entry, TranscriptView } from "./transcript.ts";
 // injected (Pi's theme and pi-tui in production), as in the subagent and watch panels, so
 // layout and keys are testable without Pi. Read-only apart from cancelling a running task.
 
-export type Tone = "accent" | "muted" | "dim" | "success" | "error" | "warning" | "border" | "borderAccent" | "text";
-
-export interface Style {
-  fg(tone: Tone, text: string): string;
-  bold(text: string): string;
-  /** Highlight for the selected list row. */
-  selected(text: string): string;
-  width(text: string): number;
-  /** Cut to `width` columns with an ellipsis; `pad` fills short text with spaces. */
-  truncate(text: string, width: number, pad?: boolean): string;
-  wrap(text: string, width: number): string[];
-}
-
 const TABS = ["overview", "spec", "handoff", "checks", "diff", "live"] as const;
 export type Tab = (typeof TABS)[number];
 const TAB_LABELS: Record<Tab, string> = { overview: "Overview", spec: "Spec", handoff: "Handoff", checks: "Checks", diff: "Diff", live: "Live" };
@@ -28,34 +16,9 @@ const TAB_LABELS: Record<Tab, string> = { overview: "Overview", spec: "Spec", ha
 const SIDE_BY_SIDE = 100;
 /** A running task with no stream event for this long is shown as quiet. */
 const QUIET_MS = 60_000;
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TAIL_LINES = 40;
 
 // ── Formatting ───────────────────────────────────────────────────────────
-
-function duration(ms: number): string {
-  const secs = Math.max(0, Math.floor(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m${String(secs % 60).padStart(2, "0")}s`;
-  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m`;
-}
-
-const home = process.env.HOME ?? "";
-const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
-
-/** Worker output and check tails can carry ANSI colours and tabs; either breaks column math. */
-export function clean(text: string): string {
-  return text
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-    .replace(/\x1b./g, "")
-    .replace(/\t/g, "    ")
-    .replace(/\r/g, "")
-    .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, "");
-}
-
-const oneLine = (text: string) => clean(text).replace(/\s+/g, " ").trim();
 
 /** `quiet 2m` for a running task that has gone silent, in warning colour, or error past stallMin. */
 export function quiet(task: TaskRecord, now: number, stallMin: number): { text: string; tone: Tone } | undefined {
@@ -83,7 +46,6 @@ function glyph(task: TaskRecord, frame: number, s: Style): string {
 }
 
 const elapsed = (t: TaskRecord, now: number) => (t.endedAt ?? now) - t.startedAt;
-const padStart = (text: string, width: number, s: Style) => " ".repeat(Math.max(0, width - s.width(text))) + text;
 
 // ── Filtering ────────────────────────────────────────────────────────────
 
@@ -449,17 +411,6 @@ export interface PanelRender {
   lines: string[];
   /** Detail body height, for paging. */
   page: number;
-}
-
-function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style, bottom = ""): string[] {
-  const tone: Tone = focused ? "borderAccent" : "border";
-  const inner = Math.max(1, width - 2);
-  const head = s.truncate(` ${title} `, Math.max(0, inner - 1));
-  const lines = [s.fg(tone, "┌─") + head + s.fg(tone, `${"─".repeat(Math.max(0, inner - 1 - s.width(head)))}┐`)];
-  for (let i = 0; i < height - 2; i++) lines.push(s.fg(tone, "│") + s.truncate(body[i] ?? "", inner, true) + s.fg(tone, "│"));
-  const tail = bottom && s.width(bottom) + 3 <= inner ? ` ${bottom} ` : "";
-  lines.push(s.fg(tone, `└${"─".repeat(inner - s.width(tail) - (tail ? 1 : 0))}`) + tail + s.fg(tone, `${tail ? "─" : ""}┘`));
-  return lines;
 }
 
 function bar(fraction: number, cells: number, s: Style): string {

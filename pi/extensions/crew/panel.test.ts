@@ -6,9 +6,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { git } from "./git.ts";
 import type { TaskReport } from "./handoff.ts";
+import type { Style, Tone } from "../run-panel/format.ts";
 import {
-  clean, DiffCache, diffTarget, filterTasks, initialPanel, panelInput, panelLines, quiet,
-  type DiffView, type PanelInput, type PanelState, type RenderDeps, type Style, type Tone,
+  DiffCache, diffTarget, filterTasks, initialPanel, panelInput, panelLines, quiet,
+  type DiffView, type PanelInput, type PanelState, type RenderDeps,
 } from "./panel.ts";
 import type { CrewState, TaskRecord } from "./state.ts";
 import { Transcript, type TranscriptView } from "./transcript.ts";
@@ -110,10 +111,6 @@ test("a quiet running task shows quiet time: warning past 60s, error past stallM
   assert.deepEqual(quiet(task(1, { lastEventAt: NOW - 61 * 60_000 }), NOW, 120), { text: "quiet 1h01m", tone: "warning" });
   // A finished task is never quiet, however old its last event.
   assert.equal(quiet(task(1, { status: "submitted", lastEventAt: 0 }), NOW, 10), undefined);
-});
-
-test("worker text is cleaned of escapes, tabs, and control characters before layout", () => {
-  assert.equal(clean("a\x1b[31mred\x1b[0m\tb\r\x07c\x1b]8;;http://x\x07link"), "ared    bclink");
 });
 
 // ── Filtering ────────────────────────────────────────────────────────────

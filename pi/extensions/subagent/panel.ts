@@ -1,42 +1,17 @@
+import { box, duration, elapsedClock, money, padStart, SPINNER, tildify, type Style as BaseStyle } from "../run-panel/format.ts";
 import type { JobRecord } from "./jobs.ts";
 
 // Rendering for the below-editor widget and the /subagents popup. Styling and
 // terminal-width handling are injected (Pi's theme and pi-tui in production) so
 // layout is testable without Pi.
 
-export type Tone = "accent" | "muted" | "dim" | "success" | "error" | "warning" | "border" | "borderAccent" | "text";
+/** Tasks and results are markdown, so this panel needs the optional renderer. */
+export type Style = BaseStyle & Required<Pick<BaseStyle, "markdown">>;
 
-export interface Style {
-  fg(tone: Tone, text: string): string;
-  bold(text: string): string;
-  /** Highlight for the selected list row. */
-  selected(text: string): string;
-  width(text: string): number;
-  /** Cut to `width` columns with an ellipsis; `pad` fills short text with spaces. */
-  truncate(text: string, width: number, pad?: boolean): string;
-  wrap(text: string, width: number): string[];
-  /** Render markdown (tasks and results) to lines no wider than `width`. */
-  markdown(text: string, width: number): string[];
-}
-
-export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 export const WIDGET_ROWS = 5;
 /** Task lines shown in the detail head before "… N more lines". */
 const TASK_PREVIEW_LINES = 3;
 const LABEL_WIDTH = 6;
-
-export function duration(ms: number): string {
-  const secs = Math.max(0, Math.floor(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m${String(secs % 60).padStart(2, "0")}s`;
-  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m`;
-}
-
-export function money(usd: number): string {
-  if (usd > 0 && usd < 0.01) return "<$0.01";
-  return `$${usd.toFixed(2)}`;
-}
 
 export function tokens(n: number): string {
   if (n < 1000) return String(n);
@@ -82,8 +57,6 @@ function icon(job: JobRecord, frame: number, s: Style) {
 }
 
 const spent = (jobs: JobRecord[]) => jobs.reduce((sum, job) => sum + job.progress.usage.cost, 0);
-
-const padStart = (text: string, width: number, s: Style) => " ".repeat(Math.max(0, width - s.width(text))) + text;
 
 /** A rule with a left title and optional right hint, e.g. `─ Subagents ───── hint ─`. */
 function rule(left: string, right: string, width: number, s: Style) {
@@ -219,30 +192,11 @@ function scrollBody(state: PopupState, key: PopupKey, page: number) {
   else if (delta !== undefined) state.scroll = Math.max(0, current + delta);
 }
 
-function box(title: string, body: string[], width: number, height: number, focused: boolean, s: Style): string[] {
-  const tone: Tone = focused ? "borderAccent" : "border";
-  const inner = Math.max(1, width - 2);
-  const head = s.truncate(` ${title} `, Math.max(0, inner - 1));
-  const top = s.fg(tone, "┌─") + head + s.fg(tone, `${"─".repeat(Math.max(0, inner - 1 - s.width(head)))}┐`);
-  const lines = [top];
-  for (let i = 0; i < height - 2; i++) lines.push(s.fg(tone, "│") + s.truncate(body[i] ?? "", inner, true) + s.fg(tone, "│"));
-  lines.push(s.fg(tone, `└${"─".repeat(inner)}┘`));
-  return lines;
-}
-
-const home = process.env.HOME ?? "";
-const tildify = (path: string) => (home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path);
-
-function clock(ms: number) {
-  const secs = Math.floor(ms / 1000);
-  return `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
-}
-
 /** Body lines (activity log or result) for the detail pane. */
 export function bodyLines(job: JobRecord, view: BodyView, width: number, s: Style): string[] {
   if (view === "activity") {
     if (!job.log.length) return [s.fg("dim", "No tool calls yet")];
-    return job.log.map((entry) => `${s.fg("dim", clock(entry.at))} ${entry.text}`);
+    return job.log.map((entry) => `${s.fg("dim", elapsedClock(entry.at))} ${entry.text}`);
   }
   if (view === "task") return s.markdown(job.task, width);
   if (job.status === "running") return [s.fg("dim", "Still running")];

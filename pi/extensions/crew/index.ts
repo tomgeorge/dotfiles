@@ -6,12 +6,13 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type KeyId } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import type { Style } from "../run-panel/format.ts";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
   mergeBranch, outsidePaths, removeWorktree, repoInfo, runChecks, worktreePath,
 } from "./git.ts";
 import { failedChecks, formatReport, parseHandoff, type Outcome, type TaskReport } from "./handoff.ts";
-import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey, type Style } from "./panel.ts";
+import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
   formatStatus, formatWidget, listCrews, loadState, money, ref, runningTasks, saveState, sessionPath, slugify, spent,

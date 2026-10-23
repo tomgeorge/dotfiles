@@ -2,14 +2,13 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import {
-  anyChecking, initialPopup, popupKey, popupLines, widgetLines, WatchStore,
-  type PopupKey, type PopupState, type Style,
-} from "./panel.ts";
+import type { Style } from "../run-panel/format.ts";
+import { initialPopup, popupKey, popupLines, widgetLines, type PopupKey, type PopupState } from "./panel.ts";
 import {
   describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt, type FirstCheck,
 } from "./report.ts";
 import { runCheck } from "./runner.ts";
+import { anyChecking, WatchStore } from "./store.ts";
 import {
   buildSpec, DELIVER, oneLine, parseArgs, Registry, UNTIL,
   type EndReason, type Kind, type RunResult, type Watch, type WatchInput,
