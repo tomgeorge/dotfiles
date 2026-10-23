@@ -3,22 +3,21 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type KeyId } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { Style } from "../run-panel/format.ts";
+import { openPanel as showPanel } from "../run-panel/pi.ts";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
   mergeBranch, outsidePaths, removeWorktree, repoInfo, runChecks, worktreePath,
 } from "./git.ts";
 import { failedChecks, formatReport, parseHandoff, type Outcome, type TaskReport } from "./handoff.ts";
-import { DiffCache, diffTarget, initialPanel, panelInput, panelLines, type PanelInput, type PanelKey } from "./panel.ts";
 import { plannerPrompt, reviewerPrompt, workerPrompt } from "./prompts.ts";
 import {
   formatStatus, formatWidget, listCrews, loadState, money, ref, runningTasks, saveState, sessionPath, slugify, spent,
   type CrewConfig, type CrewState, type ModelRef, type TaskRecord, type TaskStatus,
 } from "./state.ts";
-import { SessionCache, Transcript, type TranscriptView } from "./transcript.ts";
+import { crewSource } from "./source.ts";
+import { Transcript } from "./transcript.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
 
 // Same reason as the subagent extension: keeps Anthropic subscription auth working
@@ -35,46 +34,8 @@ const REVIEW_DIFF_BYTES = 60_000;
 const DEFAULTS = { maxConcurrent: 3, budgetUsd: 10, taskTimeoutMin: 45, stallMin: 10 };
 // Free in Pi's defaults and in Ghostty on macOS; Linux terminals often bind it to copy.
 const PANEL_KEY = "ctrl+shift+c";
-const PANEL_TICK_MS = 500;
 // A crew that isn't live in this session is re-read from its ledger at most this often.
 const LEDGER_RELOAD_MS = 2_000;
-
-// First match wins. Printable keys that aren't listed go to the panel as characters.
-const PANEL_KEYS: [KeyId[], PanelKey][] = [
-  [["up", "ctrl+p"], "up"],
-  [["down", "ctrl+n"], "down"],
-  [["pageUp", "ctrl+u"], "pageUp"],
-  [["pageDown", "ctrl+d"], "pageDown"],
-  [["home"], "top"],
-  [["end"], "bottom"],
-  [["enter", "right"], "enter"],
-  [["left"], "left"],
-  [["escape"], "escape"],
-  [["tab"], "tab"],
-  [["shift+tab"], "backTab"],
-  [["backspace"], "backspace"],
-  [["ctrl+o"], "zoom"],
-  [["ctrl+c", PANEL_KEY], "close"],
-];
-
-function panelStyle(theme: Theme): Style {
-  return {
-    fg: (tone, text) => theme.fg(tone, text),
-    bold: (text) => theme.bold(text),
-    selected: (text) => theme.bg("selectedBg", text),
-    width: visibleWidth,
-    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
-    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
-  };
-}
-
-function panelEvent(data: string): PanelInput | undefined {
-  const key = PANEL_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1];
-  if (key) return { key };
-  // Kitty's keyboard protocol sends even plain letters as escape sequences.
-  const char = data.length === 1 && data >= " " && data !== "\x7f" ? data : decodeKittyPrintable(data);
-  return char ? { char } : undefined;
-}
 
 /** A finished implement task with the worktree and base a review needs. */
 type ReviewableTask = TaskRecord & { worktree: string; base: string };
@@ -604,102 +565,29 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       }
       return ledger;
     };
-    // Per panel: task ids repeat across crews.
-    const diffs = new DiffCache();
-    const sessions = new SessionCache();
-    void ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-      closePanel = done;
-      const style = panelStyle(theme);
-      const state = initialPanel(initial);
-      let frame = 0;
-      let page = 1;
-      // The panel never awaits planner work, so handoffs keep waking the planner while it's open.
-      const ticker = setInterval(() => { frame++; tui.requestRender(); }, PANEL_TICK_MS);
-      const diff = (task: TaskRecord) => {
-        const target = diffTarget(current(), task);
-        if ("message" in target) return { state: "unavailable" as const, message: target.message };
-        return diffs.get(task.id, current().config.repoRoot, target.base, target.branch, () => tui.requestRender());
-      };
-      const transcript = (task: TaskRecord): TranscriptView => {
-        // The stream is fresher than the file, which grows only as messages finish.
-        const streamed = transcripts.get(task);
-        if (streamed) return { state: "ready", transcript: streamed, source: "live" };
-        if (!task.session) return { state: "unavailable", message: "No transcript: this task started before workers recorded sessions." };
-        return sessions.get(task.session, () => tui.requestRender());
-      };
-      const cancelTask = (id: number, live: boolean) => {
-        const controller = live ? controllers.get(id) : undefined;
-        // Not quiet: the planner should hear that the human stopped a task.
+    const live = () => current() === crew && isActive();
+    const source = crewSource(current, {
+      live,
+      cancel(id) {
+        // Task ids repeat across crews: only the live crew's workers are ours to stop.
+        const controller = live() ? controllers.get(id) : undefined;
         controller?.abort();
-        state.flash = controller ? { text: `Cancelling #${id}; its handoff will wake the planner`, tone: "warning" }
-          : { text: `#${id} is no longer running`, tone: "dim" };
-      };
-      const copyWorktree = (task: TaskRecord | undefined, id: number) => {
-        if (!task?.worktree) {
-          state.flash = { text: `#${id} has no worktree`, tone: "warning" };
-          return;
-        }
-        const path = task.worktree;
-        state.flash = { text: path, tone: "accent" };
-        void copyPath(path).then((message) => {
-          if (state.flash?.text === path) state.flash = { text: message, tone: "accent" };
-          tui.requestRender();
-        });
-      };
-      const exportTask = (task: TaskRecord | undefined, id: number) => {
-        const session = task?.session;
-        if (!session || !existsSync(session)) {
-          state.flash = { text: `#${id} has no session file yet: the worker hasn't finished its first message`, tone: "warning" };
-          return;
-        }
-        if (exporting.has(session)) {
-          state.flash = { text: `#${id} is already being exported`, tone: "dim" };
-          return;
-        }
-        const output = session.replace(/\.jsonl$/, "") + ".html";
-        const tag = `Exporting #${id}\u2026`;
-        exporting.add(session);
-        state.flash = { text: tag, tone: "dim" };
-        // A running worker's export is a snapshot of the messages it has finished.
-        void exportSession(session, output)
-          .then(() => ({ text: `Exported #${id} to ${output}`, tone: "success" as const }))
-          .catch((error: unknown) => ({ text: `Export of #${id} failed: ${(error as Error).message}`, tone: "error" as const }))
-          .then((flash) => {
-            exporting.delete(session);
-            // A later key press cleared or replaced the flash: notify instead of clobbering it.
-            if (state.flash?.text === tag) state.flash = flash;
-            else ctx.ui.notify(flash.text, flash.tone === "error" ? "error" : "info");
-            tui.requestRender();
-          });
-      };
-      return {
-        render(width: number) {
-          const height = Math.max(12, Math.floor(tui.terminal.rows * 0.85));
-          const out = panelLines(current(), state, Date.now(), width, height, style, { diff, transcript, frame, closeHint: `${PANEL_KEY} close` });
-          page = out.page;
-          return out.lines;
-        },
-        handleInput(data: string) {
-          const event = panelEvent(data);
-          if (!event) return;
-          const shown = current();
-          const live = shown === crew && isActive();
-          const action = panelInput(state, shown.tasks, event, { page, live });
-          if (action.type === "close") return done();
-          const task = "id" in action ? shown.tasks.find((t) => t.id === action.id) : undefined;
-          if (action.type === "cancel") cancelTask(action.id, live);
-          else if (action.type === "open") copyWorktree(task, action.id);
-          else if (action.type === "export") exportTask(task, action.id);
-          tui.requestRender();
-        },
-        invalidate() {},
-        dispose() {
-          clearInterval(ticker);
-        },
-      };
-    }, { overlay: true, overlayOptions: { anchor: "center", width: "95%", minWidth: 60, maxHeight: "85%" } })
-      .catch((error: unknown) => warn(`crew panel: ${(error as Error).message}`))
-      .finally(() => { panelOpen = false; closePanel = undefined; });
+        return !!controller;
+      },
+      streamed: (task) => transcripts.get(task),
+      copyPath,
+      exportSession,
+      exporting,
+      fileExists: existsSync,
+    });
+    // The panel never awaits planner work, so handoffs keep waking the planner while it's open.
+    const handle = showPanel(ctx, source, { id: "crew", closeKey: PANEL_KEY });
+    if (!handle) {
+      panelOpen = false;
+      return;
+    }
+    closePanel = handle.close;
+    void handle.closed.finally(() => { panelOpen = false; closePanel = undefined; });
   }
 
   pi.registerShortcut(PANEL_KEY, {

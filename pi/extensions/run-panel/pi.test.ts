@@ -186,7 +186,9 @@ test("the tick animates spinners and re-renders", async () => {
   const handle = openPanel(f.ctx, fixtureSource([job(1)]), { tickMs: 5 })!;
   try {
     const first = f.screen();
-    await new Promise((r) => setTimeout(r, 30));
+    // Polled, not a fixed sleep: timers run late when the whole suite runs in parallel.
+    const deadline = Date.now() + 2_000;
+    while (f.opened[0].renders < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5));
     assert.ok(f.opened[0].renders >= 2);
     assert.notEqual(f.screen(), first, "the spinner moved");
   } finally {
