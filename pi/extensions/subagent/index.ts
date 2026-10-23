@@ -288,7 +288,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("subagents", {
     description: `Browse subagents: status, activity, spend, results (${PANEL_KEY})`,
-    handler: (_args, ctx) => openPanel(ctx),
+    handler: async (_args, ctx) => openPanel(ctx),
   });
 
   pi.registerShortcut(PANEL_KEY, {

@@ -561,7 +561,8 @@ test("y re-checks the action against the item as it is now", () => {
   jobs[1].status = "done";
   assert.equal(ran(p.press("y")), "none");
   assert.deepEqual(p.state.flash, { text: "#2 is not running", tone: "warning" });
-  assert.equal(p.state.confirm, undefined);
+  // Not `confirm` itself: asserting it undefined would narrow it to never for the checks below.
+  assert.equal(p.state.confirm?.item, undefined);
 
   // The item disappears while the question is up.
   p.press("k", "x");
