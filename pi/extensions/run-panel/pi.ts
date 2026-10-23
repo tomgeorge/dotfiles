@@ -66,6 +66,12 @@ export interface PanelOptions {
   closeKey?: KeyId;
   /** Spinner and refresh interval. */
   tickMs?: number;
+  /**
+   * A faster interval while a spinner shows (the source is busy, or an item has no glyph), so
+   * spinners animate smoothly without redrawing that often when nothing spins. Unset: always
+   * `tickMs`.
+   */
+  spinnerMs?: number;
   overlay?: OverlayOptions;
   /** Default `makeStyle(theme)`. */
   style?(theme: Theme): Style;
@@ -79,6 +85,9 @@ export interface PanelHandle {
 
 /** Panels open in this extension, by id. Per extension: Pi loads each with its own module cache. */
 const open = new Set<string>();
+
+/** A spinner is on screen: the source is busy, or an item shows the default spinner glyph. */
+export const spinning = (source: Source<any>) => !!source.busy?.() || source.items().some((item) => item.glyph === undefined);
 
 const notifyType = (tone: Tone) => (tone === "error" ? "error" : tone === "warning" ? "warning" : "info");
 
@@ -121,7 +130,17 @@ export function openPanel<T>(ctx: ExtensionContext, source: Source<T>, opts: Pan
     let frame = 0;
     // Counts key presses, so a slow action's result doesn't clobber a newer flash.
     let keys = 0;
-    ticker = setInterval(() => { frame++; rerender(); }, opts.tickMs ?? TICK_MS);
+    const slow = opts.tickMs ?? TICK_MS;
+    const fast = opts.spinnerMs !== undefined && opts.spinnerMs < slow ? opts.spinnerMs : undefined;
+    let ticked = Date.now();
+    ticker = setInterval(() => {
+      const now = Date.now();
+      // At the fast rate, skip frames with nothing spinning until the slow interval is up.
+      if (fast !== undefined && now - ticked < slow && !spinning(source)) return;
+      ticked = now;
+      frame++;
+      rerender();
+    }, fast ?? slow);
     try {
       unsubscribe = source.subscribe?.(rerender);
     } catch (error) {
