@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
-import { fakePi } from "../test-support/fake-pi.ts";
+import { createEventBus, fakePi } from "../test-support/fake-pi.ts";
+import { LEADER_CONTRIBUTE, LEADER_DISCOVER } from "../vi-mode/leaderContract.ts";
 
 // After fake-pi registers its module stubs.
 const { default: watchExtension } = await import("./index.ts");
@@ -79,4 +80,25 @@ test("timeouts report through the watch's delivery; loops only notify", async (t
   // Normally one check; a second can start if the runner's kill (libuv clock)
   // beats the Registry's Date.now deadline by a hair.
   assert.match(sent[1].content, /^Watch #1 timed out after 1s without its condition being met: sleep 2\nCommand: sleep 2\nLast check was still running and was killed after \d+ checks?\.\n\n\(no output\)$/);
+});
+
+test("contributes SPC w l on load and again on leader:discover, with no shortcut", () => {
+  const events = createEventBus();
+  const seen: unknown[] = [];
+  events.on(LEADER_CONTRIBUTE, (data) => seen.push(data));
+  const f = fakePi({ events });
+  watchExtension(f.pi);
+  const expected = {
+    source: "watch",
+    bindings: [{
+      id: "watch.list",
+      path: [{ key: "w", label: "watches" }, { key: "l", label: "list" }],
+      command: { name: "watches" },
+    }],
+  };
+  assert.deepEqual(seen, [expected]);
+  events.emit(LEADER_DISCOVER, undefined);
+  assert.deepEqual(seen, [expected, expected]);
+  assert.ok(f.commands.has("watches"), "the bound command exists");
+  assert.equal(f.shortcuts.size, 0);
 });

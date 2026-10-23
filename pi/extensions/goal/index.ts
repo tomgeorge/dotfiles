@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { contributeLeader, type LeaderBinding } from "../vi-mode/leaderContract.ts";
 import {
   continuationMessage, decide, GOAL_GUIDELINES, goalFromEntry, newGoal, parseGoalArgs, runCheck, startMessage, statusLine,
   type Goal, type LifecycleWord, type SetCommand,
@@ -8,7 +9,23 @@ import {
 const CHECK_TIMEOUT_MS = 10 * 60_000;
 const ENTRY = "goal-state";
 
+// SPC g <word> runs /goal <word>. Setting a goal needs an objective and a check,
+// so the leader doesn't bind it.
+const GROUP = { key: "g", label: "goal" };
+const LEADER_WORDS: { key: string; word: LifecycleWord }[] = [
+  { key: "s", word: "status" },
+  { key: "p", word: "pause" },
+  { key: "r", word: "resume" },
+  { key: "c", word: "clear" },
+];
+const LEADER_BINDINGS: LeaderBinding[] = LEADER_WORDS.map(({ key, word }) => ({
+  id: `goal.${word}`,
+  path: [GROUP, { key, label: word }],
+  command: { name: "goal", args: word },
+}));
+
 export default function (pi: ExtensionAPI) {
+  contributeLeader(pi.events, "goal", LEADER_BINDINGS);
   let goal: Goal | undefined;
   // The loaded session's context, kept for rendering status outside event handlers.
   let session: ExtensionContext | undefined;

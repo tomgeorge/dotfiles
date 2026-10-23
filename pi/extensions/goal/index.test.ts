@@ -3,7 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fakePi } from "../test-support/fake-pi.ts";
+import { createEventBus, fakePi } from "../test-support/fake-pi.ts";
+import { LEADER_CONTRIBUTE, LEADER_DISCOVER } from "../vi-mode/leaderContract.ts";
 
 // After fake-pi registers its module stubs.
 const { default: goalExtension } = await import("./index.ts");
@@ -157,4 +158,25 @@ test("a malformed latest goal entry leaves no goal, without resurrecting the ear
   assert.ok(!f.active().includes("goal_park"), "the earlier active goal stays dropped");
   await f.command("goal", "status", ctx);
   assert.match(f.notes.at(-1)!, /^No goal/);
+});
+
+test("contributes SPC g bindings on load and again on leader:discover", () => {
+  const events = createEventBus();
+  const seen: unknown[] = [];
+  events.on(LEADER_CONTRIBUTE, (data) => seen.push(data));
+  const f = fakePi({ events });
+  goalExtension(f.pi);
+  const expected = {
+    source: "goal",
+    bindings: [["s", "status"], ["p", "pause"], ["r", "resume"], ["c", "clear"]].map(([key, word]) => ({
+      id: `goal.${word}`,
+      path: [{ key: "g", label: "goal" }, { key, label: word }],
+      command: { name: "goal", args: word },
+    })),
+  };
+  assert.deepEqual(seen, [expected]);
+  events.emit(LEADER_DISCOVER, undefined);
+  assert.deepEqual(seen, [expected, expected]);
+  assert.ok(f.commands.has("goal"), "the bound command exists");
+  assert.equal(f.shortcuts.size, 0);
 });
