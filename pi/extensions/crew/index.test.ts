@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, write
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { fakePi } from "../test-support/fake-pi.ts";
+import { createEventBus, fakePi } from "../test-support/fake-pi.ts";
+import { LEADER_CONTRIBUTE, LEADER_DISCOVER, type LeaderContribution } from "../vi-mode/leaderContract.ts";
 
 // Worktrees go under $HOME/git/worktrees; keep them out of the real home.
 const HOME = realpathSync(mkdtempSync(join(tmpdir(), "crew-home-")));
@@ -460,13 +461,12 @@ function panelUi(ctx: any) {
     assert.equal(returned, true, "the command returned while the panel is still open");
   };
   const screen = () => opened.at(-1)!.component.render(120).join("\n") as string;
-  // Pi doesn't await shortcut handlers; neither does this.
-  const shortcut = async (f: any, context: any) => {
-    void f.shortcuts.get("ctrl+shift+c").handler(context);
+  const status = async (f: any, context: any) => {
+    await returnsOpen(f.command("crew-status", "", context));
     await waitFor(() => opened.length > 0, "the panel");
   };
   const type = (...keys: string[]) => { for (const k of keys) opened.at(-1)!.component.handleInput(k); };
-  return { opened, screen, type, shortcut, closeAll, returnsOpen };
+  return { opened, screen, type, status, closeAll, returnsOpen };
 }
 
 crewTest("/crew with no goal opens the panel on live, in-memory task state without blocking", async (e) => {
@@ -497,7 +497,7 @@ crewTest("/crew with no goal opens the panel on live, in-memory task state witho
 crewTest("cancelling from the panel asks first, then stops the worker and wakes the planner", async (e) => {
   const ui = panelUi(e.ctx);
   await e.dispatch();
-  await ui.shortcut(e.f, e.ctx);
+  await ui.status(e.f, e.ctx);
   try {
     ui.type("x");
     assert.match(ui.screen(), /Cancel #1 "do it"\?/);
@@ -520,7 +520,7 @@ crewTest("the live tab streams the worker's events; a crew from the ledger falls
     const emit = e.w.list[0].opts.onEvent;
     emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "pondering the theme" } });
     emit({ type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: { command: "npm test" } });
-    await ui.shortcut(e.f, e.ctx);
+    await ui.status(e.f, e.ctx);
     ui.type("6");
     let text = ui.screen();
     assert.match(text, /streaming from the worker/);
@@ -538,7 +538,7 @@ crewTest("the live tab streams the worker's events; a crew from the ledger falls
     const other = panelUi(b.ctx);
     try {
       await b.f.emit("session_start", {}, b.ctx);
-      await other.shortcut(b.f, b.ctx);
+      await other.status(b.f, b.ctx);
       other.type("6");
       await waitFor(() => /from the file/.test(other.screen()), "the session file");
       assert.match(other.screen(), /from the session file/);
@@ -560,7 +560,7 @@ test("e exports the selected task's session next to it, and reports a missing fi
   const ui = panelUi(e.ctx);
   try {
     await e.dispatch();
-    await ui.shortcut(e.f, e.ctx);
+    await ui.status(e.f, e.ctx);
     ui.type("e");
     assert.match(ui.screen(), /#1 has no session file yet/);
     assert.equal(calls.length, 0);
@@ -582,7 +582,7 @@ test("e exports the selected task's session next to it, and reports a missing fi
   }
 });
 
-test("the shortcut opens a stopped crew from the ledger in a new session, read-only", BOUND, async (t) => {
+test("/crew-status opens a stopped crew from the ledger in a new session, read-only", BOUND, async (t) => {
   const root = makeRepo();
   const a = boot(root);
   onCancel(t, a.shutdown);
@@ -601,7 +601,7 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
   });
   try {
     await b.f.emit("session_start", {}, b.ctx);
-    await ui.shortcut(b.f, b.ctx);
+    await ui.status(b.f, b.ctx);
     const text = ui.screen();
     assert.match(text, /stopped · ledger goal/);
     assert.match(text, /#1 impl left behind .*cancelled/);
@@ -631,16 +631,139 @@ test("the shortcut opens a stopped crew from the ledger in a new session, read-o
   }
 });
 
-test("the shortcut says so when the repository has no crews", BOUND, async (t) => {
+test("/crew-status and /crews say so when the repository has no crews", BOUND, async (t) => {
   const e = boot(makeRepo());
   onCancel(t, e.shutdown);
   try {
     const ui = panelUi(e.ctx);
-    await e.f.shortcuts.get("ctrl+shift+c")!.handler(e.ctx);
+    await e.f.command("crew-status", "", e.ctx);
     assert.equal(ui.opened.length, 0);
     assert.match(e.f.notes.at(-1)!, /No crews in this repository/);
+    e.f.notes.length = 0;
+    await e.f.command("crews", "", e.ctx);
+    assert.equal(ui.opened.length, 0);
+    assert.deepEqual(e.f.notes, ["No crews in this repository"]);
   } finally {
     await e.shutdown();
+  }
+});
+
+test("/crews picks any crew from the ledger and opens it; without a UI it lists them", BOUND, async (t) => {
+  const root = makeRepo();
+  const a = boot(root);
+  onCancel(t, a.shutdown);
+  await a.f.emit("session_start", {}, a.ctx);
+  await a.f.command("crew", "first goal", a.ctx);
+  await a.f.command("crew-stop", "", a.ctx);
+  const long = `second goal ${"x".repeat(80)}`;
+  await a.f.command("crew", long, a.ctx);
+  await a.f.command("crew-stop", "", a.ctx);
+  await a.shutdown();
+
+  const b = boot(root);
+  const ui = panelUi(b.ctx);
+  onCancel(t, async () => {
+    ui.closeAll();
+    await b.shutdown();
+  });
+  try {
+    await b.f.emit("session_start", {}, b.ctx);
+    let offered: string[] = [];
+    // The base fake's select type takes no arguments; Object.assign widens it.
+    Object.assign(b.ctx.ui, {
+      select: async (title: string, options: string[]) => {
+        assert.equal(title, "Crews");
+        offered = options;
+        return options.find((o) => o.includes("first goal"));
+      },
+    });
+    await ui.returnsOpen(b.f.command("crews", "", b.ctx));
+    assert.equal(offered.length, 2);
+    for (const row of offered) assert.match(row, /^\S+ · stopped · /);
+    const longRow = offered.find((o) => o.includes("second goal"));
+    assert.ok(longRow && longRow.endsWith("…") && !longRow.includes("x".repeat(70)), `goal cut: ${longRow}`);
+    assert.equal(ui.opened.length, 1);
+    assert.match(ui.screen(), /stopped · first goal/);
+    ui.type("q");
+    await waitFor(() => ui.opened[0].closed, "close");
+
+    // Cancelling the picker opens nothing.
+    b.ctx.ui.select = async () => undefined;
+    await b.f.command("crews", "", b.ctx);
+    assert.equal(ui.opened.length, 1);
+
+    const logged: string[] = [];
+    const log = console.log;
+    console.log = (text: string) => { logged.push(text); };
+    try {
+      await b.f.command("crews", "", { ...b.ctx, hasUI: false });
+    } finally {
+      console.log = log;
+    }
+    assert.deepEqual(logged.join("\n").split("\n"), offered);
+  } finally {
+    ui.closeAll();
+    await b.shutdown();
+  }
+});
+
+test("crew registers no shortcut and contributes its leader group on load and on discover", BOUND, async (t) => {
+  const events = createEventBus();
+  const seen: LeaderContribution[] = [];
+  events.on(LEADER_CONTRIBUTE, (data) => { seen.push(data as LeaderContribution); });
+  const f = fakePi({ events });
+  crewExtension(f.pi, { runWorker: workers().run as any });
+  t.after(() => f.emit("session_shutdown", {}, f.ctx(tmpdir())));
+  assert.equal(f.shortcuts.size, 0);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].source, "crew");
+  const keys = (c: LeaderContribution) => c.bindings.map((b) => b.path.map((s) => s.key).join(" "));
+  assert.deepEqual(keys(seen[0]), ["c l", "c s", "c r", "c c"]);
+  for (const b of seen[0].bindings) assert.equal(b.path[0].label, "crew");
+  assert.deepEqual(seen[0].bindings.map((b) => b.command.name), ["crews", "crew-status", "crew-resume", "crew-clean"]);
+  for (const b of seen[0].bindings) assert.ok(f.commands.has(b.command.name), `/${b.command.name} exists`);
+  assert.equal(new Set(seen[0].bindings.map((b) => b.id)).size, 4);
+  events.emit(LEADER_DISCOVER, undefined);
+  assert.equal(seen.length, 2);
+  assert.deepEqual(seen[1], seen[0]);
+});
+
+test("the crew group offers stop only while a crew is active", BOUND, async (t) => {
+  const events = createEventBus();
+  const seen: LeaderContribution[] = [];
+  events.on(LEADER_CONTRIBUTE, (data) => { seen.push(data as LeaderContribution); });
+  const root = makeRepo();
+  const w = workers();
+  const f = fakePi({ events });
+  crewExtension(f.pi, { runWorker: w.run as any });
+  const ctx = f.ctx(root, {
+    ui: {
+      notify: (text: string) => { f.notes.push(text); }, setStatus() {}, setWidget() {},
+      select: async (title: string, options: string[]) => (title.startsWith("Max concurrent") ? "3" : options[0]),
+      input: async () => "10", editor: async () => undefined, confirm: async () => true,
+    },
+    modelRegistry: { getAvailable: () => [{ provider: "p", id: "m" }] },
+  });
+  onCancel(t, () => f.emit("session_shutdown", {}, ctx));
+  const stop = () => seen.at(-1)?.bindings.find((b) => b.path[1]?.key === "x");
+  try {
+    await f.emit("session_start", {}, ctx);
+    assert.equal(stop(), undefined);
+    await f.command("crew", "leader goal", ctx);
+    const x = stop();
+    assert.ok(x, "stop offered while active");
+    assert.equal(x.command.name, "crew-stop");
+    assert.equal(x.path[1].tone, "exit");
+    events.emit(LEADER_DISCOVER, undefined);
+    assert.ok(stop(), "discover re-announces the active bindings");
+    await f.command("crew-stop", "", ctx);
+    assert.equal(stop(), undefined);
+    await f.command("crew-resume", "", ctx);
+    assert.ok(stop(), "stop offered again after resume");
+    await f.command("crew-stop", "", ctx);
+    assert.equal(stop(), undefined);
+  } finally {
+    await f.emit("session_shutdown", {}, ctx);
   }
 });
 

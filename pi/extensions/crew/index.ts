@@ -6,6 +6,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { openPanel as showPanel } from "../run-panel/pi.ts";
+import { contributeLeader, type LeaderBinding } from "../vi-mode/leaderContract.ts";
 import {
   addWorktree, branchCommits, branchFacts, commitAll, commonDirOf, diffText, dirtyFiles, discardChanges, GIT_ENV, gitOk,
   mergeBranch, outsidePaths, removeWorktree, repoInfo, runChecks, worktreePath,
@@ -33,7 +34,6 @@ const RENDER_MS = 1_000;
 const REVIEW_DIFF_BYTES = 60_000;
 const DEFAULTS = { maxConcurrent: 3, budgetUsd: 10, taskTimeoutMin: 45, stallMin: 10 };
 // Free in Pi's defaults and in Ghostty on macOS; Linux terminals often bind it to copy.
-const PANEL_KEY = "ctrl+shift+c";
 // A crew that isn't live in this session is re-read from its ledger at most this often.
 const LEDGER_RELOAD_MS = 2_000;
 
@@ -41,6 +41,27 @@ const LEDGER_RELOAD_MS = 2_000;
 type ReviewableTask = TaskRecord & { worktree: string; base: string };
 /** What crew_dispatch sets up before the worker starts. */
 interface Prepared { prompt: string; worktree: string }
+
+const CREW_GROUP = { key: "c", label: "crew" };
+const crewBinding = (id: string, key: string, label: string, name: string, tone?: "exit"): LeaderBinding =>
+  ({ id: `crew.${id}`, path: [CREW_GROUP, { key, label, ...(tone && { tone }) }], command: { name } });
+
+/** The `SPC c` group. Stop is offered only while a crew runs in this session. */
+export function crewBindings(active: boolean): LeaderBinding[] {
+  return [
+    crewBinding("list", "l", "list", "crews"),
+    crewBinding("status", "s", "status", "crew-status"),
+    crewBinding("resume", "r", "resume", "crew-resume"),
+    crewBinding("clean", "c", "clean", "crew-clean"),
+    ...(active ? [crewBinding("stop", "x", "stop", "crew-stop", "exit")] : []),
+  ];
+}
+
+/** One `/crews` row: `slug · status · goal`, the goal cut to fit. */
+export function crewLabel(state: CrewState): string {
+  const goal = state.config.goal.replace(/\s+/g, " ").trim();
+  return `${state.config.slug} · ${state.status} · ${goal.length > 60 ? `${goal.slice(0, 59)}…` : goal}`;
+}
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }], details: undefined });
 const addError = (report: TaskReport, error: string) => {
@@ -99,6 +120,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   let closePanel: (() => void) | undefined;
 
   const isActive = () => crew?.status === "active";
+  const leader = contributeLeader(pi.events, "crew", crewBindings(false));
   const withoutCrewTools = () => pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t));
 
   function warn(message: string) {
@@ -127,7 +149,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       ui.ui.setStatus("crew", undefined);
       return;
     }
-    ui.ui.setWidget("crew", formatWidget(crew, `${PANEL_KEY} or /crew`), { placement: "belowEditor" });
+    ui.ui.setWidget("crew", formatWidget(crew, "/crew-status"), { placement: "belowEditor" });
     ui.ui.setStatus("crew", `crew: ${runningTasks(crew).length} running`);
   }
 
@@ -159,6 +181,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     sweepTimer = setInterval(sweep, SWEEP_MS);
     if (ui?.hasUI) renderTimer = setInterval(render, RENDER_MS);
     render();
+    leader.update(crewBindings(true));
   }
 
   function deactivate() {
@@ -167,6 +190,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     toolsBefore = undefined;
     stopTimers();
     render();
+    leader.update(crewBindings(false));
   }
 
   function stopTimers() {
@@ -586,7 +610,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       fileExists: existsSync,
     });
     // The panel never awaits planner work, so handoffs keep waking the planner while it's open.
-    const handle = showPanel(ctx, source, { id: "crew", closeKey: PANEL_KEY });
+    const handle = showPanel(ctx, source, { id: "crew" });
     if (!handle) {
       panelOpen = false;
       return;
@@ -594,11 +618,6 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     closePanel = handle.close;
     void handle.closed.finally(() => { panelOpen = false; closePanel = undefined; });
   }
-
-  pi.registerShortcut(PANEL_KEY, {
-    description: "Open the crew panel",
-    handler: (ctx) => openPanel(ctx),
-  });
 
   // ---- commands ----------------------------------------------------------
 
@@ -611,7 +630,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   }
 
   pi.registerCommand("crew", {
-    description: `Start a crew: a planner (this session) delegating to worktree workers. /crew <goal>. With no goal, open the current or last unfinished crew's panel (${PANEL_KEY})`,
+    description: `Start a crew: a planner (this session) delegating to worktree workers. /crew <goal>. With no goal, open the current or last unfinished crew's panel`,
     handler: (args, ctx) => switchCrew(ctx, async () => {
       if (!args.trim() && ctx.hasUI) {
         const found = await panelCrew(ctx, true);
@@ -656,7 +675,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   });
 
   pi.registerCommand("crew-status", {
-    description: `Open the crew panel (${PANEL_KEY}); prints the ledger without a UI`,
+    description: "Open the crew panel; prints the ledger without a UI",
     async handler(_args, ctx) {
       const state = await panelCrew(ctx);
       // The text ledger stays for print mode and the planner's crew_status tool.
@@ -664,6 +683,23 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const message = state ? formatStatus(state) : "No crews in this repository";
       if (ctx.hasUI) ctx.ui.notify(message, "info");
       else console.log(message);
+    },
+  });
+
+  pi.registerCommand("crews", {
+    description: "Pick any crew in this repository and open its panel; lists them without a UI",
+    async handler(_args, ctx) {
+      const crews = listCrews(await commonDirOf(ctx.cwd));
+      if (!ctx.hasUI) {
+        console.log(crews.length ? crews.map(crewLabel).join("\n") : "No crews in this repository");
+        return;
+      }
+      if (!crews.length) return ctx.ui.notify("No crews in this repository", "info");
+      const labels = crews.map(crewLabel);
+      const choice = await ctx.ui.select("Crews", labels);
+      const chosen = choice === undefined ? undefined : crews[labels.indexOf(choice)];
+      // The in-memory crew is fresher than its ledger.
+      if (chosen) return openPanel(ctx, chosen.config.slug === crew?.config.slug ? crew : chosen);
     },
   });
 
