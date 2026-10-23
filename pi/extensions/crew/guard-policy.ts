@@ -1,4 +1,4 @@
-import { lstatSync, readlinkSync, realpathSync } from "node:fs";
+import { lstatSync, readlinkSync, type Stats } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
  */
 function physical(abs: string): string {
   let todo = abs.split(sep).filter(Boolean);
-  let cur = sep;
+  let cur: string = sep;
   let hops = 0;
   let missing = false;
   while (todo.length) {
@@ -28,7 +28,7 @@ function physical(abs: string): string {
     }
     const next = join(cur, part);
     if (!missing) {
-      let stat;
+      let stat: Stats | undefined;
       try {
         stat = lstatSync(next);
       } catch {
@@ -56,7 +56,7 @@ function piResolve(path: string, cwd: string): string {
   // join, not resolve: Pi turns "~//abs" into $HOME/abs, not /abs.
   if (p === "~") p = homedir();
   else if (p.startsWith("~/")) p = join(homedir(), p.slice(2));
-  if (/^file:\/\//.test(p)) p = fileURLToPath(p);
+  if (p.startsWith("file://")) p = fileURLToPath(p);
   return resolve(cwd, p);
 }
 
@@ -123,8 +123,10 @@ function lex(src: string): Lexed {
     let heredocNext: { strip: boolean } | undefined;
     const endWord = () => {
       if (word === undefined) return;
-      if (heredocNext) heredocs.push({ delim: word, strip: heredocNext.strip }), heredocNext = undefined;
-      else if (dropNext) dropNext = false;
+      if (heredocNext) {
+        heredocs.push({ delim: word, strip: heredocNext.strip });
+        heredocNext = undefined;
+      } else if (dropNext) dropNext = false;
       else words.push(word);
       word = undefined;
     };
@@ -133,6 +135,7 @@ function lex(src: string): Lexed {
       if (words.length) commands.push(words);
       words = [];
     };
+    // `i` sits just past the opener; the inner command is judged on its own, the word keeps a marker.
     const substitution = (closer: string): boolean => {
       if (!parse(closer, depth + 1)) return false;
       word = (word ?? "") + SUB;
@@ -179,18 +182,8 @@ function lex(src: string): Lexed {
           const d = src[i];
           if (d === '"') { i++; break; }
           if (d === "\\") { word += src[i + 1] ?? ""; i += 2; continue; }
-          if (d === "$" && src[i + 1] === "(") {
-            i += 2;
-            if (!parse(")", depth + 1)) return false;
-            word += SUB;
-            continue;
-          }
-          if (d === "`") {
-            i++;
-            if (!parse("`", depth + 1)) return false;
-            word += SUB;
-            continue;
-          }
+          if (d === "$" && src[i + 1] === "(") { i += 2; if (!substitution(")")) return false; continue; }
+          if (d === "`") { i++; if (!substitution("`")) return false; continue; }
           word += d;
           i++;
         }

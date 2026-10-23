@@ -8,9 +8,14 @@ import { StringDecoder } from "node:string_decoder";
 
 export type ToolState = "pending" | "running" | "ok" | "error";
 
-export type Entry =
-  | { kind: "user" | "thinking" | "text" | "note"; text: string }
-  | { kind: "tool"; id: string; name: string; args: string; result: string; state: ToolState };
+export interface TextEntry { kind: "user" | "thinking" | "text" | "note"; text: string }
+export interface ToolEntry { kind: "tool"; id: string; name: string; args: string; result: string; state: ToolState }
+export type Entry = TextEntry | ToolEntry;
+/** A thinking or text block of an assistant message. */
+type BlockEntry = TextEntry & { kind: "thinking" | "text" };
+
+/** Untyped JSON from the event stream or session file. */
+type Raw = Record<string, any>;
 
 export const LIMITS = { entries: 400, chars: 400_000, text: 12_000, user: 4_000, args: 1_000, result: 4_000 };
 
@@ -18,11 +23,16 @@ const size = (e: Entry) => (e.kind === "tool" ? e.name.length + e.args.length + 
 const tail = (text: string, max: number) => (text.length > max ? `…${text.slice(-(max - 1))}` : text);
 const head = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+/** `value` as an object to index into; anything else reads as empty. */
+const record = (value: unknown): Raw => (typeof value === "object" && value !== null ? value : {});
+
 function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map((p: any) => (p?.type === "text" && typeof p.text === "string" ? p.text : p?.type === "image" ? "[image]" : ""))
-    .filter(Boolean).join("\n");
+  return content.map((part) => {
+    const p = record(part);
+    return p.type === "text" && typeof p.text === "string" ? p.text : p.type === "image" ? "[image]" : "";
+  }).filter(Boolean).join("\n");
 }
 
 /** One line for a tool call: the command, path, or pattern when there is one, else compact JSON. */
@@ -34,7 +44,9 @@ export function toolArgs(args: unknown): string {
   return head(main ?? JSON.stringify(a), LIMITS.args);
 }
 
-const thinkingText = (block: any) => (block?.redacted && !block.thinking ? "(redacted thinking)" : String(block?.thinking ?? ""));
+const isBlock = (entry: Entry | undefined, kind: BlockEntry["kind"]): entry is BlockEntry => entry?.kind === kind;
+
+const thinkingText = (block: Raw) => (block.redacted && !block.thinking ? "(redacted thinking)" : String(block.thinking ?? ""));
 
 export class Transcript {
   readonly entries: Entry[] = [];
@@ -45,8 +57,8 @@ export class Transcript {
   private chars = 0;
   /** Blocks of the assistant message in progress, by contentIndex. */
   private blocks = new Map<number, Entry>();
-  private tools = new Map<string, Extract<Entry, { kind: "tool" }>>();
-  private evicted = new WeakSet<Entry>();
+  private readonly tools = new Map<string, ToolEntry>();
+  private readonly evicted = new WeakSet<Entry>();
 
   private push<E extends Entry>(entry: E): E {
     this.capEntry(entry);
@@ -86,13 +98,13 @@ export class Transcript {
     }
   }
 
-  private tool(id: string, name: string): Extract<Entry, { kind: "tool" }> {
+  private tool(id: string, name: string): ToolEntry {
     return this.tools.get(id) ?? this.push({ kind: "tool", id, name, args: "", result: "", state: "pending" });
   }
 
-  private block(index: number, kind: "thinking" | "text"): Extract<Entry, { kind: "thinking" | "text" }> {
+  private block(index: number, kind: BlockEntry["kind"]): BlockEntry {
     const found = this.blocks.get(index);
-    if (found && found.kind === kind) return found;
+    if (isBlock(found, kind)) return found;
     const entry = this.push({ kind, text: "" });
     this.blocks.set(index, entry);
     return entry;
@@ -100,45 +112,57 @@ export class Transcript {
 
   private assistantBlocks(content: unknown, reconcile: boolean) {
     if (!Array.isArray(content)) return;
-    content.forEach((b: any, i: number) => {
-      if (b?.type === "thinking" || b?.type === "text") {
+    content.forEach((part, i) => {
+      const b = record(part);
+      if (b.type === "thinking" || b.type === "text") {
         const text = b.type === "thinking" ? thinkingText(b) : String(b.text ?? "");
         // A finished message's empty block adds nothing; a streamed one is replaced in place.
         if (!text && !this.blocks.has(i)) return;
         const entry = reconcile ? this.block(i, b.type) : this.push({ kind: b.type, text: "" });
         this.update(entry, (e) => { e.text = text; });
-      } else if (b?.type === "toolCall") {
+      } else if (b.type === "toolCall") {
         const entry = this.tool(String(b.id ?? ""), String(b.name ?? "tool"));
         this.update(entry, (e) => { e.args = toolArgs(b.arguments); });
       }
     });
   }
 
+  /** One streamed delta of the assistant message in progress. */
+  private applyUpdate(u: Raw) {
+    const i = typeof u.contentIndex === "number" ? u.contentIndex : -1;
+    switch (u.type) {
+      case "thinking_start": this.block(i, "thinking"); return;
+      case "text_start": this.block(i, "text"); return;
+      case "thinking_delta":
+      case "text_delta":
+        if (typeof u.delta === "string") this.update(this.block(i, u.type === "thinking_delta" ? "thinking" : "text"), (e) => { e.text += u.delta; });
+        return;
+      case "thinking_end":
+      case "text_end":
+        if (typeof u.content === "string") this.update(this.block(i, u.type === "thinking_end" ? "thinking" : "text"), (e) => { e.text = u.content; });
+        return;
+      case "toolcall_start":
+        this.blocks.set(i, this.tool(String(u.id ?? ""), String(u.toolName ?? "tool")));
+        return;
+      case "toolcall_end": {
+        if (!u.toolCall) return;
+        const entry = this.tool(String(u.toolCall.id ?? ""), String(u.toolCall.name ?? "tool"));
+        this.update(entry, (e) => { e.args = toolArgs(u.toolCall.arguments); });
+        return;
+      }
+    }
+  }
+
   /** Apply one event from `pi --mode json`. */
-  applyEvent(event: Record<string, any>) {
+  applyEvent(event: Raw) {
     switch (event.type) {
       case "message_start":
         if (event.message?.role === "user") this.push({ kind: "user", text: contentText(event.message.content) });
         else if (event.message?.role === "assistant") this.blocks = new Map();
         return;
-      case "message_update": {
-        const u = event.assistantMessageEvent ?? {};
-        const i = typeof u.contentIndex === "number" ? u.contentIndex : -1;
-        if (u.type === "thinking_start" || u.type === "text_start") this.block(i, u.type === "thinking_start" ? "thinking" : "text");
-        else if ((u.type === "thinking_delta" || u.type === "text_delta") && typeof u.delta === "string") {
-          this.update(this.block(i, u.type === "thinking_delta" ? "thinking" : "text"), (e) => { e.text += u.delta; });
-        } else if (u.type === "thinking_end" || u.type === "text_end") {
-          const kind = u.type === "thinking_end" ? "thinking" : "text";
-          if (typeof u.content === "string") this.update(this.block(i, kind), (e) => { e.text = u.content; });
-        } else if (u.type === "toolcall_start") {
-          const entry = this.tool(String(u.id ?? ""), String(u.toolName ?? "tool"));
-          this.blocks.set(i, entry);
-        } else if (u.type === "toolcall_end" && u.toolCall) {
-          const entry = this.tool(String(u.toolCall.id ?? ""), String(u.toolCall.name ?? "tool"));
-          this.update(entry, (e) => { e.args = toolArgs(u.toolCall.arguments); });
-        }
+      case "message_update":
+        this.applyUpdate(record(event.assistantMessageEvent));
         return;
-      }
       case "message_end":
         if (event.message?.role !== "assistant") return;
         // The final message is authoritative: it replaces what the deltas built.
@@ -168,7 +192,7 @@ export class Transcript {
   }
 
   /** Apply one record of a pi session file. */
-  applySessionEntry(entry: Record<string, any>) {
+  applySessionEntry(entry: Raw) {
     if (entry.type === "compaction") { this.push({ kind: "note", text: "context compacted" }); return; }
     if (entry.type !== "message") return;
     const m = entry.message ?? {};
@@ -243,14 +267,7 @@ export class SessionTail {
     if (!info) { this.exists = false; return false; }
     this.exists = true;
     // Replaced or truncated: start over.
-    if (info.ino !== this.ino || info.size < this.offset) {
-      this.transcript = new Transcript();
-      this.offset = 0;
-      this.pending = "";
-      this.skipping = false;
-      this.decoder = new StringDecoder("utf8");
-      this.ino = info.ino;
-    }
+    if (info.ino !== this.ino || info.size < this.offset) this.restart(info.ino);
     const before = this.transcript.version;
     while (this.offset < info.size) {
       const bytes = await this.fs.read(this.path, this.offset, Math.min(CHUNK, info.size - this.offset));
@@ -259,6 +276,15 @@ export class SessionTail {
       this.consume(this.decoder.write(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length)));
     }
     return this.transcript.version !== before;
+  }
+
+  private restart(ino: number) {
+    this.transcript = new Transcript();
+    this.offset = 0;
+    this.pending = "";
+    this.skipping = false;
+    this.decoder = new StringDecoder("utf8");
+    this.ino = ino;
   }
 
   private consume(text: string) {

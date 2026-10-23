@@ -72,12 +72,14 @@ const STATUS_TONE: Record<TaskStatus, Tone> = {
   failed: "error", cancelled: "warning", timeout: "warning", interrupted: "warning",
 };
 
+/** Running tasks show the spinner instead. */
+const STATUS_GLYPH: Record<Exclude<TaskStatus, "running">, string> = {
+  submitted: "✓", integrated: "●", conflict: "!", failed: "✗", cancelled: "⊘", timeout: "◷", interrupted: "◌",
+};
+
 function glyph(task: TaskRecord, frame: number, s: Style): string {
-  const g: Record<TaskStatus, string> = {
-    running: SPINNER[frame % SPINNER.length], submitted: "✓", integrated: "●", conflict: "!",
-    failed: "✗", cancelled: "⊘", timeout: "◷", interrupted: "◌",
-  };
-  return s.fg(STATUS_TONE[task.status], g[task.status]);
+  const g = task.status === "running" ? SPINNER[frame % SPINNER.length] : STATUS_GLYPH[task.status];
+  return s.fg(STATUS_TONE[task.status], g);
 }
 
 const elapsed = (t: TaskRecord, now: number) => (t.endedAt ?? now) - t.startedAt;
@@ -241,31 +243,7 @@ export function panelInput(state: PanelState, tasks: TaskRecord[], input: PanelI
     return move(state, tasks, key!, opts.page);
   }
 
-  if (char !== undefined) {
-    if (/^[1-6]$/.test(char)) { setTab(state, TABS[Number(char) - 1]); return { type: "none" }; }
-    if (char === "?") { state.help = true; return { type: "none" }; }
-    if (char === "x" || char === "o" || char === "e") {
-      const { task } = visible(state, tasks);
-      if (!task) return { type: "none" };
-      if (char === "o") return { type: "open", id: task.id };
-      if (char === "e") {
-        if (task.session) return { type: "export", id: task.id };
-        state.flash = { text: `#${task.id} has no session file: it started before sessions were recorded`, tone: "warning" };
-        return { type: "none" };
-      }
-      if (task.status !== "running") state.flash = { text: `#${task.id} is not running`, tone: "warning" };
-      else if (!opts.live) state.flash = { text: "This crew isn't running in this session; nothing to cancel", tone: "warning" };
-      else state.confirm = task.id;
-      return { type: "none" };
-    }
-    const mapped = KEY_CHARS[char];
-    if (mapped === "close") return { type: "close" };
-    if (mapped) return move(state, tasks, mapped, opts.page);
-    // Any other printable key starts a filter: type to jump.
-    state.filtering = true;
-    if (char !== "/") state.query = char;
-    return { type: "none" };
-  }
+  if (char !== undefined) return pressChar(state, tasks, char, opts);
 
   switch (key) {
     case "tab": case "backTab": {
@@ -285,6 +263,37 @@ export function panelInput(state: PanelState, tasks: TaskRecord[], input: PanelI
   }
 }
 
+/** A printable key outside the filter: a tab number, a task action, a vi key, or the start of a filter. */
+function pressChar(state: PanelState, tasks: TaskRecord[], char: string, opts: InputOptions): PanelAction {
+  if (/^[1-6]$/.test(char)) { setTab(state, TABS[Number(char) - 1]); return { type: "none" }; }
+  if (char === "?") { state.help = true; return { type: "none" }; }
+  if (char === "x" || char === "o" || char === "e") {
+    const { task } = visible(state, tasks);
+    return task ? taskAction(state, task, char, opts.live) : { type: "none" };
+  }
+  const mapped = KEY_CHARS[char];
+  if (mapped === "close") return { type: "close" };
+  if (mapped) return move(state, tasks, mapped, opts.page);
+  // Any other printable key starts a filter: type to jump.
+  state.filtering = true;
+  if (char !== "/") state.query = char;
+  return { type: "none" };
+}
+
+/** `o` copies the worktree path, `e` exports the session, `x` asks before cancelling. */
+function taskAction(state: PanelState, task: TaskRecord, char: "x" | "o" | "e", live: boolean): PanelAction {
+  if (char === "o") return { type: "open", id: task.id };
+  if (char === "e") {
+    if (task.session) return { type: "export", id: task.id };
+    state.flash = { text: `#${task.id} has no session file: it started before sessions were recorded`, tone: "warning" };
+    return { type: "none" };
+  }
+  if (task.status !== "running") state.flash = { text: `#${task.id} is not running`, tone: "warning" };
+  else if (!live) state.flash = { text: "This crew isn't running in this session; nothing to cancel", tone: "warning" };
+  else state.confirm = task.id;
+  return { type: "none" };
+}
+
 function move(state: PanelState, tasks: TaskRecord[], key: PanelKey, page: number): PanelAction {
   const { shown, task, index } = visible(state, tasks);
   // Paging always scrolls the details, so a long diff reads without leaving the list.
@@ -299,28 +308,9 @@ function move(state: PanelState, tasks: TaskRecord[], key: PanelKey, page: numbe
   }
   if (state.focus === "detail" && !state.filtering) {
     if (key === "left") { state.focus = "list"; return { type: "none" }; }
-    if (state.tab === "checks" && task) {
-      const count = task.checks.length;
-      if (key === "enter" && count) {
-        const k = `${task.id}:${state.checkCursor}`;
-        state.expanded[k] = !checkOpen(state, task, state.checkCursor);
-        state.followCursor = true;
-        return { type: "none" };
-      }
-      const step = key === "down" ? 1 : key === "up" ? -1 : key === "top" ? -Infinity : key === "bottom" ? Infinity : 0;
-      if (step && count) {
-        state.checkCursor = Math.min(count - 1, Math.max(0, state.checkCursor + step));
-        state.followCursor = true;
-      }
-      return { type: "none" };
-    }
-    if (key === "enter") { state.focus = "list"; return { type: "none" }; }
-    // Only G resumes following: a resize or eviction that clamps the scroll mustn't.
-    if (key === "up" || key === "top") state.follow = false;
-    if (key === "bottom") state.follow = true;
-    if (key === "top") state.scroll = 0;
-    else if (key === "bottom") state.scroll = Number.MAX_SAFE_INTEGER;
-    else if (key === "up" || key === "down") state.scroll = Math.max(0, state.scroll + (key === "down" ? 1 : -1));
+    if (state.tab === "checks" && task) moveCheckCursor(state, task, key);
+    else if (key === "enter") state.focus = "list";
+    else scrollDetail(state, key);
     return { type: "none" };
   }
   const last = shown.length - 1;
@@ -328,6 +318,30 @@ function move(state: PanelState, tasks: TaskRecord[], key: PanelKey, page: numbe
   const next = shown[Math.min(last, Math.max(0, target))];
   if (next) select(state, next);
   return { type: "none" };
+}
+
+/** On the Checks tab the keys pick a check; enter opens or closes its output. */
+function moveCheckCursor(state: PanelState, task: TaskRecord, key: PanelKey) {
+  const count = task.checks.length;
+  if (!count) return;
+  if (key === "enter") {
+    state.expanded[`${task.id}:${state.checkCursor}`] = !checkOpen(state, task, state.checkCursor);
+    state.followCursor = true;
+    return;
+  }
+  const step = key === "down" ? 1 : key === "up" ? -1 : key === "top" ? -Infinity : key === "bottom" ? Infinity : 0;
+  if (!step) return;
+  state.checkCursor = Math.min(count - 1, Math.max(0, state.checkCursor + step));
+  state.followCursor = true;
+}
+
+function scrollDetail(state: PanelState, key: PanelKey) {
+  // Only G resumes following: a resize or eviction that clamps the scroll mustn't.
+  if (key === "up" || key === "top") state.follow = false;
+  if (key === "bottom") state.follow = true;
+  if (key === "top") state.scroll = 0;
+  else if (key === "bottom") state.scroll = Number.MAX_SAFE_INTEGER;
+  else if (key === "up" || key === "down") state.scroll = Math.max(0, state.scroll + (key === "down" ? 1 : -1));
 }
 
 // ── Diff ─────────────────────────────────────────────────────────────────
@@ -350,8 +364,16 @@ export function diffTarget(crew: CrewState, task: TaskRecord): { base: string; b
  * diff is computed once per commit. While a task's diff is visible its tip is rechecked at
  * most every `recheckMs`; nothing runs for tasks or tabs that aren't shown.
  */
+interface DiffEntry {
+  /** `base..tip` of the diff in `view`; unset until one has been computed. */
+  key?: string;
+  view: DiffView;
+  checkedAt: number;
+  busy: boolean;
+}
+
 export class DiffCache {
-  private entries = new Map<number, { key?: string; view: DiffView; checkedAt: number; busy: boolean }>();
+  private readonly entries = new Map<number, DiffEntry>();
   private readonly run: (cwd: string, args: string[]) => Promise<GitResult>;
   private readonly maxBytes: number;
   private readonly recheckMs: number;
@@ -377,7 +399,7 @@ export class DiffCache {
     return entry.view;
   }
 
-  private async refresh(entry: { key?: string; view: DiffView }, repoRoot: string, base: string, branch: string) {
+  private async refresh(entry: DiffEntry, repoRoot: string, base: string, branch: string) {
     const tip = await this.run(repoRoot, ["rev-parse", "--verify", "--quiet", `${branch}^{commit}`]);
     if (tip.code !== 0) {
       entry.key = undefined;
@@ -500,7 +522,16 @@ function tabBar(active: Tab, width: number, s: Style): string {
   return s.truncate(s.width(full) <= width ? full : bar(true), width);
 }
 
-type Body = { lines: string[]; paint?: (line: string) => string; anchor?: number; /** Shown in the bottom border, so it never scrolls away. */ status?: string };
+/** The scrollable content of one details tab. */
+interface Body {
+  lines: string[];
+  /** Colours a line at render time, after scrolling has picked it. */
+  paint?: (line: string) => string;
+  /** Line the cursor is on, kept on screen when `followCursor` is set. */
+  anchor?: number;
+  /** Shown in the bottom border, so it never scrolls away. */
+  status?: string;
+}
 
 function field(label: string, value: string, width: number, s: Style): string[] {
   const labelW = 13;

@@ -17,7 +17,8 @@ export function git(cwd: string, args: string[]): Promise<GitResult> {
   return new Promise((resolve) => {
     execFile("git", args, { cwd, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ...GIT_ENV } },
       (error, stdout, stderr) => {
-        const code = error ? (typeof (error as { code?: unknown }).code === "number" ? (error as { code: number }).code : 1) : 0;
+        // `code` is a string (ENOENT, …) when git itself couldn't be run; that's a failure too.
+        const code = !error ? 0 : typeof error.code === "number" ? error.code : 1;
         resolve({ code, stdout, stderr });
       });
   });
@@ -76,6 +77,7 @@ export async function commitAll(cwd: string, message: string): Promise<boolean> 
 
 export interface BranchFacts { commits: string[]; diffStat: string; files: string[] }
 
+/** Non-empty lines of git output, trimmed. */
 const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 
 export async function branchFacts(cwd: string, base: string): Promise<BranchFacts> {
@@ -156,6 +158,12 @@ export async function runChecks(cwd: string, commands: string[], timeoutMs: numb
   return results;
 }
 
+/** Output kept per check, in bytes and then lines: enough to see why it failed. */
+const CHECK_OUTPUT_BYTES = 16_384;
+const CHECK_TAIL_LINES = 30;
+/** After the shell exits, how long its pipes get to deliver the last output. */
+const DRAIN_MS = 500;
+
 /** Run a shell check; keep only the tail so failures don't flood the planner's context. */
 export function runCheck(cwd: string, command: string, timeoutMs: number, signal?: AbortSignal): Promise<CheckResult> {
   return new Promise((resolve) => {
@@ -166,7 +174,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number, signal
     let timedOut = false;
     let done = false;
     let drain: ReturnType<typeof setTimeout> | undefined;
-    const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-16_384); };
+    const keep = (chunk: Buffer) => { out = (out + chunk.toString("utf8")).slice(-CHECK_OUTPUT_BYTES); };
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
     // Kill the whole process group: test runners spawn their own children.
@@ -181,7 +189,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number, signal
       // A daemon that left the process group can hold the pipes open forever; stop reading.
       child.stdout.destroy();
       child.stderr.destroy();
-      resolve({ command, exit, tail: out.split("\n").slice(-30).join("\n"), timedOut });
+      resolve({ command, exit, tail: out.split("\n").slice(-CHECK_TAIL_LINES).join("\n"), timedOut });
     };
     // exit is null on timeout or abort, so it can never read as a pass.
     const stop = () => finish(null);
@@ -189,7 +197,7 @@ export function runCheck(cwd: string, command: string, timeoutMs: number, signal
     signal?.addEventListener("abort", stop, { once: true });
     child.on("error", (error) => { out += error.message; finish(null); });
     // "close" waits for every pipe holder; after the shell exits, give output a moment to drain.
-    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), 500); });
+    child.on("exit", (code) => { clearTimeout(timer); drain = setTimeout(() => finish(code), DRAIN_MS); });
     child.on("close", (code) => finish(code));
   });
 }

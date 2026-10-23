@@ -20,13 +20,13 @@
   {
     "name": "review of an unfinished task allowed",
     "file": "index.ts",
-    "from": "|| target.status === \"running\")) {",
-    "to": ")) {"
+    "from": "|| target.status === \"running\") {",
+    "to": ") {"
   },
   {
     "name": "worker runs outside its worktree",
     "file": "index.ts",
-    "from": "provider: model.provider, model: model.model, cwd: task.worktree!, prompt,",
+    "from": "provider: model.provider, model: model.model, cwd: worktree, prompt,",
     "to": "provider: model.provider, model: model.model, cwd: c.repoRoot, prompt,"
   },
   {
@@ -38,19 +38,19 @@
   {
     "name": "worker's uncommitted work not committed",
     "file": "index.ts",
-    "from": "report.autoCommitted = await commitAll(task.worktree, `crew: uncommitted changes left by task #${task.id}`);",
+    "from": "report.autoCommitted = await commitAll(worktree, `crew: uncommitted changes left by task #${task.id}`);",
     "to": ""
   },
   {
     "name": "task checks not run",
     "file": "index.ts",
-    "from": "report.checks = await runChecks(task.worktree, task.checks, CHECK_TIMEOUT_MS, signal);",
+    "from": "report.checks = await runChecks(worktree, task.checks, CHECK_TIMEOUT_MS, signal);",
     "to": ""
   },
   {
     "name": "dirty task worktree not reported",
     "file": "index.ts",
-    "from": "report.dirtyAfterChecks = await dirtyFiles(task.worktree);",
+    "from": "report.dirtyAfterChecks = await dirtyFiles(worktree);",
     "to": ""
   },
   {
@@ -62,7 +62,7 @@
   {
     "name": "cancel during checks still reads as submitted",
     "file": "index.ts",
-    "from": "        report.outcome = \"cancelled\";\n",
+    "from": "      report.outcome = \"cancelled\";\n",
     "to": ""
   },
   {
@@ -80,8 +80,8 @@
   {
     "name": "integration worktree left dirty after post-merge checks",
     "file": "index.ts",
-    "from": "      const dirty = await discardChanges(state.config.integrationPath);\n      const failed = failedChecks(checks, 15);",
-    "to": "      const dirty: string[] = [];\n      const failed = failedChecks(checks, 15);"
+    "from": "    const dirty = await discardChanges(c.integrationPath);\n    const failed = failedChecks(checks, 15);",
+    "to": "    const dirty: string[] = [];\n    const failed = failedChecks(checks, 15);"
   },
   {
     "name": "finish ignores running workers",
@@ -122,7 +122,7 @@
   {
     "name": "resume keeps dead tasks running",
     "file": "index.ts",
-    "from": "for (const t of runningTasks(state)) { t.status = \"interrupted\"; t.endedAt = Date.now(); }",
+    "from": "for (const t of runningTasks(state)) endTask(t, \"interrupted\");",
     "to": ""
   },
   {
@@ -146,20 +146,20 @@
   {
     "name": "crew tools visible outside crew mode",
     "file": "index.ts",
-    "from": "if (!isActive()) pi.setActiveTools(pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));",
+    "from": "if (!isActive()) pi.setActiveTools(withoutCrewTools());",
     "to": ""
   },
   {
     "name": "tools not restored after the crew",
     "file": "index.ts",
-    "from": "pi.setActiveTools(toolsBefore ?? pi.getActiveTools().filter((t) => !CREW_TOOLS.includes(t)));",
+    "from": "pi.setActiveTools(toolsBefore ?? withoutCrewTools());",
     "to": ""
   },
   {
     "name": "shutdown doesn't mark tasks interrupted",
     "file": "index.ts",
-    "from": "task.status = shuttingDown ? \"interrupted\"",
-    "to": "task.status = false ? \"interrupted\""
+    "from": "endTask(task, shuttingDown ? \"interrupted\"",
+    "to": "endTask(task, false ? \"interrupted\""
   },
   {
     "name": "shutdown doesn't wait for workers",
@@ -188,8 +188,8 @@
   {
     "name": "dispatch launches for a crew stopped during setup",
     "file": "index.ts",
-    "from": "if (crew !== state || !isActive()) {\n        task.status = \"cancelled\";",
-    "to": "if (false) {\n        task.status = \"cancelled\";"
+    "from": "if (crew !== state || !isActive()) {\n        endTask(task, \"cancelled\");",
+    "to": "if (false) {\n        endTask(task, \"cancelled\");"
   },
   {
     "name": "panel filter ignores the branch",
@@ -224,7 +224,7 @@
   {
     "name": "panel cancels tasks of a crew not running here",
     "file": "panel.ts",
-    "from": "else if (!opts.live)",
+    "from": "else if (!live)",
     "to": "else if (false)"
   },
   {
@@ -273,7 +273,7 @@
     "name": "panel cancel doesn't wake the planner",
     "file": "index.ts",
     "from": "      controller?.abort();\n",
-    "to": "      if (controller) quietCancels.add(action.id);\n      controller?.abort();\n"
+    "to": "      if (controller) quietCancels.add(id);\n      controller?.abort();\n"
   },
   {
     "name": "/crew-status prints text instead of opening the panel",
@@ -290,8 +290,8 @@
   {
     "name": "dispatch does not record the worker session",
     "file": "index.ts",
-    "from": "PI_CREW_ROOT: task.worktree! }, session: task.session,",
-    "to": "PI_CREW_ROOT: task.worktree! },"
+    "from": "PI_CREW_ROOT: worktree }, session: task.session,",
+    "to": "PI_CREW_ROOT: worktree },"
   },
   {
     "name": "worker never reports stream events",
@@ -344,8 +344,8 @@
   {
     "name": "session tail misses a replaced file",
     "file": "transcript.ts",
-    "from": "if (info.ino !== this.ino || info.size < this.offset) {",
-    "to": "if (this.ino === -1) {"
+    "from": "if (info.ino !== this.ino || info.size < this.offset) this.restart(",
+    "to": "if (this.ino === -1) this.restart("
   },
   {
     "name": "session tail splits multi-byte characters",
