@@ -107,6 +107,19 @@ export class Bridge {
     };
   }
 
+  // Put a snapshot back as though nothing happened since it was taken: no new
+  // undo step, and the undo stack cut back to depth. The leader uses this
+  // after running a command, because setText() would drop collapsed pastes'
+  // content and leave two undo steps (the draft, then the empty prompt).
+  reinstate(s: Snapshot, depth: number): void {
+    const stack = this.e.undoStack.stack;
+    if (stack.length > depth) stack.length = depth;
+    this.e.exitHistoryBrowsing();
+    this.e.pastes = new Map(s.pastes);
+    this.e.pasteCounter = s.pasteCounter;
+    this.replaceLines([...s.lines], s.cursor);
+  }
+
   // Restore a snapshot as a new undo step.
   restore(s: Snapshot): void {
     // The snapshot pushed here must hold the old pastes, so undo restores them.

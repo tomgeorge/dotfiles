@@ -64,7 +64,59 @@ const STUBS: Record<string, string> = {
     export const serializeConversation = (messages) => JSON.stringify(messages);
     // Throws so callers take their no-clipboard path, as they did before this stub existed.
     export const copyToClipboard = async () => { throw new Error("no clipboard in tests"); };
-    export class CustomEditor {}
+    // Just enough of Pi's Editor for vi-mode: the private fields its bridge reads, public
+    // getText/setText, and handleInput that types printable keys and submits on "enter".
+    // Pi sets onSubmit, onEscape, and actionHandlers after construction; tests do the same.
+    export class CustomEditor {
+      constructor(tui) {
+        this.tui = tui;
+        this.borderColor = (s) => s;
+        this.state = { lines: [""], cursorLine: 0, cursorCol: 0 };
+        this.undoStack = { stack: [] };
+        this.lastAction = null;
+        this.pastes = new Map();
+        this.pasteCounter = 0;
+        this.actionHandlers = new Map();
+      }
+      setCursorCol(col) { this.state.cursorCol = col; }
+      pushUndoSnapshot() {
+        this.undoStack.stack.push({ lines: [...this.state.lines], cursorLine: this.state.cursorLine, cursorCol: this.state.cursorCol });
+      }
+      undo() {
+        const s = this.undoStack.stack.pop();
+        if (s) this.state = { lines: s.lines, cursorLine: s.cursorLine, cursorCol: s.cursorCol };
+      }
+      exitHistoryBrowsing() {}
+      isShowingAutocomplete() { return false; }
+      getText() { return this.state.lines.join("\\n"); }
+      getCursor() { return { line: this.state.cursorLine, col: this.state.cursorCol }; }
+      // As Pi's: an undo step if the text changes, pastes cleared, cursor at the end.
+      setText(text) {
+        if (this.getText() !== text) this.pushUndoSnapshot();
+        this.pastes.clear();
+        this.pasteCounter = 0;
+        const lines = text.split("\\n");
+        this.state = { lines, cursorLine: lines.length - 1, cursorCol: lines[lines.length - 1].length };
+        this.onChange?.(this.getText());
+      }
+      handleInput(data) {
+        if (data === "escape") return this.onEscape?.();
+        if (data === "enter") {
+          const text = this.getText();
+          this.undoStack.stack.length = 0;
+          this.setText("");
+          this.undoStack.stack.length = 0;
+          return this.onSubmit?.(text);
+        }
+        if ([...data].length !== 1) return;
+        this.pushUndoSnapshot();
+        const { lines, cursorLine, cursorCol } = this.state;
+        const line = lines[cursorLine];
+        lines[cursorLine] = line.slice(0, cursorCol) + data + line.slice(cursorCol);
+        this.state.cursorCol = cursorCol + data.length;
+      }
+      renderBottomBorder(width) { return "─".repeat(width); }
+    }
     export class BorderedLoader {
       #abort = new AbortController();
       get signal() { return this.#abort.signal; }

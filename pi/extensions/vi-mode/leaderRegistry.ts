@@ -414,7 +414,7 @@ export class LeaderRegistry {
   private latest: LeaderDiagnostic[] = [];
   private readonly listeners = new Set<() => void>();
 
-  constructor(core: CoreBinding[] = []) {
+  constructor(core: readonly CoreBinding[] = []) {
     this.core = core.map((b) => ({ ...b }));
     this.rebuild();
   }
