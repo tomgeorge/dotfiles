@@ -12,7 +12,7 @@ import {
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
 import { parseCommandArgs, pickModel, type PickerUI } from "./picker.ts";
-import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress } from "./runner.ts";
+import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress, type Result } from "./runner.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
 const MAX_CONCURRENT_FLAG = "subagent-max-concurrent";
@@ -20,6 +20,13 @@ const MAX_CONCURRENT_ENV = "PI_SUBAGENT_MAX_CONCURRENT";
 const PANEL_KEY = "ctrl+shift+s";
 const WIDGET_KEY = "subagents";
 const SPINNER_MS = 120;
+// Tick so elapsed time moves during long model calls with no tool activity.
+const PROGRESS_TICK_MS = 1000;
+
+interface ActiveJob {
+  controller: AbortController;
+  done: Promise<Result>;
+}
 
 // glow when installed; otherwise Pi's own markdown component.
 const renderMarkdown = glowRenderer((text, width) => new Markdown(text, 0, 0, getMarkdownTheme()).render(width));
@@ -34,6 +41,16 @@ function makeStyle(theme: Theme): Style {
     wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
     markdown: (text, width) => renderMarkdown(text, Math.max(1, width)),
   };
+}
+
+/** Cap like other tool results; the full text goes to disk since the child session is gone. */
+async function capResult(text: string): Promise<string> {
+  const truncated = truncateHead(text);
+  if (!truncated.truncated) return truncated.content;
+  const dir = await mkdtemp(join(tmpdir(), "pi-subagent-"));
+  const file = join(dir, "result.txt");
+  await writeFile(file, text, { mode: 0o600 });
+  return `${truncated.content}\n\n[Output truncated to 2000 lines / 50 KiB. Full output: ${file}]`;
 }
 
 // First match wins; letters mirror lazygit/vim.
@@ -54,7 +71,7 @@ const POPUP_KEYS: [KeyId[], PopupKey][] = [
 ];
 
 export default function (pi: ExtensionAPI) {
-  const active = new Map<number, { controller: AbortController; done: Promise<unknown> }>();
+  const active = new Map<number, ActiveJob>();
   let nextId = 1;
   let shuttingDown = false;
   // One model picker at a time: parallel tool calls would otherwise stack dialogs.
@@ -174,14 +191,18 @@ export default function (pi: ExtensionAPI) {
     return next;
   }
 
-  async function run(job: Job, ctx: ExtensionContext, signal?: AbortSignal, onUpdate?: AgentToolUpdateCallback) {
-    if (shuttingDown) throw new Error("Session is shutting down");
-    checkCapacity();
-    validateJob(job);
+  function assertModelAvailable(job: Job, ctx: ExtensionContext) {
     const available = ctx.modelRegistry.getAvailable();
     if (!available.some((model) => model.provider === job.provider && model.id === job.model)) {
       throw new Error(`Unavailable model: ${job.provider}/${job.model}. Use /subagent to pick an exact model.`);
     }
+  }
+
+  async function run(job: Job, ctx: ExtensionContext, signal?: AbortSignal, onUpdate?: AgentToolUpdateCallback) {
+    if (shuttingDown) throw new Error("Session is shutting down");
+    checkCapacity();
+    validateJob(job);
+    assertModelAvailable(job, ctx);
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener("abort", abort, { once: true });
@@ -203,8 +224,7 @@ export default function (pi: ExtensionAPI) {
     active.set(id, { controller, done });
     syncWidget(ctx);
     report();
-    // Tick so elapsed time moves during long model calls with no tool activity.
-    const ticker = setInterval(report, 1000);
+    const ticker = setInterval(report, PROGRESS_TICK_MS);
     let finished = false;
     try {
       const result = await done;
@@ -212,15 +232,7 @@ export default function (pi: ExtensionAPI) {
       finished = true;
       const footer = summary(record, Date.now());
       if (result.status !== "ok") throw new Error(`Subagent #${id} ${result.status}: ${result.error}\n\n${footer}`);
-      const truncated = truncateHead(result.text);
-      let text = truncated.content;
-      if (truncated.truncated) {
-        const dir = await mkdtemp(join(tmpdir(), "pi-subagent-"));
-        const file = join(dir, "result.txt");
-        await writeFile(file, result.text, { mode: 0o600 });
-        text += `\n\n[Output truncated to 2000 lines / 50 KiB. Full output: ${file}]`;
-      }
-      text += `\n\n${footer}`;
+      const text = `${await capResult(result.text)}\n\n${footer}`;
       return {
         content: [{ type: "text" as const, text }],
         details: {

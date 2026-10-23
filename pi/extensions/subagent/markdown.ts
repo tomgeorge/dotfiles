@@ -53,7 +53,11 @@ export function glowRenderer(fallback: MarkdownRenderer, opts: GlowOptions = {})
     const hit = cache.get(key);
     if (hit) return hit;
     const lines = glow(text, width) ?? fallback(text, width);
-    if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!);
+    if (cache.size >= CACHE_LIMIT) {
+      // Maps iterate in insertion order, so the first key is the oldest entry.
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
     cache.set(key, lines);
     return lines;
   };

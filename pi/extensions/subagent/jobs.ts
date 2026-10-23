@@ -39,8 +39,8 @@ export interface JobRecord {
 export const LOG_LIMIT = 200;
 
 export class JobStore {
-  private jobs = new Map<number, JobRecord>();
-  private listeners = new Set<() => void>();
+  private readonly jobs = new Map<number, JobRecord>();
+  private readonly listeners = new Set<() => void>();
 
   add(job: Omit<JobRecord, "status" | "log" | "ended">): JobRecord {
     const record: JobRecord = { ...job, status: "running", log: [] };
