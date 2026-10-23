@@ -14,6 +14,11 @@ export interface PanelState {
   focus: "list" | "detail";
   /** Id of the details view (tab) on screen. */
   view: string;
+  /**
+   * The user picked `view` for the selected item. Until then the view follows the item's
+   * `defaultView`, which can change while it's selected (a run finishing).
+   */
+  viewPicked?: boolean;
   /** Detail body scroll offset in lines. */
   scroll: number;
   /** Selected entry of a collapsible view. */
