@@ -115,7 +115,14 @@ export default function (pi: ExtensionAPI, deps: { configPath?: string } = {}) {
         key: leader.key,
         name: leader.name,
         style: panelStyle(() => ui.theme),
-        showPanel: (lines) => ui.setWidget("leader", lines, { placement: "belowEditor" }),
+        // A component, not a string array: Pi keeps only 10 strings of an
+        // array and pads each, so the 21-line, full-width panel would be cut
+        // and its header would wrap.
+        showPanel: (lines) => ui.setWidget(
+          "leader",
+          lines && (() => ({ render: (width: number) => lines.map((line) => truncateToWidth(line, width, "")), invalidate() {} })),
+          { placement: "belowEditor" },
+        ),
         commandExists: (name) => pi.getCommands().some((c) => c.name === name),
         notify: (text, level) => ui.notify(text, level),
       });

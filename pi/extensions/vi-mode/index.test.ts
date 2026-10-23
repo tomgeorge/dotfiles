@@ -14,6 +14,23 @@ type Factory = (tui: unknown, theme: unknown, keybindings: unknown) => {
   onEscape?: () => void;
 };
 interface Widget { key: string; lines: string[] | undefined; options: unknown }
+type WidgetContent = string[] | ((tui: unknown, theme: unknown) => { render(width: number): string[] }) | undefined;
+
+// The rows Pi 1.0.2 draws for a widget at width (interactive-mode.js
+// setExtensionWidget): a string array keeps its first 10 entries, each a Text
+// with one column of padding a side, so a string wider than width - 2 wraps.
+// A component factory draws whatever its render returns.
+const PI_MAX_WIDGET_LINES = 10;
+function piRows(content: WidgetContent, width: number): string[] | undefined {
+  if (content === undefined) return undefined;
+  if (!Array.isArray(content)) return content(undefined, undefined).render(width);
+  const rows: string[] = [];
+  for (const line of content.slice(0, PI_MAX_WIDGET_LINES)) {
+    for (let i = 0; i === 0 || i < line.length; i += width - 2) rows.push(line.slice(i, i + width - 2));
+  }
+  if (content.length > PI_MAX_WIDGET_LINES) rows.push("... (widget truncated)");
+  return rows;
+}
 
 const crew: LeaderBinding[] = [{ id: "list", path: [{ key: "c", label: "crew" }, { key: "l", label: "list" }], command: { name: "crews" } }];
 const watch: LeaderBinding[] = [{ id: "list", path: [{ key: "w", label: "watches" }, { key: "l", label: "list" }], command: { name: "watches" } }];
@@ -25,7 +42,7 @@ function configFile(content?: string): string {
 }
 
 // vi-mode loaded into a fake Pi, with a UI that records what it's asked to show.
-function load(configPath: string, events = createEventBus()) {
+function load(configPath: string, events = createEventBus(), columns = 80) {
   const f = fakePi({ events });
   viMode(f.pi, { configPath });
   const notes: { text: string; level?: string }[] = [];
@@ -33,7 +50,7 @@ function load(configPath: string, events = createEventBus()) {
   let factory: Factory | undefined;
   const ui = {
     notify: (text: string, level?: string) => { notes.push({ text, level }); },
-    setWidget: (key: string, lines: string[] | undefined, options?: unknown) => { widgets.push({ key, lines, options }); },
+    setWidget: (key: string, content: WidgetContent, options?: unknown) => { widgets.push({ key, lines: piRows(content, columns), options }); },
     setEditorComponent: (next: Factory) => { factory = next; },
     theme: { fg: (_c: string, t: string) => t, bold: (t: string) => t, inverse: (t: string) => t },
   };
@@ -43,7 +60,7 @@ function load(configPath: string, events = createEventBus()) {
     start: () => f.emit("session_start", {}, ctx),
     editor: () => {
       if (!factory) throw new Error("no editor installed");
-      return factory({ terminal: { columns: 80 }, requestRender() {} }, {}, {});
+      return factory({ terminal: { columns }, requestRender() {} }, {}, {});
     },
     leader: async () => {
       notes.length = 0;
@@ -144,6 +161,34 @@ test("the editor shows the panel below the editor and runs commands Pi knows", a
   editor.handleInput("l");
   assert.deepEqual(submitted, ["/leader"]);
   assert.equal(v.widgets.at(-1)?.lines, undefined);
+});
+
+test("the panel Pi draws shows every group, uncut and unwrapped", async () => {
+  const events = createEventBus();
+  const v = load(configFile(), events, 40);
+  contributeLeader(events, "crew", crew);
+  contributeLeader(events, "watch", watch);
+  contributeLeader(events, "agents", [{ id: "list", path: [{ key: "a", label: "agents" }, { key: "l", label: "list" }], command: { name: "subagents" } }]);
+  contributeLeader(events, "goal", [{ id: "status", path: [{ key: "g", label: "goal" }, { key: "s", label: "status" }], command: { name: "goal", args: "status" } }]);
+  await v.start();
+  const editor = v.editor();
+  editor.handleInput("escape");
+  editor.handleInput(" ");
+  const rows = v.widgets.at(-1)?.lines ?? [];
+  for (const label of ["agents", "crew", "goal", "help", "models", "quit", "sessions", "watches"]) {
+    assert.ok(rows.some((r) => r.includes(label)), `${label} is on the panel`);
+  }
+  assert.ok(!rows.some((r) => r.includes("widget truncated")));
+});
+
+test("the panel's header fits Pi's widget width on one row", async () => {
+  const v = load(configFile());
+  await v.start();
+  const editor = v.editor();
+  editor.handleInput("escape");
+  editor.handleInput(" ");
+  const rows = v.widgets.at(-1)?.lines ?? [];
+  assert.ok(rows[0]?.includes("esc cancel · backspace up"), `header row: ${rows[0]}`);
 });
 
 test("a replaced editor's open leader is closed and stops redrawing", async () => {
