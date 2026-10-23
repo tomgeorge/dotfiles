@@ -6,6 +6,14 @@ const update = (assistantMessageEvent: Record<string, unknown>) => ({ type: "mes
 const toolCall = (id: string, name: string, args: Record<string, unknown>) => ({ type: "toolCall", id, name, arguments: args });
 const result = (text: string) => ({ content: [{ type: "text", text }] });
 
+/** The assistant message that turn ends with. */
+const REPLY = [
+  { type: "thinking", thinking: "Let me look", thinkingSignature: "secret" },
+  { type: "text", text: "Reading the theme." },
+  toolCall("a", "read", { path: "theme.ts" }),
+  toolCall("b", "bash", { command: "npm test" }),
+];
+
 /** One worker turn as `pi --mode json` streams it: prompt, thinking, text, two tool calls. */
 const STREAM = [
   { type: "message_start", message: { role: "user", content: "Task: paint it" } },
@@ -18,12 +26,7 @@ const STREAM = [
   update({ type: "toolcall_start", contentIndex: 2, id: "a", toolName: "read" }),
   update({ type: "toolcall_end", contentIndex: 2, toolCall: toolCall("a", "read", { path: "theme.ts" }) }),
   update({ type: "toolcall_start", contentIndex: 3, id: "b", toolName: "bash" }),
-  { type: "message_end", message: { role: "assistant", content: [
-    { type: "thinking", thinking: "Let me look", thinkingSignature: "secret" },
-    { type: "text", text: "Reading the theme." },
-    toolCall("a", "read", { path: "theme.ts" }),
-    toolCall("b", "bash", { command: "npm test" }),
-  ] } },
+  { type: "message_end", message: { role: "assistant", content: REPLY } },
   // Tools may run in parallel and finish out of order.
   { type: "tool_execution_start", toolCallId: "a", toolName: "read", args: { path: "theme.ts" } },
   { type: "tool_execution_start", toolCallId: "b", toolName: "bash", args: { command: "npm test" } },
@@ -36,7 +39,7 @@ const STREAM = [
 const SESSION = [
   { type: "session", version: 3, id: "s", cwd: "/wt" },
   { type: "message", message: { role: "user", content: [{ type: "text", text: "Task: paint it" }] } },
-  { type: "message", message: { role: "assistant", content: STREAM[10].message!.content } },
+  { type: "message", message: { role: "assistant", content: REPLY } },
   { type: "message", message: { role: "toolResult", toolCallId: "b", toolName: "bash", ...result("1 failing"), isError: true } },
   { type: "message", message: { role: "toolResult", toolCallId: "a", toolName: "read", ...result("export const x = 1;"), isError: false } },
 ];

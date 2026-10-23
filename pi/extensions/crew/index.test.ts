@@ -636,7 +636,7 @@ test("the shortcut says so when the repository has no crews", BOUND, async (t) =
   onCancel(t, e.shutdown);
   try {
     const ui = panelUi(e.ctx);
-    await e.f.shortcuts.get("ctrl+shift+c").handler(e.ctx);
+    await e.f.shortcuts.get("ctrl+shift+c")!.handler(e.ctx);
     assert.equal(ui.opened.length, 0);
     assert.match(e.f.notes.at(-1)!, /No crews in this repository/);
   } finally {

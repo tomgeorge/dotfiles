@@ -16,7 +16,7 @@ ln -s "$PWD/pi/extensions/subagent" ~/.pi/agent/extensions/subagent
 
 Run `/reload` in Pi afterward. Requires `pi` on PATH (the same version as the parent).
 Optional: [`glow`](https://github.com/charmbracelet/glow) on PATH renders tasks and
-results in the popup; without it, Pi's built-in markdown renderer is used.
+results in the panel; without it, Pi's built-in markdown renderer is used.
 `PI_SUBAGENT_GLOW_STYLE` picks the glow style (default `dark`).
 
 ## Use
@@ -55,29 +55,41 @@ then `+N more`):
  ⠹  #3  claude-opus-5-5    1m04s   12 tools   $0.28  thinking…
 ```
 
-`ctrl+shift+s` or `/subagents` opens a two-pane popup: jobs on the left, details for
-the selected one on the right (cwd, git branch and whether it is a linked worktree,
-tools, spend and tokens, a task preview, and a timestamped tool-call log or the result).
-`t` shows the full task, scrollable like the other views. Tasks and results render
-as markdown. Finished jobs stay listed for the session.
+`ctrl+shift+s` or `/subagents` opens the shared panel ([`run-panel`](../run-panel/)),
+with the crew panel's layout and keys: jobs on the left (stacked above the details
+below 100 columns), and the selected job's details in four tabs:
 
-| Key | List | Details |
-| --- | --- | --- |
-| `j`/`k`, arrows, `ctrl+d`/`ctrl+u`, `g`/`G` | Select job | Scroll |
-| `enter`, `tab` | Focus details | Back to list |
-| `a` | Switch activity/result | Same |
-| `t` | Show full task (again: back) | Same |
-| `x` | Cancel selected job | Same |
-| `esc` | Close | Back to list |
-| `q`, `ctrl+shift+s` | Close | Close |
+1. **Overview**: cwd, git branch and whether it is a linked worktree, tools, spend and
+   tokens, tool calls and current activity, status and elapsed time.
+2. **Task**: the whole task, as markdown.
+3. **Activity**: one timestamped line per tool call. It follows new calls; `k` or
+   `ctrl+u` pauses and `G` follows again.
+4. **Result**: the answer as markdown, with any error first.
+
+A job opens on Activity while it runs and on Result once it ends, until you pick a
+tab yourself. Finished jobs stay listed for the session.
+
+| Key | Action |
+|---|---|
+| type, `/` | Filter by id, model, status, activity, or task. `enter` keeps the filter, `esc` clears it |
+| `j`/`k`, arrows | Move; in the details, scroll |
+| `enter`, `l` / `h` | Focus the details / back to the list |
+| `tab`/`shift+tab`, `1`-`4` | Switch tab |
+| `g`/`G` | Top/bottom. On Activity, `G` follows new tool calls again |
+| `ctrl+d`/`ctrl+u` | Page the details, from either pane |
+| `ctrl+o` | Zoom the details to the full panel |
+| `x` | Cancel the selected running job, after a `y` to confirm |
+| `?` | Help |
+| `esc` | Clear the filter, leave the details, leave zoom, then close |
+| `q`, `ctrl+shift+s` | Close |
 
 Spend is the provider-reported cost from the child's usage events, summed over its
 turns. The tool result ends with a one-line summary (elapsed, tool calls, spend,
 tokens), so spend stays in the transcript after the job ends. Failed jobs append it
 to the error; successful ones also carry it in `details.usage`. `ctrl+shift+s` needs a terminal that reports modifier keys (kitty keyboard
-protocol: Ghostty, kitty, WezTerm); elsewhere use `/subagents`. Rendering
-(`panel.ts`) and job state (`jobs.ts`) are separate from Pi so they can be tested
-with injected styling.
+protocol: Ghostty, kitty, WezTerm); elsewhere use `/subagents`. The widget
+(`panel.ts`), the panel source (`source.ts`), and job state (`jobs.ts`) are separate
+from Pi so they can be tested with injected styling.
 
 The parent can also call the `subagent` tool when you request/approve delegation.
 If you named a model, it passes it; otherwise it omits `provider` and `model`, and

@@ -193,69 +193,57 @@
   },
   {
     "name": "panel filter ignores the branch",
-    "file": "panel.ts",
-    "from": "`#${t.id}`, t.status, t.kind, t.title, t.branch ?? \"\"]",
-    "to": "`#${t.id}`, t.status, t.kind, t.title]"
+    "file": "source.ts",
+    "from": "task.title, task.branch ?? \"\"]",
+    "to": "task.title]"
   },
   {
     "name": "panel filter matches letters across fields",
-    "file": "panel.ts",
-    "from": "const score = fieldScore(token, fields);",
-    "to": "const score = fuzzyScore(token, fields.join(\" \"));"
+    "file": "source.ts",
+    "from": "text: [`#${task.id}`, task.status, task.kind, task.title, task.branch ?? \"\"],",
+    "to": "text: [`#${task.id}`, task.status, task.kind, task.title, task.branch ?? \"\"].join(\" \"),"
   },
   {
     "name": "quiet shown only after ten minutes",
-    "file": "panel.ts",
+    "file": "source.ts",
     "from": "if (ms <= QUIET_MS) return undefined;",
     "to": "if (ms <= 10 * QUIET_MS) return undefined;"
   },
   {
     "name": "quiet never turns error past stallMin",
-    "file": "panel.ts",
+    "file": "source.ts",
     "from": "tone: ms >= stallMin * 60_000 ? \"error\" : \"warning\"",
     "to": "tone: \"warning\""
   },
   {
     "name": "panel cancels without asking",
-    "file": "panel.ts",
-    "from": "else state.confirm = task.id;",
-    "to": "else return { type: \"cancel\", id: task.id };"
+    "file": "source.ts",
+    "from": "      confirm: (task) =>",
+    "to": "      unconfirmed: (task) =>"
   },
   {
     "name": "panel cancels tasks of a crew not running here",
-    "file": "panel.ts",
-    "from": "else if (!live)",
-    "to": "else if (false)"
-  },
-  {
-    "name": "esc leaves the filter in place",
-    "file": "panel.ts",
-    "from": "      if (state.query) state.query = \"\";\n      else if (state.focus === \"detail\")",
-    "to": "      if (state.focus === \"detail\")"
-  },
-  {
-    "name": "panes never stack",
-    "file": "panel.ts",
-    "from": "} else if (width >= SIDE_BY_SIDE) {",
-    "to": "} else if (true) {"
+    "file": "source.ts",
+    "from": ": !deps.live() ?",
+    "to": ": false ?"
   },
   {
     "name": "review diff shows its own branch",
-    "file": "panel.ts",
+    "file": "source.ts",
     "from": "const source = task.reviewOf ? crew.tasks.find((t) => t.id === task.reviewOf) : task;",
     "to": "const source = task;"
   },
   {
     "name": "diff recomputed although the tip didn't move",
-    "file": "panel.ts",
+    "file": "source.ts",
     "from": "if (key === entry.key) return;",
     "to": ""
   },
   {
     "name": "failing check output starts closed",
-    "file": "panel.ts",
-    "from": "?? checkFailed(task.report?.checks[index]);",
-    "to": "?? false;"
+    "file": "source.ts",
+    "from": "open: checkFailed(result),",
+    "to": "open: false,"
   },
   {
     "name": "/crew with no goal starts a crew instead of the panel",
@@ -266,8 +254,8 @@
   {
     "name": "panel blocks the command until it closes",
     "file": "index.ts",
-    "from": "void ctx.ui.custom<void>(",
-    "to": "await ctx.ui.custom<void>("
+    "from": "void handle.closed.finally(",
+    "to": "await handle.closed.finally("
   },
   {
     "name": "panel cancel doesn't wake the planner",
@@ -307,27 +295,15 @@
   },
   {
     "name": "live tab ignores the stream for the session file",
-    "file": "index.ts",
-    "from": "if (streamed) return",
-    "to": "if (false) return"
+    "file": "source.ts",
+    "from": "streamed ? { state: \"ready\"",
+    "to": "false ? { state: \"ready\""
   },
   {
     "name": "export ignores a missing session file",
     "file": "index.ts",
-    "from": "if (!session || !existsSync(session)) {",
-    "to": "if (!session) {"
-  },
-  {
-    "name": "live tab does not follow new output",
-    "file": "panel.ts",
-    "from": "if (state.tab === \"live\" && state.follow) state.scroll = max;",
-    "to": ""
-  },
-  {
-    "name": "scrolling up does not pause the live tab",
-    "file": "panel.ts",
-    "from": "if (key === \"up\" || key === \"top\") state.follow = false;",
-    "to": ""
+    "from": "fileExists: existsSync,",
+    "to": "fileExists: () => true,"
   },
   {
     "name": "final message duplicates streamed blocks",

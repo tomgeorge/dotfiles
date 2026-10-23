@@ -51,7 +51,7 @@ test("change: baseline is silent, each change fires, runs until timeout", async 
   h.registry.start(spec({ until: "change", timeoutMs: 60_000 }));
   // The last result repeats, so checks after the second change are silent.
   await until(() => h.fired.length === 2);
-  assert.deepEqual(h.ended, []);
+  assert.equal(h.ended.length, 0);
   h.clock.skew = 60_000;
   await until(() => h.ended.length > 0);
   assert.deepEqual(h.fired.map((f) => f.result?.stdout), ["ALERT", "ok"]);

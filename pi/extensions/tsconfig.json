@@ -1,0 +1,20 @@
+{
+  // Type-check only: Pi loads these files with jiti and tests run under Node's
+  // type stripping, so nothing is emitted. Run test-support/typecheck.sh, which
+  // extends this file with paths into Pi's install (its location changes on
+  // every Pi upgrade, so it can't be committed here).
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}
