@@ -7,7 +7,7 @@ import {
   type PopupKey, type PopupState, type Style,
 } from "./panel.ts";
 import {
-  describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt,
+  describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt, type FirstCheck,
 } from "./report.ts";
 import { runCheck } from "./runner.ts";
 import {
@@ -55,7 +55,7 @@ export default function (pi: ExtensionAPI) {
   let ctx: ExtensionContext | undefined;
   let shuttingDown = false;
   // Reports that must wait for the foreground run to finish.
-  let heldNotices: Message[] = [];
+  const heldNotices: Message[] = [];
   const dueLoops: number[] = [];
   // Watches whose `watch` tool call is still waiting for the first check. A report
   // in that window goes into the tool result instead of a separate message.
@@ -77,27 +77,35 @@ export default function (pi: ExtensionAPI) {
     ticker = setTimeout(tick, anyChecking(store.list()) ? SPINNER_MS : IDLE_TICK_MS);
   }
 
+  function showWidget(context: ExtensionContext) {
+    widgetCtx = context;
+    context.ui.setWidget(WIDGET_KEY, (tui, theme) => {
+      widgetTui = tui;
+      const component: Component = {
+        render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
+        invalidate() {},
+      };
+      return component;
+    }, { placement: "belowEditor" });
+    tick();
+  }
+
+  function hideWidget() {
+    clearTimeout(ticker);
+    ticker = undefined;
+    widgetCtx?.ui.setWidget(WIDGET_KEY, undefined);
+    widgetCtx = undefined;
+    widgetTui = undefined;
+  }
+
   /** Show the below-editor widget while watches are active. */
   function syncWidget() {
     if (shuttingDown || !ctx?.hasUI) return;
     const active = store.active().length > 0;
     if (active && !widgetCtx) {
-      widgetCtx = ctx;
-      ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
-        widgetTui = tui;
-        const component: Component = {
-          render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
-          invalidate() {},
-        };
-        return component;
-      }, { placement: "belowEditor" });
-      tick();
+      showWidget(ctx);
     } else if (!active && widgetCtx) {
-      clearTimeout(ticker);
-      ticker = undefined;
-      widgetCtx.ui.setWidget(WIDGET_KEY, undefined);
-      widgetCtx = undefined;
-      widgetTui = undefined;
+      hideWidget();
     } else if (anyChecking(store.list()) && ticker) {
       // A check just started: pick up spinner speed now, not after the slow tick.
       clearTimeout(ticker);
@@ -233,7 +241,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   /** Wait briefly for the first check, so a broken command shows up while the caller is watching. */
-  async function firstCheck(watch: Watch): Promise<RunResult | undefined | "pending"> {
+  async function firstCheck(watch: Watch): Promise<FirstCheck> {
     if (watch.kind !== "command") return "pending";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const pending = new Promise<"pending">((resolve) => { timer = setTimeout(() => resolve("pending"), FIRST_CHECK_WAIT_MS); });
@@ -257,9 +265,7 @@ export default function (pi: ExtensionAPI) {
   // iteration (each starts a run; the rest wait for the next settle).
   pi.on("agent_settled", async (_event, context) => {
     ctx = context;
-    const notices = heldNotices;
-    heldNotices = [];
-    for (const message of notices) pi.sendMessage(message);
+    for (const message of heldNotices.splice(0)) pi.sendMessage(message);
     if (!context.hasPendingMessages()) runDueLoop();
   });
 
@@ -300,7 +306,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params, _signal, _onUpdate, context) {
       const watch = start(params, context);
       startingByTool.set(watch, undefined);
-      let first: Awaited<ReturnType<typeof firstCheck>>;
+      let first: FirstCheck;
       let report: string | undefined;
       try {
         first = await firstCheck(watch);

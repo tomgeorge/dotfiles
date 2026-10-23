@@ -20,6 +20,11 @@ export const LIMITS = {
   maxTimeout: 86_400_000,
 };
 
+/** bash's "not executable" and "not found": retrying can never succeed. */
+const UNRUNNABLE_EXIT_CODES: ReadonlySet<number> = new Set([126, 127]);
+/** A check started just before the deadline still gets a moment to run. */
+const MIN_CHECK_BUDGET_MS = 1_000;
+
 export interface WatchSpec {
   kind: Kind;
   /** Shell command or prompt. */
@@ -73,10 +78,10 @@ interface Entry {
 }
 
 export class Registry {
-  private entries = new Map<number, Entry>();
-  private run: Runner;
-  private events: Events;
-  private now: () => number;
+  private readonly entries = new Map<number, Entry>();
+  private readonly run: Runner;
+  private readonly events: Events;
+  private readonly now: () => number;
 
   // No parameter properties: Node's type stripping (used by the tests) rejects them.
   constructor(run: Runner, events: Events, now: () => number = Date.now) {
@@ -175,7 +180,7 @@ export class Registry {
     this.events.onUpdate(watch);
     let result: RunResult;
     try {
-      const budget = Math.max(1_000, watch.deadline - this.now());
+      const budget = Math.max(MIN_CHECK_BUDGET_MS, watch.deadline - this.now());
       result = await this.run(watch.text, watch.cwd, entry.controller.signal, budget);
     } catch (error) {
       if (!ended()) this.end(entry, "error", error instanceof Error ? error.message : String(error));
@@ -185,26 +190,32 @@ export class Registry {
     watch.previous = watch.last;
     watch.last = result;
     entry.resolveFirst(result);
-    // Retrying a missing or non-executable command can never succeed.
-    if (result.code === 126 || result.code === 127) {
+    if (UNRUNNABLE_EXIT_CODES.has(result.code)) {
       return this.end(entry, "error", `exit ${result.code}: ${result.stderr.trim() || "command not found or not executable"}`);
     }
+    // A killed check (timeout) is neither success nor a change worth reporting.
     if (watch.until === "success") {
       if (result.code === 0 && !result.killed) {
-        watch.fires++;
-        this.events.onFire(watch, result);
+        this.fire(entry, result);
         return this.end(entry, "met");
       }
-    } else if (!result.killed) {
-      const signature = `${result.code}\n${result.stdout.trim()}`;
-      if (entry.baseline === undefined) entry.baseline = signature;
-      else if (signature !== entry.baseline) {
-        entry.baseline = signature;
-        watch.fires++;
-        this.events.onFire(watch, result);
-      }
+    } else if (!result.killed && this.changed(entry, result)) {
+      this.fire(entry, result);
     }
     this.schedule(entry);
+  }
+
+  private fire(entry: Entry, result: RunResult) {
+    entry.watch.fires++;
+    this.events.onFire(entry.watch, result);
+  }
+
+  /** Update the `change` baseline; true when it differs. The first check only sets it. */
+  private changed(entry: Entry, result: RunResult): boolean {
+    const signature = `${result.code}\n${result.stdout.trim()}`;
+    const changed = entry.baseline !== undefined && signature !== entry.baseline;
+    entry.baseline = signature;
+    return changed;
   }
 
   private end(entry: Entry, reason: EndReason, detail?: string) {
@@ -270,6 +281,17 @@ export function buildSpec(input: WatchInput, cwd: string): WatchSpec {
   };
 }
 
+const USAGE: Record<Kind, string> = {
+  command: "Usage: /watch [30s] [--change] [--wake|--steer|--notify] [--timeout 1h] <shell command>",
+  prompt: "Usage: /loop [10m] [--timeout 4h] <prompt>",
+};
+
+/** The first whitespace-delimited token and what follows it, or undefined when `text` is blank. */
+function splitToken(text: string): [token: string, rest: string] | undefined {
+  const match = text.match(/^(\S+)\s*([\s\S]*)$/);
+  return match ? [match[1], match[2]] : undefined;
+}
+
 /**
  * Parse `/watch` and `/loop` arguments: leading options, then the command or prompt.
  * Options: an interval like `30s`, `--timeout DUR`, and for `/watch` also
@@ -278,24 +300,20 @@ export function buildSpec(input: WatchInput, cwd: string): WatchSpec {
 export function parseArgs(args: string, kind: Kind): WatchInput {
   const input: WatchInput = {};
   let rest = args.trim();
-  for (;;) {
-    const match = rest.match(/^(\S+)\s*([\s\S]*)$/);
-    if (!match) break;
-    const [, token, after] = match;
+  for (let next = splitToken(rest); next; next = splitToken(rest)) {
+    const [token, after] = next;
     if (token === "--") { rest = after; break; }
     const deliver = kind === "command" ? DELIVER.find((mode) => token === `--${mode}`) : undefined;
+    const inlineTimeout = token.match(/^--timeout=(.+)$/);
     if (/^\d+(?:\.\d+)?[smhd]$/i.test(token) && input.interval === undefined) {
       input.interval = token;
-    } else if (token.startsWith("--timeout")) {
-      const inline = token.match(/^--timeout=(.+)$/);
-      if (inline) input.timeout = inline[1];
-      else if (token === "--timeout") {
-        const value = after.match(/^(\S+)\s*([\s\S]*)$/);
-        if (!value) throw new Error("--timeout needs a duration");
-        input.timeout = value[1];
-        rest = value[2];
-        continue;
-      } else break;
+    } else if (inlineTimeout) {
+      input.timeout = inlineTimeout[1];
+    } else if (token === "--timeout") {
+      const value = splitToken(after);
+      if (!value) throw new Error("--timeout needs a duration");
+      [input.timeout, rest] = value;
+      continue;
     } else if (kind === "command" && token === "--change") {
       input.until = "change";
     } else if (deliver) {
@@ -303,7 +321,7 @@ export function parseArgs(args: string, kind: Kind): WatchInput {
     } else break;
     rest = after;
   }
-  if (!rest) throw new Error(kind === "command" ? "Usage: /watch [30s] [--change] [--wake|--steer|--notify] [--timeout 1h] <shell command>" : "Usage: /loop [10m] [--timeout 4h] <prompt>");
+  if (!rest) throw new Error(USAGE[kind]);
   if (kind === "command") input.command = rest;
   else input.prompt = rest;
   return input;
