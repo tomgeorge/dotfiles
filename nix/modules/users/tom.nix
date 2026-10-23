@@ -29,7 +29,7 @@ in
       homeManager.tom.imports = [
         hm.default
         hm.gpgTools
-        hm.piRouter
+        # Subagent routing is off for now; re-add hm.piRouter to bring it back.
         hm.piCheckin
         # docker -> podman only on personal machines; work uses orbstack
         {
@@ -41,7 +41,7 @@ in
       homeManager.tom-work.imports = [
         hm.default
         hm.devWork
-        hm.piRouter
+        # Subagent routing is off for now; re-add hm.piRouter to bring it back.
       ];
     }
   ];

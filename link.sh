@@ -48,7 +48,8 @@ link pi/AGENTS.md ~/.pi/agent/AGENTS.md
 link "pi/mcp/$(hostname -s).json" ~/.pi/agent/mcp.json
 link pi/prompts ~/.pi/agent/prompts
 link pi/extensions/subagent ~/.pi/agent/extensions/subagent
-link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
+# Subagent routing is off for now: without this config the picker lists all models.
+# link pi/subagent-routes.json ~/.pi/agent/subagent-routes.json
 link pi/leader.json ~/.pi/agent/leader.json
 link pi/extensions/run-panel ~/.pi/agent/extensions/run-panel
 link pi/extensions/crew ~/.pi/agent/extensions/crew
