@@ -12,9 +12,11 @@ async function until(done: () => boolean, ms = 5_000) {
 
 const result = (code: number, stdout = ""): RunResult => ({ code, stdout, stderr: "", killed: false });
 
+/** Timers run on real time; `clock.skew` lets a test push the deadline into the past without waiting. */
 function harness(results: RunResult[] | (() => Promise<RunResult>)) {
   const fired: Array<{ id: number; result?: RunResult }> = [];
   const ended: Array<{ id: number; reason: EndReason; detail?: string }> = [];
+  const clock = { skew: 0 };
   let calls = 0;
   const registry = new Registry(
     async () => typeof results === "function" ? results() : results[Math.min(calls++, results.length - 1)],
@@ -24,8 +26,9 @@ function harness(results: RunResult[] | (() => Promise<RunResult>)) {
       onEnd: (w, reason, detail) => ended.push({ id: w.id, reason, detail }),
       onUpdate: () => {},
     },
+    () => Date.now() + clock.skew,
   );
-  return { registry, fired, ended, calls: () => calls };
+  return { registry, fired, ended, clock, calls: () => calls };
 }
 
 const spec = (over: Partial<WatchSpec> = {}): WatchSpec => ({
@@ -45,8 +48,11 @@ test("success: keeps checking until exit 0, then fires once and ends", async () 
 
 test("change: baseline is silent, each change fires, runs until timeout", async () => {
   const h = harness([result(0, "ok"), result(0, "ok"), result(1, "ALERT"), result(1, "ALERT"), result(0, "ok")]);
-  // Long enough for all five results even when loaded; the last one repeats, so extra checks are silent.
-  h.registry.start(spec({ until: "change", timeoutMs: 500 }));
+  h.registry.start(spec({ until: "change", timeoutMs: 60_000 }));
+  // The last result repeats, so checks after the second change are silent.
+  await until(() => h.fired.length === 2);
+  assert.deepEqual(h.ended, []);
+  h.clock.skew = 60_000;
   await until(() => h.ended.length > 0);
   assert.deepEqual(h.fired.map((f) => f.result?.stdout), ["ALERT", "ok"]);
   assert.deepEqual(h.ended.map((e) => e.reason), ["timeout"]);
@@ -55,7 +61,7 @@ test("change: baseline is silent, each change fires, runs until timeout", async 
 test("command not found ends with an error instead of retrying", async () => {
   const h = harness([{ code: 127, stdout: "", stderr: "bash: nope: command not found", killed: false }]);
   h.registry.start(spec());
-  await sleep(30);
+  await until(() => h.ended.length > 0);
   assert.equal(h.calls(), 1);
   assert.equal(h.ended[0].reason, "error");
   assert.match(h.ended[0].detail!, /command not found/);
@@ -81,12 +87,12 @@ test("stop aborts a running check and suppresses its result", async () => {
 test("prompt loop waits for rearm before scheduling the next iteration", async () => {
   const h = harness([]);
   const watch = h.registry.start(spec({ kind: "prompt", intervalMs: 10 }));
+  await until(() => h.fired.length === 1);
   await sleep(40);
   assert.equal(h.fired.length, 1, "no second iteration while the first is undelivered");
   assert.equal(watch.state, "due");
   h.registry.rearm(watch.id);
-  await sleep(25);
-  assert.equal(h.fired.length, 2);
+  await until(() => h.fired.length === 2);
   h.registry.stopAll();
 });
 
@@ -123,8 +129,7 @@ test("firstCheck resolves with the first result, even if the watch ends on it", 
 test("change reports keep the previous result", async () => {
   const h = harness([result(1, ""), result(0, "a")]);
   const w = h.registry.start(spec({ until: "change", timeoutMs: 60_000, intervalMs: 20 }));
-  await sleep(30);
-  assert.equal(h.fired.length, 1);
+  await until(() => h.fired.length === 1);
   assert.equal(w.previous?.code, 1);
   assert.equal(w.last?.code, 0);
   h.registry.stopAll();

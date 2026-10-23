@@ -20,6 +20,7 @@ export interface Style {
 }
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const TAB_WIDTH = 8;
 export const WIDGET_ROWS = 5;
 export const LOG_LIMIT = 200;
 /** Ended watches kept for the popup; the oldest go first. */
@@ -55,9 +56,9 @@ export interface WatchRecord {
 function expandTabs(text: string): string {
   return text.split("\n").map((line) => {
     let out = "";
-    for (const part of line.split("\t").entries()) {
-      if (part[0] > 0) out += " ".repeat(8 - ([...out].length % 8));
-      out += part[1];
+    for (const [i, part] of line.split("\t").entries()) {
+      if (i > 0) out += " ".repeat(TAB_WIDTH - ([...out].length % TAB_WIDTH));
+      out += part;
     }
     return out;
   }).join("\n");
@@ -78,10 +79,10 @@ function summaryLine(result: RunResult, previous: RunResult | undefined) {
 }
 
 export class WatchStore {
-  private records: WatchRecord[] = [];
-  private byWatch = new Map<Watch, WatchRecord>();
+  private readonly records: WatchRecord[] = [];
+  private readonly byWatch = new Map<Watch, WatchRecord>();
   private nextKey = 1;
-  private listeners = new Set<() => void>();
+  private readonly listeners = new Set<() => void>();
 
   add(watch: Watch, now = Date.now()): WatchRecord {
     const record: WatchRecord = { key: this.nextKey++, watch, log: [] };
@@ -99,19 +100,25 @@ export class WatchStore {
     if (!record) return;
     const last = watch.last;
     if (last && last !== record.logged) {
-      const line = summaryLine(last, record.logged);
+      this.logCheck(record, last, now);
       record.logged = last;
-      // Whole output, as the Registry compares for `change`: the shown line alone can hide a change.
-      const signature = `${exitText(last)}\n${last.stdout.trim()}\n${last.stderr.trim()}`;
-      const text = `check · ${exitText(last)}${line ? ` · ${line}` : ""}`;
-      const tone: Tone | undefined = last.code === 0 && !last.killed ? undefined : "dim";
-      const prev = record.log.at(-1);
-      if (prev?.signature === signature) {
-        prev.repeat++;
-        prev.at = now;
-      } else this.push(record, { at: now, text, tone, repeat: 1, signature });
     }
     this.emit();
+  }
+
+  private logCheck(record: WatchRecord, result: RunResult, now: number) {
+    // Whole output, as the Registry compares for `change`: the shown line alone can hide a change.
+    const signature = `${exitText(result)}\n${result.stdout.trim()}\n${result.stderr.trim()}`;
+    const prev = record.log.at(-1);
+    if (prev?.signature === signature) {
+      prev.repeat++;
+      prev.at = now;
+      return;
+    }
+    const line = summaryLine(result, record.logged);
+    const text = `check · ${exitText(result)}${line ? ` · ${line}` : ""}`;
+    const tone: Tone | undefined = result.code === 0 && !result.killed ? undefined : "dim";
+    this.push(record, { at: now, text, tone, repeat: 1, signature });
   }
 
   note(watch: Watch, text: string, tone?: Tone, now = Date.now()) {
@@ -127,12 +134,17 @@ export class WatchStore {
     this.sync(watch, now);
     record.ended = { at: now, reason, detail };
     this.push(record, { at: now, text: endText(watch, record.ended), tone: END_MARK[reason].tone, repeat: 1 });
+    this.pruneEnded();
+    this.emit();
+  }
+
+  /** Drop the oldest ended records beyond ENDED_LIMIT; active ones are never pruned. */
+  private pruneEnded() {
     const ended = this.records.filter((r) => r.ended);
     for (const old of ended.slice(0, Math.max(0, ended.length - ENDED_LIMIT))) {
       this.records.splice(this.records.indexOf(old), 1);
       this.byWatch.delete(old.watch);
     }
-    this.emit();
   }
 
   list(): WatchRecord[] { return [...this.records]; }
@@ -295,6 +307,19 @@ export function initialPopup(records: WatchRecord[]): PopupState {
 // The log reads bottom-up (newest last), so it opens at the tail; output reads from the top.
 const resetScroll = (state: PopupState) => { state.scroll = state.view === "activity" ? "end" : 0; };
 
+/** Where a navigation key moves the list selection; other keys leave it in place. */
+function moveIndex(key: PopupKey, index: number, last: number, page: number): number {
+  switch (key) {
+    case "up": return index - 1;
+    case "down": return index + 1;
+    case "pageUp": return index - page;
+    case "pageDown": return index + page;
+    case "top": return 0;
+    case "bottom": return last;
+    default: return index;
+  }
+}
+
 /** Apply a key. `page` is the body height, for paging. Mutates `state`. */
 export function popupKey(state: PopupState, records: WatchRecord[], key: PopupKey, page: number): PopupAction {
   const index = records.findIndex((r) => r.key === state.selected);
@@ -310,9 +335,7 @@ export function popupKey(state: PopupState, records: WatchRecord[], key: PopupKe
     if (key === "back") return { type: "close" };
     if (key === "enter") { if (record) state.focus = "detail"; return { type: "none" }; }
     const last = records.length - 1;
-    const target = key === "up" ? index - 1 : key === "down" ? index + 1
-      : key === "top" ? 0 : key === "bottom" ? last
-      : key === "pageUp" ? index - page : key === "pageDown" ? index + page : index;
+    const target = moveIndex(key, index, last, page);
     const next = records[Math.min(last, Math.max(0, target))];
     if (next && next.key !== state.selected) {
       state.selected = next.key;
@@ -401,6 +424,24 @@ export interface PopupRender {
   page: number;
 }
 
+/** Index of the selected record, or 0 when the selection is gone (e.g. pruned). */
+const selectedIndex = (records: WatchRecord[], state: PopupState) =>
+  Math.max(0, records.findIndex((r) => r.key === state.selected));
+
+/** Rows of the list pane, scrolled just enough to keep the selection visible. */
+function listRows(records: WatchRecord[], state: PopupState, now: number, innerWidth: number, rows: number, frame: number, s: Style): string[] {
+  if (!records.length) return [s.fg("dim", " No watches yet")];
+  const first = Math.max(0, selectedIndex(records, state) - rows + 1);
+  return records.slice(first, first + rows).map((record) => {
+    const isSelected = record.key === state.selected;
+    const age = duration((record.ended?.at ?? now) - record.watch.startedAt);
+    const lead = `${isSelected ? s.fg("accent", "▸") : " "}${icon(record, frame, s)} ${s.fg("accent", `#${record.watch.id}`)} ${s.fg("muted", kindLabel(record.watch).padEnd(5))} `;
+    const room = innerWidth - s.width(lead) - s.width(age) - 1;
+    const row = lead + s.truncate(record.watch.description, Math.max(1, room), true) + " " + s.fg("dim", age);
+    return isSelected ? s.selected(s.truncate(row, innerWidth, true)) : row;
+  });
+}
+
 export function popupLines(records: WatchRecord[], state: PopupState, now: number, width: number, height: number, s: Style, frame: number): PopupRender {
   const help = state.focus === "list"
     ? "j/k move · enter focus details · a activity/output · x stop · esc close"
@@ -412,23 +453,10 @@ export function popupLines(records: WatchRecord[], state: PopupState, now: numbe
   const title = `${s.bold("Watches")} ${s.fg("muted", `${active}/${records.length}`)}`;
   const footer = `${summary(records)} `;
 
-  const listRows = paneH - 2;
-  const selectedIndex = Math.max(0, records.findIndex((r) => r.key === state.selected));
-  // Scroll just enough to keep the selection visible.
-  const first = Math.max(0, selectedIndex - listRows + 1);
-  const innerLeft = leftW - 2;
-  const list = records.slice(first, first + listRows).map((record) => {
-    const isSelected = record.key === state.selected;
-    const age = duration((record.ended?.at ?? now) - record.watch.startedAt);
-    const lead = `${isSelected ? s.fg("accent", "▸") : " "}${icon(record, frame, s)} ${s.fg("accent", `#${record.watch.id}`)} ${s.fg("muted", kindLabel(record.watch).padEnd(5))} `;
-    const room = innerLeft - s.width(lead) - s.width(age) - 1;
-    const row = lead + s.truncate(record.watch.description, Math.max(1, room), true) + " " + s.fg("dim", age);
-    return isSelected ? s.selected(s.truncate(row, innerLeft, true)) : row;
-  });
-  if (!records.length) list.push(s.fg("dim", " No watches yet"));
+  const list = listRows(records, state, now, leftW - 2, paneH - 2, frame, s);
   const left = box(title, list, leftW, paneH, state.focus === "list", s);
 
-  const record = records[selectedIndex];
+  const record = records[selectedIndex(records, state)];
   let page = 1;
   let rightBody: string[] = [];
   let rightTitle = "Details";
