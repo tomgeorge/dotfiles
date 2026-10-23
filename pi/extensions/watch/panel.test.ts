@@ -48,9 +48,9 @@ test("widget lists active watches and loops and hides when none are active", () 
   const loop = watch(2, { kind: "prompt", description: "slack incidents", fires: 2, state: "due" });
   store.add(ci, 0);
   store.add(loop, 0);
-  const lines = widgetLines(store.list(), 0, 100, plain, { frame: 0, hint: "ctrl+shift+w" });
+  const lines = widgetLines(store.list(), 0, 100, plain, { frame: 0, hint: "/watches" });
   assert.equal(lines.length, 3);
-  assert.match(lines[0], /^─ Watches · 1 watching · 1 loop ─+ ctrl\+shift\+w ─$/);
+  assert.match(lines[0], /^─ Watches · 1 watching · 1 loop ─+ \/watches ─$/);
   assert.equal([...lines[0]].length, 100);
   assert.match(lines[1], /◷ {2}#1 {2}watch {2}CI for PR 123 {4}3 checks {2}exit 8 {2}next in 25s$/);
   // Columns line up across rows.
@@ -63,11 +63,11 @@ test("widget lists active watches and loops and hides when none are active", () 
 
 test("widget caps rows and never exceeds the width", () => {
   const { store } = storeWith(8);
-  const lines = widgetLines(store.list(), 0, 120, plain, { frame: 0, hint: "ctrl+shift+w" });
+  const lines = widgetLines(store.list(), 0, 120, plain, { frame: 0, hint: "/watches" });
   assert.equal(lines.length, 1 + WIDGET_ROWS);
-  assert.match(lines.at(-1)!, /\+4 more · ctrl\+shift\+w to view all/);
+  assert.match(lines.at(-1)!, /\+4 more · \/watches to view all/);
   for (const width of [20, 40, 80]) {
-    for (const line of widgetLines(store.list(), 0, width, plain, { frame: 0, hint: "ctrl+shift+w" })) {
+    for (const line of widgetLines(store.list(), 0, width, plain, { frame: 0, hint: "/watches" })) {
       assert.ok([...line].length <= width, `${width}: ${line}`);
     }
   }

@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { makeStyle, openPanel as showPanel } from "../run-panel/pi.ts";
+import { contributeLeader, type LeaderBinding } from "../vi-mode/leaderContract.ts";
 import { widgetLines } from "./panel.ts";
 import {
   describe, endReport, fireReport, firedNote, firstCheckNote, firstCheckReport, loopPrompt, type FirstCheck,
@@ -18,14 +19,22 @@ import {
 type Message = { customType: string; content: string; display: boolean; details: unknown };
 
 const FIRST_CHECK_WAIT_MS = 10_000;
-const PANEL_KEY = "ctrl+shift+w";
 const WIDGET_KEY = "watches";
 // Fast while a check runs (spinner), slow otherwise (countdowns): watches can
 // live for hours, so don't redraw at spinner speed the whole time.
 const SPINNER_MS = 120;
 const IDLE_TICK_MS = 1_000;
+const PANEL_HINT = "/watches";
+
+// SPC w l opens the panel; vi-mode's registry owns the leader key itself.
+const LEADER_BINDINGS: LeaderBinding[] = [{
+  id: "watch.list",
+  path: [{ key: "w", label: "watches" }, { key: "l", label: "list" }],
+  command: { name: "watches" },
+}];
 
 export default function (pi: ExtensionAPI) {
+  contributeLeader(pi.events, "watch", LEADER_BINDINGS);
   let ctx: ExtensionContext | undefined;
   let shuttingDown = false;
   // Reports that must wait for the foreground run to finish.
@@ -55,7 +64,7 @@ export default function (pi: ExtensionAPI) {
     context.ui.setWidget(WIDGET_KEY, (tui, theme) => {
       widgetTui = tui;
       const component: Component = {
-        render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
+        render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_HINT }),
         invalidate() {},
       };
       return component;
@@ -89,7 +98,7 @@ export default function (pi: ExtensionAPI) {
   /** Show the panel. Returns once it's up: Pi blocks the editor while a command handler runs. */
   function openPanel(context: ExtensionContext) {
     // Spinner speed while a check runs; countdowns only need the idle tick.
-    showPanel(context, watchSource(store, registry), { id: "watches", closeKey: PANEL_KEY, tickMs: IDLE_TICK_MS, spinnerMs: SPINNER_MS });
+    showPanel(context, watchSource(store, registry), { id: "watches", tickMs: IDLE_TICK_MS, spinnerMs: SPINNER_MS });
   }
 
   // Queued messages count as busy: a new turn now would jump ahead of them.
@@ -317,17 +326,12 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("watches", {
-    description: `Browse watches and loops: status, check log, last output; x stops one (${PANEL_KEY})`,
+    description: "Browse watches and loops: status, check log, last output; x stops one",
     async handler(_args, context) {
       if (!context.hasUI) return console.log(listText());
       ctx = context;
       openPanel(context);
     },
-  });
-
-  pi.registerShortcut(PANEL_KEY, {
-    description: "Browse watches and loops",
-    handler: (context) => openPanel(context),
   });
 
   pi.registerCommand("unwatch", {
