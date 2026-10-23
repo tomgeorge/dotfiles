@@ -20,13 +20,13 @@ export function trimBlank(lines: string[]): string[] {
 export interface GlowOptions {
   /** Executable; tests point this at a stub. */
   command?: string;
-  /** Glamour style. "auto" falls back to plain text when stdout isn't a TTY, so name one. */
+  /** Glamour style. "auto" falls back to plain text when stdout isn't a TTY, so name one. Default `PI_SUBAGENT_GLOW_STYLE`, then "dark". */
   style?: string;
 }
 
 /**
  * Render with `glow`, falling back to `fallback` when glow is missing or fails.
- * The popup re-renders every spinner tick, so results are cached per text and width.
+ * Panels re-render every spinner tick, so results are cached per text and width.
  */
 export function glowRenderer(fallback: MarkdownRenderer, opts: GlowOptions = {}): MarkdownRenderer {
   const command = opts.command ?? "glow";
