@@ -5,7 +5,7 @@
 import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { decodeKittyPrintable, matchesKey, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
 import { Bridge, missingInternals, type Snapshot } from "./bridge.ts";
-import { prevCol } from "./chars.ts";
+import { before, prevCol, type Pos } from "./chars.ts";
 import { PI_BUILTIN_COMMANDS } from "./coreBindings.ts";
 import { clampNormal, Engine, type Action } from "./engine.ts";
 import { leaderKey, opensLeader, type LeaderStep } from "./leader.ts";
@@ -21,6 +21,8 @@ const MISSED_MS = 1500;
 // Stands in for a key that's neither printable nor Esc or Backspace (an arrow,
 // a chord). leaderKey closes on any input longer than one character.
 const OTHER_KEY = "other";
+// The left arrow, which Pi's editor binds to cursorLeft by default.
+const LEFT = "\x1b[D";
 
 // What the editor needs from index.ts to run the leader.
 export interface LeaderOptions {
@@ -75,6 +77,15 @@ export class ViEditor extends CustomEditor {
     this.missing = missingInternals(this);
     this.bridge = new Bridge(this);
     this.leader = leader;
+  }
+
+  // index.ts calls this when the editor is replaced or the session ends. Pi
+  // doesn't dispose a replaced editor, and an open leader's registry
+  // subscription would keep drawing its panel over the new editor's.
+  dispose(): void {
+    this.closeLeader();
+    this.clearMissed();
+    this.droppingPaste = false;
   }
 
   handleInput(data: string): void {
@@ -232,15 +243,43 @@ export class ViEditor extends CustomEditor {
     }
     // Submit the command from an empty prompt, as though typed, then put the
     // draft back. Pi's onSubmit clears the editor before its first await, so
-    // the draft restored here stays. The bridge puts back the cursor, the
-    // collapsed pastes, and the undo stack, which setText(draft) would lose.
-    const draft = this.bridge.snapshot();
-    const depth = this.bridge.undoDepth();
+    // the draft restored here stays.
+    const restore = this.saveDraft();
     this.setText("");
     try {
       this.onSubmit?.(args ? `/${name} ${args}` : `/${name}`);
     } finally {
-      this.bridge.reinstate(draft, depth);
+      restore();
+    }
+  }
+
+  // Returns what puts the current draft back. The bridge restores the cursor,
+  // the collapsed pastes, and the undo stack, which setText(draft) would lose.
+  // Checked now, not just at construction, so the bridge is never used without
+  // its fields; then public setText and Left presses restore text and cursor.
+  private saveDraft(): () => void {
+    if (missingInternals(this).length === 0) {
+      const draft = this.bridge.snapshot();
+      const depth = this.bridge.undoDepth();
+      return () => this.bridge.reinstate(draft, depth);
+    }
+    const text = this.getText();
+    const cursor = this.getCursor();
+    return () => {
+      this.setText(text);
+      this.stepLeftTo(cursor);
+    };
+  }
+
+  // setText leaves the cursor at the end; Left steps back a grapheme at a
+  // time, across lines. Stops if a press doesn't move it (Left rebound).
+  private stepLeftTo(target: Pos): void {
+    let at = this.getCursor();
+    while (before(target, at)) {
+      super.handleInput(LEFT);
+      const next = this.getCursor();
+      if (!before(next, at)) return;
+      at = next;
     }
   }
 

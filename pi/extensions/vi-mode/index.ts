@@ -75,6 +75,14 @@ export default function (pi: ExtensionAPI, deps: { configPath?: string } = {}) {
   });
   pi.events.emit(LEADER_DISCOVER, undefined);
 
+  // The editor this extension last installed. Pi doesn't dispose a replaced
+  // editor, so an open leader in it would keep redrawing from the registry.
+  let active: ViEditor | undefined;
+  const retire = (): void => {
+    active?.dispose();
+    active = undefined;
+  };
+
   pi.registerCommand("leader", {
     description: "Show the leader key map, where each binding came from, conflicts, and leader.json errors",
     async handler(_args, ctx) {
@@ -90,6 +98,7 @@ export default function (pi: ExtensionAPI, deps: { configPath?: string } = {}) {
     config = loaded.config;
     configErrors = loaded.errors;
     registry.setKeymap(config.keymap);
+    retire();
     if (!ctx.hasUI) return;
     const ui = ctx.ui;
     notify = (text, level) => ui.notify(text, level);
@@ -100,6 +109,7 @@ export default function (pi: ExtensionAPI, deps: { configPath?: string } = {}) {
 
     const leader = config.leader;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+      retire();
       const editor = new ViEditor(tui, theme, keybindings, {
         registry,
         key: leader.key,
@@ -114,7 +124,10 @@ export default function (pi: ExtensionAPI, deps: { configPath?: string } = {}) {
         // Say so, rather than misbehave; the editor acts like the default.
         ctx.ui.notify(`vi-mode disabled: this Pi's editor lacks ${editor.missing.join(", ")} (checked against Pi ${CHECKED_PI_VERSION})`, "error");
       }
+      active = editor;
       return editor;
     });
   });
+
+  pi.on("session_shutdown", () => retire());
 }

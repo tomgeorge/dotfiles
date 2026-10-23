@@ -11,6 +11,7 @@ const { default: viMode } = await import("./index.ts");
 type Factory = (tui: unknown, theme: unknown, keybindings: unknown) => {
   handleInput(data: string): void;
   onSubmit?: (text: string) => void;
+  onEscape?: () => void;
 };
 interface Widget { key: string; lines: string[] | undefined; options: unknown }
 
@@ -143,4 +144,38 @@ test("the editor shows the panel below the editor and runs commands Pi knows", a
   editor.handleInput("l");
   assert.deepEqual(submitted, ["/leader"]);
   assert.equal(v.widgets.at(-1)?.lines, undefined);
+});
+
+test("a replaced editor's open leader is closed and stops redrawing", async () => {
+  const events = createEventBus();
+  const v = load(configFile(), events);
+  await v.start();
+  const old = v.editor();
+  let escapes = 0;
+  old.onEscape = () => { escapes++; };
+  old.handleInput("escape");
+  old.handleInput(" ");
+  assert.ok(v.widgets.at(-1)?.lines);
+  await v.start();
+  v.editor();
+  assert.equal(v.widgets.at(-1)?.lines, undefined);
+  const count = v.widgets.length;
+  contributeLeader(events, "crew", crew);
+  assert.equal(v.widgets.length, count, "the old editor doesn't redraw its panel");
+  old.handleInput("escape");
+  assert.equal(escapes, 1, "the old leader is closed, so Esc is Pi's again");
+});
+
+test("session shutdown closes an open leader", async () => {
+  const events = createEventBus();
+  const v = load(configFile(), events);
+  await v.start();
+  const editor = v.editor();
+  editor.handleInput("escape");
+  editor.handleInput(" ");
+  await v.f.emit("session_shutdown", {}, v.ctx);
+  assert.equal(v.widgets.at(-1)?.lines, undefined);
+  const count = v.widgets.length;
+  contributeLeader(events, "crew", crew);
+  assert.equal(v.widgets.length, count);
 });
