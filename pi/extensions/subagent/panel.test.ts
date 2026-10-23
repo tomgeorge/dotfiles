@@ -90,9 +90,9 @@ test("widget lists running jobs in aligned columns and hides when idle", () => {
   const store = storeWith(2);
   store.update(1, progress({ toolCalls: 3, activity: "grep setStatus", phase: "tool", usage: { input: 1, output: 1, cost: 0.11 } }));
   store.update(2, progress({ phase: "thinking" }));
-  const lines = widgetLines(store.list(), 12_000, 100, plain, { frame: 0, hint: "ctrl+shift+s" });
+  const lines = widgetLines(store.list(), 12_000, 100, plain, { frame: 0, hint: "/subagents" });
   assert.equal(lines.length, 3);
-  assert.match(lines[0], /^─ Subagents · 2 running · \$0\.11 ─+ ctrl\+shift\+s ─$/);
+  assert.match(lines[0], /^─ Subagents · 2 running · \$0\.11 ─+ \/subagents ─$/);
   assert.equal([...lines[0]].length, 100);
   assert.match(lines[1], /#1 {2}model-1 {2}\s+12s {4}3 tools {2} \$0\.11 {2}grep setStatus$/);
   assert.match(lines[2], /thinking…$/);
@@ -104,16 +104,16 @@ test("widget lists running jobs in aligned columns and hides when idle", () => {
 });
 
 test("widget caps rows with a +N more line", () => {
-  const lines = widgetLines(storeWith(8).list(), 0, 120, plain, { frame: 0, hint: "ctrl+shift+s" });
+  const lines = widgetLines(storeWith(8).list(), 0, 120, plain, { frame: 0, hint: "/subagents" });
   assert.equal(lines.length, 1 + WIDGET_ROWS);
-  assert.match(lines.at(-1)!, /\+4 more · ctrl\+shift\+s to view all/);
+  assert.match(lines.at(-1)!, /\+4 more · \/subagents to view all/);
 });
 
 test("widget lines never exceed the width", () => {
   const store = storeWith(3);
   store.update(1, progress({ toolCalls: 1, phase: "tool", activity: "read ".repeat(40) }));
   for (const width of [20, 40, 80]) {
-    for (const line of widgetLines(store.list(), 0, width, plain, { frame: 0, hint: "ctrl+shift+s" })) {
+    for (const line of widgetLines(store.list(), 0, width, plain, { frame: 0, hint: "/subagents" })) {
       assert.ok([...line].length <= width, `${width}: ${line}`);
     }
   }

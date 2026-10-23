@@ -6,6 +6,7 @@ import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type Ext
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { makeStyle, openPanel as showPanel } from "../run-panel/pi.ts";
+import { contributeLeader, type LeaderBinding } from "../vi-mode/leaderContract.ts";
 import { JobStore, readGitInfo } from "./jobs.ts";
 import { progressLine, summary, widgetLines } from "./panel.ts";
 import { parseCommandArgs, pickModel, type PickerUI } from "./picker.ts";
@@ -15,11 +16,19 @@ import { subagentSource } from "./source.ts";
 const DEFAULT_MAX_CONCURRENT = 5;
 const MAX_CONCURRENT_FLAG = "subagent-max-concurrent";
 const MAX_CONCURRENT_ENV = "PI_SUBAGENT_MAX_CONCURRENT";
-const PANEL_KEY = "ctrl+shift+s";
+const PANEL_COMMAND = "subagents";
 const WIDGET_KEY = "subagents";
 const SPINNER_MS = 120;
 // Tick so elapsed time moves during long model calls with no tool activity.
 const PROGRESS_TICK_MS = 1000;
+
+const LEADER_BINDINGS: LeaderBinding[] = [
+  {
+    id: "subagent.list",
+    path: [{ key: "a", label: "agents" }, { key: "l", label: "list" }],
+    command: { name: PANEL_COMMAND },
+  },
+];
 
 interface ActiveJob {
   controller: AbortController;
@@ -58,7 +67,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
         widgetTui = tui;
         const component: Component = {
-          render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: PANEL_KEY }),
+          render: (width) => widgetLines(store.list(), Date.now(), width, makeStyle(theme), { frame, hint: `/${PANEL_COMMAND}` }),
           invalidate() {},
         };
         return component;
@@ -80,7 +89,7 @@ export default function (pi: ExtensionAPI) {
       job?.controller.abort();
       return !!job;
     });
-    showPanel(ctx, source, { id: "subagents", closeKey: PANEL_KEY, spinnerMs: SPINNER_MS });
+    showPanel(ctx, source, { id: "subagents", spinnerMs: SPINNER_MS });
   }
 
   pi.registerFlag(MAX_CONCURRENT_FLAG, {
@@ -286,15 +295,12 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("subagents", {
-    description: `Browse subagents: status, activity, spend, results (${PANEL_KEY})`,
+  pi.registerCommand(PANEL_COMMAND, {
+    description: "Browse subagents: status, activity, spend, results",
     handler: async (_args, ctx) => openPanel(ctx),
   });
 
-  pi.registerShortcut(PANEL_KEY, {
-    description: "Browse subagents",
-    handler: (ctx) => openPanel(ctx),
-  });
+  contributeLeader(pi.events, "subagent", LEADER_BINDINGS);
 
   pi.on("session_shutdown", async () => {
     shuttingDown = true;
