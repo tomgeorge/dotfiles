@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { glowRenderer, trimBlank } from "./markdown.ts";
 
 function stub(script: string) {
-  const file = join(mkdtempSync(join(tmpdir(), "subagent-glow-")), "glow");
+  const file = join(mkdtempSync(join(tmpdir(), "run-panel-glow-")), "glow");
   writeFileSync(file, `#!/bin/sh\n${script}\n`);
   chmodSync(file, 0o755);
   return file;
@@ -25,7 +25,7 @@ test("glowRenderer pipes markdown through glow with style and width", () => {
 });
 
 test("glowRenderer caches per text and width", () => {
-  const dir = mkdtempSync(join(tmpdir(), "subagent-glow-count-"));
+  const dir = mkdtempSync(join(tmpdir(), "run-panel-glow-count-"));
   const command = stub(`echo x >> ${dir}/calls; cat`);
   const render = glowRenderer(fallback, { command });
   render("a", 10);

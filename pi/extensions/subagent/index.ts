@@ -2,17 +2,15 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { getMarkdownTheme, truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
-import { Markdown, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type Component, type KeyId, type TUI } from "@earendil-works/pi-tui";
+import { truncateHead, type AgentToolUpdateCallback, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { makeStyle, openPanel as showPanel } from "../run-panel/pi.ts";
 import { JobStore, readGitInfo } from "./jobs.ts";
-import { glowRenderer } from "./markdown.ts";
-import {
-  initialPopup, popupKey, popupLines, progressLine, summary, widgetLines,
-  type PopupKey, type PopupState, type Style,
-} from "./panel.ts";
+import { progressLine, summary, widgetLines } from "./panel.ts";
 import { parseCommandArgs, pickModel, type PickerUI } from "./picker.ts";
 import { ALLOWED_TOOLS, runSubagent, validateJob, type Job, type Progress, type Result } from "./runner.ts";
+import { subagentSource } from "./source.ts";
 
 const DEFAULT_MAX_CONCURRENT = 5;
 const MAX_CONCURRENT_FLAG = "subagent-max-concurrent";
@@ -28,21 +26,6 @@ interface ActiveJob {
   done: Promise<Result>;
 }
 
-// glow when installed; otherwise Pi's own markdown component.
-const renderMarkdown = glowRenderer((text, width) => new Markdown(text, 0, 0, getMarkdownTheme()).render(width));
-
-function makeStyle(theme: Theme): Style {
-  return {
-    fg: (tone, text) => theme.fg(tone, text),
-    bold: (text) => theme.bold(text),
-    selected: (text) => theme.bg("selectedBg", text),
-    width: visibleWidth,
-    truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
-    wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
-    markdown: (text, width) => renderMarkdown(text, Math.max(1, width)),
-  };
-}
-
 /** Cap like other tool results; the full text goes to disk since the child session is gone. */
 async function capResult(text: string): Promise<string> {
   const truncated = truncateHead(text);
@@ -53,36 +36,18 @@ async function capResult(text: string): Promise<string> {
   return `${truncated.content}\n\n[Output truncated to 2000 lines / 50 KiB. Full output: ${file}]`;
 }
 
-// First match wins; letters mirror lazygit/vim.
-const POPUP_KEYS: [KeyId[], PopupKey][] = [
-  [["up", "k"], "up"],
-  [["down", "j"], "down"],
-  [["pageUp", "ctrl+u"], "pageUp"],
-  [["pageDown", "ctrl+d"], "pageDown"],
-  [["home", "g"], "top"],
-  [["end", "shift+g"], "bottom"],
-  [["enter", "tab", "l", "right"], "enter"],
-  [["escape", "h", "left"], "back"],
-  [["a"], "toggle"],
-  [["t"], "task"],
-  [["ctrl+o"], "expand"],
-  [["x"], "cancel"],
-  [["q", "ctrl+c", PANEL_KEY], "close"],
-];
-
 export default function (pi: ExtensionAPI) {
   const active = new Map<number, ActiveJob>();
   let nextId = 1;
   let shuttingDown = false;
   // One model picker at a time: parallel tool calls would otherwise stack dialogs.
   let pickerQueue: Promise<unknown> = Promise.resolve();
-  // Every job this session, finished ones included, for the widget and popup.
+  // Every job this session, finished ones included, for the widget and panel.
   const store = new JobStore();
   let frame = 0;
   let spinner: ReturnType<typeof setInterval> | undefined;
   let widgetTui: TUI | undefined;
   let widgetCtx: ExtensionContext | undefined;
-  let popupOpen = false;
 
   /** Show the below-editor widget while jobs run; animate its spinner. */
   function syncWidget(ctx: ExtensionContext) {
@@ -108,43 +73,14 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function openPopup(ctx: ExtensionContext) {
-    if (!ctx.hasUI || popupOpen) return;
-    popupOpen = true;
-    try {
-      await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-        const state: PopupState = initialPopup(store.list());
-        let page = 1;
-        const unsubscribe = store.subscribe(() => tui.requestRender());
-        // The widget's spinner stops when nothing runs; tick here too so elapsed
-        // time moves for jobs started while only the popup is up.
-        const ticker = setInterval(() => tui.requestRender(), SPINNER_MS);
-        return {
-          render(width) {
-            const height = Math.max(8, Math.floor(tui.terminal.rows * 0.8));
-            const out = popupLines(store.list(), state, Date.now(), width, height, makeStyle(theme), frame);
-            page = out.page;
-            return out.lines;
-          },
-          handleInput(data) {
-            const key = POPUP_KEYS.find(([ids]) => ids.some((id) => matchesKey(data, id)))?.[1]
-              ?? (data === "G" ? "bottom" : undefined);
-            if (!key) return;
-            const action = popupKey(state, store.list(), key, page);
-            if (action.type === "close") return done();
-            if (action.type === "cancel") active.get(action.id)?.controller.abort();
-            tui.requestRender();
-          },
-          invalidate() {},
-          dispose() {
-            unsubscribe();
-            clearInterval(ticker);
-          },
-        };
-      }, { overlay: true, overlayOptions: { anchor: "center", width: "90%", minWidth: 60, maxHeight: "80%" } });
-    } finally {
-      popupOpen = false;
-    }
+  /** Show the panel. Returns once it's up: Pi blocks the editor while a command handler runs. */
+  function openPanel(ctx: ExtensionContext) {
+    const source = subagentSource(store, (id) => {
+      const job = active.get(id);
+      job?.controller.abort();
+      return !!job;
+    });
+    showPanel(ctx, source, { id: "subagents", closeKey: PANEL_KEY });
   }
 
   pi.registerFlag(MAX_CONCURRENT_FLAG, {
@@ -213,7 +149,7 @@ export default function (pi: ExtensionAPI) {
       progress: { toolCalls: 0, activity: "starting", phase: "starting", usage: { input: 0, output: 0, cost: 0 } },
     });
     readGitInfo(job.cwd).then((git) => store.setGit(id, git));
-    // The tool row streams one line; the widget and popup read the store.
+    // The tool row streams one line; the widget and panel read the store.
     const report = () => {
       onUpdate?.({ content: [{ type: "text", text: progressLine(record, Date.now()) }], details: undefined });
     };
@@ -352,12 +288,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("subagents", {
     description: `Browse subagents: status, activity, spend, results (${PANEL_KEY})`,
-    handler: (_args, ctx) => openPopup(ctx),
+    handler: (_args, ctx) => openPanel(ctx),
   });
 
   pi.registerShortcut(PANEL_KEY, {
     description: "Browse subagents",
-    handler: (ctx) => openPopup(ctx),
+    handler: (ctx) => openPanel(ctx),
   });
 
   pi.on("session_shutdown", async () => {

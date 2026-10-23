@@ -1,7 +1,8 @@
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type KeyId, type OverlayOptions } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
+import { decodeKittyPrintable, Markdown, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi, type KeyId, type OverlayOptions } from "@earendil-works/pi-tui";
 import type { Style, Tone } from "./format.ts";
 import { input, type PanelInput, type PanelKey } from "./input.ts";
+import { glowRenderer } from "./markdown.ts";
 import { render } from "./render.ts";
 import type { Action, ActionContext, Item, Result, Source } from "./source.ts";
 import { initialState } from "./state.ts";
@@ -41,7 +42,12 @@ export function panelEvent(data: string, closeKeys: KeyId[] = []): PanelInput | 
   return char ? { char } : undefined;
 }
 
-export function makeStyle(theme: Theme, markdown?: Style["markdown"]): Style {
+// glow when installed; otherwise Pi's own markdown component. One per extension, so its cache
+// outlives a panel.
+const renderMarkdown = glowRenderer((text, width) => new Markdown(text, 0, 0, getMarkdownTheme()).render(width));
+
+/** Every panel's Style renders markdown, so sources can rely on `Style.markdown`. */
+export function makeStyle(theme: Theme, markdown: NonNullable<Style["markdown"]> = (text, width) => renderMarkdown(text, Math.max(1, width))): Style {
   return {
     fg: (tone, text) => theme.fg(tone, text),
     bold: (text) => theme.bold(text),
@@ -49,7 +55,7 @@ export function makeStyle(theme: Theme, markdown?: Style["markdown"]): Style {
     width: visibleWidth,
     truncate: (text, width, pad) => truncateToWidth(text, Math.max(0, width), "…", pad),
     wrap: (text, width) => wrapTextWithAnsi(text, Math.max(1, width)),
-    ...(markdown ? { markdown } : {}),
+    markdown,
   };
 }
 
