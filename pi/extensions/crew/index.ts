@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { tildify } from "../run-panel/format.ts";
 import { openPanel as showPanel } from "../run-panel/pi.ts";
 import { contributeLeader, type LeaderBinding } from "../vi-mode/leaderContract.ts";
 import {
@@ -17,6 +18,7 @@ import {
   formatStatus, formatWidget, listCrews, loadState, money, ref, runningTasks, saveState, sessionPath, slugify, spent,
   type CrewConfig, type CrewState, type ModelRef, type TaskRecord, type TaskStatus,
 } from "./state.ts";
+import { withProgress } from "./progress.ts";
 import { crewSource } from "./source.ts";
 import { Transcript } from "./transcript.ts";
 import { runWorker, type WorkerJob, type WorkerResult } from "./worker.ts";
@@ -354,6 +356,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
     const worktree = worktreePath(c.repoName, task.branch);
     task.worktree = worktree;
     task.base = (await gitOk(c.integrationPath, ["rev-parse", "HEAD"])).trim();
+    // Checking out a big repo takes a while; the widget and panel show this until the worker starts.
+    task.activity = "creating worktree";
     await addWorktree(c.repoRoot, worktree, task.branch, task.base);
     return { prompt: workerPrompt(c, task), worktree };
   }
@@ -647,7 +651,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       await drain(ctx);
       const goal = args.trim() || (await ctx.ui.editor("Crew goal"))?.trim();
       if (!goal) return;
-      const info = await repoInfo(ctx.cwd);
+      const info = await withProgress(ctx, "Crew: checking the repository…", () => repoInfo(ctx.cwd));
       if (info.dirty && !(await ctx.ui.confirm("Uncommitted changes", "Workers branch from HEAD; your uncommitted changes won't be included. Continue?"))) return;
       const workerModel = await pickModel(ctx, "Worker model (implements tasks)");
       if (!workerModel) return;
@@ -661,7 +665,8 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       const slug = slugify(goal);
       const integrationBranch = `crew/${slug}`;
       const integrationPath = worktreePath(info.name, integrationBranch);
-      await addWorktree(info.root, integrationPath, integrationBranch, info.head);
+      await withProgress(ctx, `Crew: creating the integration worktree ${tildify(integrationPath)}…`,
+        () => addWorktree(info.root, integrationPath, integrationBranch, info.head));
       refuseIfShuttingDown();
       crew = {
         version: 1, status: "active", tasks: [], nextId: 1,
@@ -750,10 +755,13 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
       if (!done.length) return ctx.ui.notify("Nothing to clean", "info");
       const ok = await ctx.ui.confirm("Remove task worktrees?", `${done.length} worktrees and branches of crew ${state.config.slug} (${done.map((t) => `#${t.id} ${t.status}`).join(", ")}). Unintegrated work on those branches is deleted.`);
       if (!ok) return;
-      for (const t of done) {
-        await removeWorktree(state.config.repoRoot, t.worktree!, t.branch);
-        t.worktree = undefined;
-      }
+      await withProgress(ctx, "Crew: removing worktrees…", async (step) => {
+        for (const [i, t] of done.entries()) {
+          step(`Crew: removing worktree ${i + 1}/${done.length} (#${t.id})…`);
+          await removeWorktree(state.config.repoRoot, t.worktree!, t.branch);
+          t.worktree = undefined;
+        }
+      });
       if (state === crew) persist();
       else saveState(state);
       ctx.ui.notify(`Removed ${done.length} task worktrees`, "info");

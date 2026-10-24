@@ -5,9 +5,6 @@ Not committed to yet; promote to TODO.md once one is worth doing.
 ## Crew
 
 - **Style the crew panel better.** Overall look: colour, spacing, emphasis.
-- **Show that crew work is in progress.** Starting a big crew and running
-  `/crew-clean` give no notification while they work (worktree setup, branch
-  and worktree removal), so it looks like nothing is happening.
 - **Multicrew support.** Today it's one crew per session; parallel crews need
   separate sessions, and bare `/crew-resume`, `/crew-clean`, and the panel fall
   back to the newest ledger crew, which can be one still active elsewhere
