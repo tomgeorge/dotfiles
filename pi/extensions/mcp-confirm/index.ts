@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { allowed, loadAllowlist } from "./allow.ts";
+import { askToAllow } from "./dialog.ts";
+import { argRows, describeTool } from "./format.ts";
 
 const ALLOWLIST = fileURLToPath(new URL("./readonly.json", import.meta.url));
 
@@ -26,7 +28,7 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) {
       return { block: true, reason: `${event.toolName} may modify data and needs confirmation, but no UI is available` };
     }
-    const ok = await ctx.ui.confirm(`Allow ${event.toolName}?`, JSON.stringify(event.input, null, 2));
+    const ok = await askToAllow(ctx, { ...describeTool(event.toolName, tool?.description), rows: argRows(event.input) });
     if (!ok) return { block: true, reason: `User declined ${event.toolName}` };
   });
 }

@@ -1,7 +1,11 @@
 # MCP confirm
 
 Asks before pi runs any MCP tool that its server doesn't mark read-only
-(`readOnlyHint`), and shows the call's arguments. Calls from codemode scripts
+(`readOnlyHint`). The prompt shows the tool's one-line description and its
+arguments in a boxed key/value table that wraps to the terminal width, with
+nested objects flattened to dotted keys. Press y or Enter to allow, n or Esc to
+deny. RPC clients get Pi's plain Yes/No confirm with the same table as text.
+Calls from codemode scripts
 are gated too. Without a UI (print mode), those calls are blocked.
 
 The hints are the server's claim, not verified. A tool without them counts as

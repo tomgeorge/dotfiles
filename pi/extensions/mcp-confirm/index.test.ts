@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import mcpConfirm from "./index.ts";
+// Installs stand-ins for Pi's packages; index.ts imports pi-tui, so it's loaded after.
+import "../test-support/fake-pi.ts";
+
+const { default: mcpConfirm } = await import("./index.ts");
 
 type Tool = { name: string; annotations?: { readOnlyHint?: unknown } };
 type Handler = (event: unknown, ctx: unknown) => Promise<unknown>;
@@ -37,12 +40,13 @@ test("only readOnlyHint === true counts; missing, false, or truthy non-true hint
     assert.deepEqual(await g.call(name), { block: true, reason: `User declined ${name}` });
   }
   assert.equal(g.prompts.length, 6);
+  assert.equal(g.prompts[0]?.[1], "(no arguments)");
 });
 
 test("the prompt shows the arguments; a yes lets the call run", async () => {
   const g = gate([], true);
   assert.equal(await g.call("mcp__slack__send", { channel: "C1", text: "hi" }), undefined);
-  assert.deepEqual(g.prompts, [["Allow mcp__slack__send?", '{\n  "channel": "C1",\n  "text": "hi"\n}']]);
+  assert.deepEqual(g.prompts, [["Allow slack › send?", "┌─────────┬────┐\n│ channel │ C1 │\n├─────────┼────┤\n│ text    │ hi │\n└─────────┴────┘"]]);
 });
 
 test("without a UI, calls that need confirmation are blocked", async () => {
