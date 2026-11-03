@@ -10,6 +10,14 @@
 
         programs.zsh.enable = true;
 
+        # Rex puts its CLI dir first on PATH, then nix-darwin resets PATH to a
+        # fixed list; put it back. Guarded because it's empty outside Rex.
+        environment.interactiveShellInit = ''
+          if [ -n "$REX_BIN_DIR" ]; then
+            export PATH="$REX_BIN_DIR:$PATH"
+          fi
+        '';
+
         homebrew.enableZshIntegration = true;
       };
 

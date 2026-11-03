@@ -48,6 +48,10 @@
           };
           interactiveShellInit = ''
             set -g fish_key_bindings fish_vi_key_bindings
+            # Rex's CLI dir; see environment.interactiveShellInit in shell-tools.nix.
+            if set -q REX_BIN_DIR
+              fish_add_path --path --prepend --move $REX_BIN_DIR
+            end
           '';
           plugins = [
             {
