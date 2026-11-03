@@ -17,6 +17,8 @@
 - Don't add dependencies without asking.
 - Handle errors explicitly; don't swallow them.
 - Prefer simple over easy: plain data and functions, values over mutable state, composition over inheritance. Don't braid concerns together, such as I/O with decisions.
+- Before writing non-trivial code (a new function, type, or package, or a change to how one decides something), read `~/.agents/skills/simple-code/RUBRIC.md` and design to it: a pure core that decides, a thin shell that does I/O, and the standard library or existing dependencies over anything hand-rolled. Use it as a lens, not a checklist. The codebase's conventions win, and don't add abstractions to satisfy it.
+- Before calling code done, reread your diff with the rubric's questions: can each piece be understood and changed without the others, and is each decision made in one place? Fix what you braided.
 - Parse untrusted input once at the boundary into typed values; no `any`, `!`, or unchecked casts.
 
 ## Verification

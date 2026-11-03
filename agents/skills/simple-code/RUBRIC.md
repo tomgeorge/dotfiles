@@ -55,6 +55,8 @@ Use this as a lens, not a checklist to max out. A finding needs a reason that ma
 
 ## Idiomatic Go
 Go's own idiom is already close to Simple Made Easy: plain structs, functions, small interfaces, explicit errors. Most findings are places where code imported another language's habits.
+- **Read the Hickey table with Go eyes:** methods, pointer receivers, mutable structs and positional parameters are normal Go. They're findings only when they braid concerns, e.g. counters mutated from several code paths that must stay in sync, or a transaction closure that both decides and writes. Pull the decision into a pure function over plain values, and leave the I/O and locking around it.
+- **Don't hand-roll what's already there:** before accepting a custom queue, cache, retry loop or worker pool, check the standard library and the module's existing `go.mod` (`x/sync/errgroup`, `semaphore`, `singleflight`, and so on). If the hand-rolled version is deliberate, a comment should say what the library gets wrong for this case.
 - **Accept interfaces, return structs:** define interfaces where they're *consumed*, small, often one method (`io.Reader`). Don't create a `FooInterface` next to `Foo` "for mocking" unless a consumer needs it.
 - **Errors are values:** return `error` last, and check it right away. Wrap with context using `fmt.Errorf("loading %s: %w", name, err)`, and match with `errors.Is`/`errors.As`, never by comparing strings. Use sentinels (`var ErrNotFound = errors.New(...)`) or typed errors only when callers branch on them. `panic` is for programmer errors, not for control flow.
 - **Happy path on the left:** early returns, and no `else` after a `return`. Deep nesting is a finding.
