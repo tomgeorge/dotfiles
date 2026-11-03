@@ -103,6 +103,25 @@ display-changed = ['exec-and-forget /run/current-system/sw/bin/sketchybar --trig
 app-id = 'com.apple.systempreferences'   # also: app-name, title (regexes), kind (normal|dialog|sheet|panel)
 run = 'layout floating'
 
+# Where apps open: code and browser on 1, chat and calendar on 2.
+[[rules]]
+app-id = 'com.mitchellh.ghostty'
+run = 'move-window-to-workspace 1'
+
+[[rules]]
+app-id = 'com.google.Chrome'
+run = 'move-window-to-workspace 1'
+
+[[rules]]
+app-id = 'com.tinyspeck.slackmacgap'
+run = 'move-window-to-workspace 2'
+
+# kind keeps Fantastical's menu bar popover out of the move.
+[[rules]]
+app-id = 'com.flexibits.fantastical2.mac'
+kind = 'normal'
+run = 'move-window-to-workspace 2'
+
 [mode.main]
 ctrl-left = 'workspace prev'
 ctrl-right = 'workspace next'
