@@ -3,6 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Only for pi-coding-agent: 1.5.0 fixes OSC 7501 status vanishing in Rex.
+    # Drop once nixpkgs-unstable has pi >= 1.5.0.
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";

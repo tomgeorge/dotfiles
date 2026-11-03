@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, inputs, ... }:
 
 {
   flake.modules = {
@@ -14,6 +14,9 @@
         # ignores on macOS, so they write to the read-only sandbox $HOME and
         # fail. The binary itself is fine. Drop once nixpkgs fixes the package.
         ketch = pkgs.ketch.overrideAttrs { doCheck = false; };
+        # From nixpkgs master until unstable has pi >= 1.5.0; see flake.nix.
+        pi-coding-agent =
+          inputs.nixpkgs-master.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pi-coding-agent;
       in
       {
         home.sessionVariables = {

@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.0.2",
+  "lastChangelogVersion": "1.5.0",
   "theme": "dark",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
@@ -19,5 +19,8 @@
     "npm:@gotgenes/pi-anthropic-auth",
     "git:github.com/mikker/fut",
     "npm:pi-google-workspace"
-  ]
+  ],
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:@gotgenes/pi-anthropic-auth\",\"scope\":\"user\"}": "3.3.2"
+  }
 }
