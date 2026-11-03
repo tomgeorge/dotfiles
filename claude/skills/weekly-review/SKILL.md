@@ -16,10 +16,9 @@ Read this before calling any tools — it's where v1 of the skill made bad assum
 - **Project structure.** The user's real project layout is:
   - **Personal** — life tasks, errands, gifts, health, etc.
   - **Work** — Chainguard tasks
+  - **Wedding Planning** — wedding tasks; treat it like Personal and Work
   - **Agendas** — questions/topics queued for specific people (1:1 fodder)
   - **Someday Maybe** — the parking lot for items they're not committing to but don't want to drop
-  - **Checklists** — contains the weekly-review checklist task with subtasks like "Look at last week calendar", "Empty your head", "Look at Projects list", etc. Use this as a sanity check for what the review should cover.
-  - Plus a personal **bug tracker** for a TUI app the user is building (entries like `[Task Creation View]`, `[Picker Item]`). This is **not** GTD inbox material — exclude it from life-task summaries unless the user asks.
   - Plus the system **Inbox**.
 - **Waiting label.** The `Waiting` label means the user is blocked on someone else doing something. During Get Clear, surface these and ask if any need a nudge.
 - **Someday/Maybe = the "Someday Maybe" project.** When the user says "move to someday" during the stale sweep, move the task to that project (don't try to use a label).
@@ -71,10 +70,8 @@ Run phases in order. Be conversational during processing phases; be terse during
 3. Call `Todoist:user-info` once — useful context, but **do not** use the user ID to filter tasks. (If already done in step 1's sanity call, reuse the result.)
 4. Call `Todoist:find-projects` once and cache the project list with their IDs. Map by name:
    - **Inbox** — for unprocessed captures
-   - **Personal**, **Work**, **Agendas** — the active life/work projects
+   - **Personal**, **Work**, **Wedding Planning**, **Agendas** — the active life/work projects
    - **Someday Maybe** — destination for parked items
-   - **Checklists** — reference for the weekly-review checklist
-   - The bug-tracker project — skip in summaries (excluded by default)
    If a name doesn't match exactly (case differences, emoji prefixes), use the closest match and confirm once with the user. Cache the name→ID mapping for the session.
 5. Tell the user: "Walking you through a GTD weekly review — capture, collect, get clear, get current, stale sweep, plan the week. ~10 minutes." Then proceed.
 
@@ -138,12 +135,11 @@ Report: "Last week: N events, M completed tasks. Next 7 days: N events, K schedu
 
 Goal: empty the inboxes. Process loose captures into actions, references, or trash.
 
-1. **Todoist Inbox.** Show the user the inbox tasks (titles only). Ask: "For each: move to Personal/Work/Agendas/Someday Maybe, schedule, drop, or leave?" Accept batched answers ("first 3 to Work, last 2 to Someday Maybe, drop #5"). Apply with `Todoist:update-tasks` (to change `projectId`) or `Todoist:delete-object`.
+1. **Todoist Inbox.** Show the user the inbox tasks (titles only). Ask: "For each: move to Personal/Work/Wedding Planning/Agendas/Someday Maybe, schedule, drop, or leave?" Accept batched answers ("first 3 to Work, last 2 to Someday Maybe, drop #5"). Apply with `Todoist:update-tasks` (to change `projectId`) or `Todoist:delete-object`.
 2. **Apple Notes recent captures.** List the recent notes that look unprocessed. Ask: "Anything here that's a next action I should put in Todoist?" **Before adding any task derived from a note**, check whether a Todoist task already references that note — use `Todoist:search` or `Todoist:find-tasks` with `searchText` matching the note title or a distinctive phrase from it (note links in tasks often appear as `applenotes://...` URLs or as Markdown links pointing at the note). If a match exists, surface it to the user ("there's already a task for this — leave it, update it, or add another anyway?") rather than blindly adding a duplicate. Only after the duplicate check, add via `Todoist:add-tasks` to the right project. **Don't delete notes** — that's for the user.
 3. **Stalled "Waiting" items.** Surface any Todoist tasks with the `Waiting` label (these are things the user is blocked on someone else for). Ask: "Any of these need a nudge, or to be closed out because they're done?"
 4. **Overdue tasks** (if any from Phase 1.4). One-line summary, ask: "Reschedule, complete, or drop?" Batch the operations.
 
-Skip items in the bug-tracker project unless the user explicitly asks about it.
 
 ### Phase 2.5: Mail Triage (HEY)
 
@@ -164,7 +160,7 @@ Run it after Get Clear so the Todoist and calendar picture is already in hand; t
 Build the match set from data already pulled in Phase 1 — do not re-query:
 
 - **People to watch:** names and addresses appearing in `Waiting`-labeled Todoist tasks (the user is blocked on these people — mail from them is the highest-value match there is), in **Agendas** tasks, and as attendees of 1:1s in the next 7 days.
-- **Topics to watch:** distinctive words from open task content in **Personal**, **Work**, and **Agendas**; titles of upcoming calendar events; and any task with a `deadlineDate` inside 14 days.
+- **Topics to watch:** distinctive words from open task content in **Personal**, **Work**, **Wedding Planning**, and **Agendas**; titles of upcoming calendar events; and any task with a `deadlineDate` inside 14 days.
 
 Then pass over the Phase 1.8 Imbox rows and flag a thread when:
 
@@ -192,7 +188,7 @@ Present as a short ranked table, longest-waiting first, and never more than ~10 
 
 For each flagged thread, ask what the user wants — batched, not one at a time:
 
-- **Task** → `Todoist:add-tasks`, routed like any other capture (Personal / Work / Agendas). Put the sender and subject in the task content so it's findable later.
+- **Task** → `Todoist:add-tasks`, routed like any other capture (Personal / Work / Wedding Planning / Agendas). Put the sender and subject in the task content so it's findable later.
 - **Event** → `Fantastical:createCalendarItem`. Only when the mail names a concrete date and time; otherwise make it a task.
 - **Nothing** → leave it.
 
@@ -210,19 +206,19 @@ In Desktop chat there is no Bash and no per-email seen action — say that plain
 
 Goal: project lists reflect reality. Each active project has a clear next action.
 
-1. Walk through **Personal**, **Work**, and **Agendas** in turn (skip Inbox, Checklists, Someday Maybe, bug-tracker, archived). For each:
+1. Walk through **Personal**, **Work**, **Wedding Planning**, and **Agendas** in turn (skip Inbox, Someday Maybe, archived). For each:
    - Show project name + count of open tasks + last activity (most recent completion or addition).
    - Flag projects with no completed tasks in the past 14 days as potentially stuck.
    - Ask: "Still active? What's the next physical action?" — capture via `Todoist:add-tasks`.
 2. **Agendas-specific prompt.** Agendas exists for a reason — questions and topics queued for specific people. Surface upcoming 1:1s from the calendar week and cross-reference: "You have a 1:1 with X this week — anything from Agendas to bring up?"
 3. Surface 1:1s and named meetings from last week's calendar (filter out standups, all-hands). Show as a short list. Ask: "Anything to capture from these?" — let the user scan, don't ask one-by-one. Capture follow-ups via `Todoist:add-tasks` into the right project (often **Agendas** for "next time I talk to X" items, or **Work**/**Personal** for direct actions).
-4. If the user has more than ~10 active sub-areas across Personal/Work, prioritize stuck-looking ones. Don't drag through everything.
+4. If the user has more than ~10 active sub-areas across Personal/Work/Wedding Planning, prioritize stuck-looking ones. Don't drag through everything.
 
 ### Phase 4: Stale Task Sweep
 
 Goal: prune dead weight.
 
-1. `Todoist:find-tasks` with `filter: "no date & created before: -14 days"` (or equivalent) to find old, undated tasks. Skip the bug-tracker project.
+1. `Todoist:find-tasks` with `filter: "no date & created before: -14 days"` (or equivalent) to find old, undated tasks.
 2. Show in batches of 5–10. For each batch, ask: "Keep, reschedule, drop, or move to Someday?" — accept comma-separated answers.
 3. **"Move to Someday"** = move the task to the **Someday Maybe** project via `Todoist:update-tasks` with the cached project ID. Don't ask the user how to model this — it's already a project.
 4. Apply changes in batched tool calls.
@@ -231,9 +227,9 @@ Goal: prune dead weight.
 
 Goal: a concrete picture of the next 7 days.
 
-1. Show upcoming calendar week grouped by day. Filter recurring noise (standups, all-hands) but **keep holidays, birthdays, travel, social events visible** — the user wants those for context. Highlight: travel, deadlines, clinical shifts, 1:1s, social events, holidays. Ask: "Anything you need to prep for?" — capture prep tasks via `Todoist:add-tasks` with appropriate due dates and into the right project (Personal vs Work).
+1. Show upcoming calendar week grouped by day. Filter recurring noise (standups, all-hands) but **keep holidays, birthdays, travel, social events visible** — the user wants those for context. Highlight: travel, deadlines, clinical shifts, 1:1s, social events, holidays. Ask: "Anything you need to prep for?" — capture prep tasks via `Todoist:add-tasks` with appropriate due dates and into the right project (Personal, Work, or Wedding Planning).
 2. Show tasks with deadlines in the next 14 days. Ask: "Any of these need to be moved up or broken down?"
-3. **Top 3 outcomes.** Ask directly: "If only three things happened this week, what would make it a win?" Capture as P1 tasks in the appropriate project (Personal or Work).
+3. **Top 3 outcomes.** Ask directly: "If only three things happened this week, what would make it a win?" Capture as P1 tasks in the appropriate project (Personal, Work, or Wedding Planning).
 
 ### Phase 6: Write the Review Note
 
