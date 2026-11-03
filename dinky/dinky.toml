@@ -50,10 +50,12 @@ outer = { top = 45, bottom = 8, left = 8, right = 8 }
 # 5 = 'secondary'
 
 # Overrides for one display.
-# macOS already reserves the notch row (where SketchyBar sits) on the laptop screen,
-# so the 45 above would leave the bar's height twice over.
-[display.built-in]
-gaps.outer.top = 8
+# macOS already reserves the notch row (where SketchyBar sits) on the work laptop's
+# screen, so the 45 above leaves the bar's height twice over there. The personal
+# laptop doesn't reserve it and needs the 45, so this stays off until the config
+# can tell the two machines apart.
+# [display.built-in]
+# gaps.outer.top = 8
 
 [borders]
 enabled = true
