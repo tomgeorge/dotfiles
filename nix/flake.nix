@@ -50,6 +50,10 @@
     };
     # No nixpkgs.follows: hey's go.mod needs a newer go than our nixpkgs pin has.
     hey-cli.url = "github:basecamp/hey-cli";
+    hunk = {
+      url = "github:modem-dev/hunk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);

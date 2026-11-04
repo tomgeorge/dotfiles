@@ -7,7 +7,7 @@
       let
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
-        hunk = pkgs.callPackage ../../pkgs/hunk.nix { };
+        hunk = inputs.hunk.packages.${pkgs.stdenv.hostPlatform.system}.default;
         fut = pkgs.callPackage ../../pkgs/fut.nix { };
         wt = pkgs.callPackage ../../pkgs/wt.nix { };
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
