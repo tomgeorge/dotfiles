@@ -24,8 +24,8 @@ github.com/clipperhouse/displaywidth v0.11.0 h1:lBc6kY44VFw+TDx4I8opi/EtL9m20WSE
 github.com/clipperhouse/displaywidth v0.11.0/go.mod h1:bkrFNkf81G8HyVqmKGxsPufD3JhNl3dSqnGhOoSD/o0=
 github.com/clipperhouse/uax29/v2 v2.7.0 h1:+gs4oBZ2gPfVrKPthwbMzWZDaAFPGYK72F0NJv2v7Vk=
 github.com/clipperhouse/uax29/v2 v2.7.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
-github.com/junegunn/fzf v0.74.4 h1:DSqIW3ZxtkuuPzeLKrVnHdoWqT9VCIGRbjc/lXiGCso=
-github.com/junegunn/fzf v0.74.4/go.mod h1:TBRY54j3mGjAm4JcpDyiUIuDq38QlHvAzrB3GLKxQXM=
+github.com/junegunn/fzf v0.74.5 h1:mpJlCdgGuddKerHrdjvV3cnezEBgyjZAVn8KCo/4OMc=
+github.com/junegunn/fzf v0.74.5/go.mod h1:TBRY54j3mGjAm4JcpDyiUIuDq38QlHvAzrB3GLKxQXM=
 github.com/junegunn/go-shellwords v0.0.0-20250127100254-2aa3b3277741 h1:7dYDtfMDfKzjT+DVfIS4iqknSEKtZpEcXtu6vuaasHs=
 github.com/junegunn/go-shellwords v0.0.0-20250127100254-2aa3b3277741/go.mod h1:6EILKtGpo5t+KLb85LNZLAF6P9LKp78hJI80PXMcn3c=
 github.com/lucasb-eyer/go-colorful v1.4.1 h1:1EO+WB73+EH8EVbzlrG3KLAfEypQWVHIBqlTf+2hNss=

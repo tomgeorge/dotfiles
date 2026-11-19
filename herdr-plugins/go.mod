@@ -7,7 +7,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/x/ansi v0.11.8
-	github.com/junegunn/fzf v0.74.4
+	github.com/junegunn/fzf v0.74.5
 	github.com/rivo/uniseg v0.4.7
 	github.com/tomgeorge/go-herdrkit v0.0.0
 	golang.org/x/term v0.34.0
