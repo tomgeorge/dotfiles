@@ -13,10 +13,16 @@
           kubectl
           kubectx
           podman
-          podman-desktop
           podman-tui
           skopeo
         ];
+      };
+
+    # GUI, so separate from the CLI tools above for headless machines.
+    homeManager.containersDesktop =
+      { pkgs, ... }:
+      {
+        home.packages = [ pkgs.podman-desktop ];
       };
   };
 }

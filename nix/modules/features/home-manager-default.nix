@@ -2,10 +2,11 @@
 
 {
   flake.modules = {
-    # Inheritance chain: base -> default
-    homeManager.default = {
+    # Inheritance chain: base -> headless -> default
+    # Everything that makes sense on a machine without a screen, such as the
+    # cloud workstation.
+    homeManager.headless = {
       imports = with inputs.self.modules.homeManager; [
-        apps
         base
         containers
         dev
@@ -13,6 +14,14 @@
         fish
         langs
         shellTools
+      ];
+    };
+
+    homeManager.default = {
+      imports = with inputs.self.modules.homeManager; [
+        headless
+        apps
+        containersDesktop
         terminal
       ];
     };

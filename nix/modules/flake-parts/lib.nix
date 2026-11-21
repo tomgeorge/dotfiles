@@ -26,6 +26,18 @@
       };
     };
 
+    # Standalone home-manager, for machines whose system Nix doesn't manage.
+    # `module` names a flake.modules.homeManager entry, usually a user.
+    mkHome = system: name: module: {
+      ${name} = inputs.home-manager.lib.homeManagerConfiguration {
+        pkgs = import inputs.nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+        modules = [ inputs.self.modules.homeManager.${module} ];
+      };
+    };
+
     mkNixos = system: name: {
       ${name} = inputs.nixpkgs.lib.nixosSystem {
         modules = [

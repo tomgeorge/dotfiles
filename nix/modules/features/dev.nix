@@ -8,7 +8,6 @@
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
         hunk = inputs.hunk.packages.${pkgs.stdenv.hostPlatform.system}.default;
-        fut = pkgs.callPackage ../../pkgs/fut.nix { };
         wt = pkgs.callPackage ../../pkgs/wt.nix { };
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
         # ignores on macOS, so they write to the read-only sandbox $HOME and
@@ -99,7 +98,6 @@
           curl
           fd
           flyctl
-          fut
           github-cli
           # Renders markdown in the pi subagent popup (falls back without it).
           glow
@@ -130,9 +128,6 @@
           yazi
           yq-go
         ];
-
-        # fut/config.toml (linked by link.sh) lists these by stable path.
-        xdg.configFile."fut/extensions".source = "${fut.extensions}/share/fut/extensions";
       };
 
     homeManager.devWork =
