@@ -439,7 +439,26 @@ All from the Mac, unless noted.
       rerun their commands. The unblok daemon had to be restarted by typing
       `exec unblok run` into the dashboard tab; it logged "daemon started
       pid=23343".
+- [x] 2026-11-21 Commit `6fdc2e5` "Manage the cloud workstations with
+  home-manager" (signed, not pushed). It contains only this work. The
+  user's uncommitted edits stayed out: in `dev.nix`, only the `fut` hunks
+  were staged, through `git update-index --cacheinfo`. The staged tree was
+  checked from `git checkout-index` into `/tmp/idx`: both
+  `homeConfigurations` evaluate, and the Mac config still lists ghostty-bin,
+  podman-desktop, hey, and fut.
 - [ ] M5 Cleanup.
+  - Done: deleted the `nixproof-home` disk and its daily snapshot
+    `nixproof-home-snap-20261121-040154` (`nixproof` itself expired).
+    Wrote `workstation/README.md`: the nodes, what runs at boot, recreating,
+    changing a home config, bumping Rex, restarting unblok, first-time
+    steps, and gotchas.
+  - Remaining:
+    - push, then replace the plain `~/git/dotfiles` copies on both nodes
+      with git clones;
+    - commit the README and the plan updates;
+    - the user decides on the old disk
+      `thomas-george-work-v2-disk-amd64` (us-central1-a, 500G) and the
+      snapshot `thomas-george-work-v2-disk-amd64-migrate-20261121`.
 
 ## Surprises & Discoveries
 
@@ -588,4 +607,39 @@ All from the Mac, unless noted.
 
 ## Outcomes & Retrospective
 
-(Fill in at the end.)
+**Achieved.**
+- The old hand-built VM is replaced by two nodes whose setup is in this repo:
+  - `work-amd64`, the pet: n4-standard-8, 120 days, the old home restored
+    from a fresh snapshot;
+  - `unblok`: n4-standard-8, 120 days, a persistent 100G home, running
+    unblok from `feat/unblok-pi`.
+- A recreate reattaches the Nix store, restarts Rex as a system service, and
+  republishes it over Tailscale Serve with no manual steps. Proven twice on
+  `nixproof`. Rex works from the Mac with no SSH session open.
+- The pet's home is `hm.headless`; `unblok`'s is git, gh, linear-cli, and
+  Rex. The Mac's own config didn't change.
+
+**Still manual.**
+- One Tailscale sign-in per new node name.
+- `gh` and Claude logins on `unblok`.
+- Restarting `unblok run` after any Rex server restart. Rex restores sessions
+  without rerunning their commands. A small unit that starts the unblok
+  session after `rex.service` would remove this; not done.
+- Home-manager changes need a `home-manager switch` on the node. The script
+  activates only on a fresh disk.
+
+**Lessons worth keeping.**
+- On macOS, tar with `COPYFILE_DISABLE=1 --no-xattrs` before shipping a
+  tree that `import-tree` reads; `._*.nix` files break evaluation.
+- On Chainguard OS, `runuser -l` doesn't source `/etc/profile`, and GCE
+  startup scripts get no `HOME`. Set the environment explicitly.
+- Nix-built programs on an OS Login VM can't resolve the user without an
+  `/etc/passwd` entry.
+- A systemd unit's `PATH` is not a login shell's. Anything a server execs on
+  the user's behalf (here, Rex's `init.lua`) needs `PATH` set in the unit.
+- `set -e` doesn't apply inside `a && set -e; ...` when `a` fails. Use
+  `bash -euc`.
+- This `cg` build needs `CG_WORK_UX=2`, despite its README.
+- For an end-to-end test, start polling a new node's MagicDNS name from the
+  Mac only after the node reports `BackendState: Running`. Otherwise macOS
+  caches the miss.
