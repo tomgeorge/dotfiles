@@ -452,10 +452,14 @@ All from the Mac, unless noted.
     Wrote `workstation/README.md`: the nodes, what runs at boot, recreating,
     changing a home config, bumping Rex, restarting unblok, first-time
     steps, and gotchas.
+  - Done: committed the README and the plan (`6087fe6`). With the user's
+    OK, pushed `master` to `origin`, including their earlier unpushed
+    `7f04614` and `b0e2779`. Replaced the plain copies on both nodes with
+    `git clone https://github.com/tomgeorge/dotfiles.git`, then ran the
+    README's `home-manager switch -b backup --flake
+    ~/git/dotfiles/nix#<node>` on each: both succeeded, Rex stayed active,
+    and unblok kept answering the Mac. Removed the old copies.
   - Remaining:
-    - push, then replace the plain `~/git/dotfiles` copies on both nodes
-      with git clones;
-    - commit the README and the plan updates;
     - the user decides on the old disk
       `thomas-george-work-v2-disk-amd64` (us-central1-a, 500G) and the
       snapshot `thomas-george-work-v2-disk-amd64-migrate-20261121`.
