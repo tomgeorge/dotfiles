@@ -119,18 +119,16 @@ export default function (pi: ExtensionAPI) {
   function pickerUI(ctx: ExtensionContext): PickerUI {
     return {
       select: (title, options, opts) => ctx.ui.select(title, options, opts),
-      status: (text) => ctx.ui.setStatus("subagent-route", text),
-      warn: (text) => ctx.ui.notify(text, "warning"),
     };
   }
 
-  /** The user confirms a model from locally ranked suggestions. `undefined` if they cancel. */
-  function confirmModel(task: string, ctx: ExtensionContext, via: "command" | "tool", signal?: AbortSignal) {
+  /** The user picks a model from the available ones. `undefined` if they cancel. */
+  function confirmModel(task: string, ctx: ExtensionContext, signal?: AbortSignal) {
     const next = pickerQueue.then(() => {
       if (signal?.aborted) return undefined;
       // Recheck here: jobs may have started while this call waited for the picker.
       checkCapacity();
-      return pickModel(task, pickerUI(ctx), ctx.modelRegistry.getAvailable(), { signal, via });
+      return pickModel(task, pickerUI(ctx), ctx.modelRegistry.getAvailable(), { signal });
     });
     pickerQueue = next.catch(() => {});
     return next;
@@ -200,7 +198,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
-    description: "Run one read-only task in a fresh pi process. Absolute cwd and tools; no parent conversation is copied. Give an exact provider/model when the user named one; otherwise omit both and the user picks from locally ranked suggestions before the job starts. Only read, grep, find, ls, and git (read-only subcommands: log, show, diff, blame, grep, merge-base, rev-parse, branch/tag listing, etc.) are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
+    description: "Run one read-only task in a fresh pi process. Absolute cwd and tools; no parent conversation is copied. Give an exact provider/model when the user named one; otherwise omit both and the user picks one before the job starts. Only read, grep, find, ls, and git (read-only subcommands: log, show, diff, blame, grep, merge-base, rev-parse, branch/tag listing, etc.) are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
     promptGuidelines: ["Use subagent only when the user requests or approves delegation. Include all necessary task context. Use the provider/model the user chose; if they didn't choose one, omit provider and model so they can pick. Never guess a model."],
     parameters: Type.Object({
       task: Type.String({ minLength: 1 }),
@@ -219,7 +217,7 @@ export default function (pi: ExtensionAPI) {
       if (provider === undefined || model === undefined) {
         if (!ctx.hasUI) throw new Error("provider and model are required without an interactive UI");
         checkCapacity();
-        const picked = await confirmModel(params.task, ctx, "tool", signal);
+        const picked = await confirmModel(params.task, ctx, signal);
         if (!picked) throw new Error("The user didn't choose a model; the subagent was not started");
         ({ provider, model } = picked);
       }
@@ -228,7 +226,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("subagent", {
-    description: "Read-only job: /subagent [provider/model] task (without a model, pick from ranked suggestions)",
+    description: "Read-only job: /subagent [provider/model] task (without a model, pick one)",
     async handler(args, ctx) {
       const fail = (error: unknown) => {
         if (shuttingDown) return;
@@ -245,7 +243,7 @@ export default function (pi: ExtensionAPI) {
           if (!ctx.hasUI) throw new Error("Specify provider/model and task in non-interactive mode");
           const task = given || await ctx.ui.editor("Subagent task (read-only)");
           if (!task?.trim()) return undefined;
-          const picked = await confirmModel(task, ctx, "command");
+          const picked = await confirmModel(task, ctx);
           return picked ? { picked, task } : undefined;
         };
         const chosen = parsed.type === "model" ? parsed : await pickInteractively(parsed.task);
