@@ -3,9 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    # Only for pi-coding-agent: 1.5.0 fixes OSC 7501 status vanishing in Rex.
-    # Drop once nixpkgs-unstable has pi >= 1.5.0.
-    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    # Agent CLIs (claude-code, codex) and hunk, updated a few times a day.
+    # No nixpkgs follows: their binary cache only hits on their own nixpkgs.
+    llm-agents.url = "github:numtide/llm-agents.nix";
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
@@ -50,10 +50,6 @@
     };
     # No nixpkgs.follows: hey's go.mod needs a newer go than our nixpkgs pin has.
     hey-cli.url = "github:basecamp/hey-cli";
-    hunk = {
-      url = "github:modem-dev/hunk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);

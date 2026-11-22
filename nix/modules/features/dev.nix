@@ -7,14 +7,13 @@
       let
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
-        hunk = inputs.hunk.packages.${pkgs.stdenv.hostPlatform.system}.default;
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
         # ignores on macOS, so they write to the read-only sandbox $HOME and
         # fail. The binary itself is fine. Drop once nixpkgs fixes the package.
         ketch = pkgs.ketch.overrideAttrs { doCheck = false; };
-        # From nixpkgs master until unstable has pi >= 1.5.0; see flake.nix.
-        pi-coding-agent =
-          inputs.nixpkgs-master.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pi-coding-agent;
+        # Agent CLIs (and hunk) move faster than nixpkgs, and the org enforces a
+        # minimum Claude Code version; see the llm-agents input in flake.nix.
+        llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
       in
       {
         home.sessionVariables = {
@@ -84,14 +83,15 @@
 
         programs.claude-code = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
           enable = true;
+          package = llm.claude-code;
         };
 
         home.packages = with pkgs; [
           agent-browser
           bat
           bitwarden-cli
-          claude-code
-          codex
+          llm.claude-code
+          llm.codex
           coreutils
           cue
           curl
@@ -105,7 +105,7 @@
           golangci-lint
           herdr
           htop
-          hunk
+          llm.hunk
           jq
           ketch
           lazygit

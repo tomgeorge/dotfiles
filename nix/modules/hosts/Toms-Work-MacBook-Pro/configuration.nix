@@ -47,7 +47,7 @@
       nix.settings.experimental-features = "nix-command flakes";
 
       environment.systemPackages = with pkgs; [
-        openssl_3_6
+        openssl_4_1
       ];
 
       system.configurationRevision = self.rev or self.dirtyRev or null;
