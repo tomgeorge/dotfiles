@@ -6,8 +6,8 @@ be done to it. The **presenter** here draws any source the same way: header, lis
 tabbed details, footer, filter, scrolling, zoom, help, and confirmations. It knows
 nothing about crews, subagents, or watches.
 
-This is not an extension. It has no `index.ts` and no line in `link.sh`, so Pi never
-loads it. Extensions import it by relative path (`../run-panel/pi.ts`); Pi resolves
+This is not an extension. It has no `index.ts` and isn't in the extension list in
+`nix/modules/features/pi.nix`, so Pi never loads it. Extensions import it by relative path (`../run-panel/pi.ts`); Pi resolves
 imports from a symlinked extension's real path, so that works. Nothing here imports
 from an extension.
 

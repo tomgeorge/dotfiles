@@ -37,27 +37,8 @@ link sketchybar ~/.config/sketchybar
 # herdr-nav (which nvim runs at its edge) and the herdr plugins are
 # installed by `make link` in herdr-plugins/, which builds them first.
 link claude/hooks ~/.claude/hooks
-link claude/skills ~/.claude/skills
-# Only skills/: ~/.agents also holds .skill-lock.json from the skills installer.
-link agents/skills ~/.agents/skills
-link pi/settings.json ~/.pi/agent/settings.json
-link pi/AGENTS.md ~/.pi/agent/AGENTS.md
-# MCP servers differ per machine (work Slack vs personal hey/todoist), so
-# each host gets its own file, named like the hosts in nix/modules/hosts/.
-link "pi/mcp/$(hostname -s).json" ~/.pi/agent/mcp.json
-link pi/prompts ~/.pi/agent/prompts
-link pi/extensions/subagent ~/.pi/agent/extensions/subagent
-link pi/leader.json ~/.pi/agent/leader.json
-link pi/extensions/run-panel ~/.pi/agent/extensions/run-panel
-link pi/extensions/crew ~/.pi/agent/extensions/crew
-link pi/extensions/goal ~/.pi/agent/extensions/goal
-link pi/extensions/advisor ~/.pi/agent/extensions/advisor
-link pi/extensions/handoff ~/.pi/agent/extensions/handoff
-link pi/retro ~/.pi/agent/retro
-link pi/extensions/vi-mode ~/.pi/agent/extensions/vi-mode
-link pi/extensions/mcp-confirm ~/.pi/agent/extensions/mcp-confirm
-link pi/extensions/watch ~/.pi/agent/extensions/watch
-link pi/extensions/hey-organize ~/.pi/agent/extensions/hey-organize
+# pi's config, extensions, and the skill directories are managed by
+# nix/modules/features/pi.nix.
 
 if [[ ! -x ~/.local/bin/herdr-nav ]]; then
   echo "note: herdr-nav isn't installed; run \`make link\` in herdr-plugins/ (nvim can't hand off to herdr or WezTerm without it)" >&2

@@ -6,7 +6,7 @@ counts, operators, text objects, a register, undo and redo. See
 
 ## Install
 
-`link.sh` links this directory to `~/.pi/agent/extensions/vi-mode`. For just
+`nix/modules/features/pi.nix` links this directory to `~/.pi/agent/extensions/vi-mode`. For just
 this extension:
 
 ```sh
@@ -96,7 +96,7 @@ Other extensions add their own groups, such as `SPC c` for crew.
 
 ### `~/.pi/agent/leader.json`
 
-`link.sh` links it from `pi/leader.json`. It's read at every session start,
+`nix/modules/features/pi.nix` links it from `pi/leader.json`. It's read at every session start,
 so `/reload` picks up edits:
 
 ```json

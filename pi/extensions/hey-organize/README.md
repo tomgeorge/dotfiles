@@ -30,9 +30,9 @@ are refused. Creating or deleting labels and collections isn't exposed.
 
 ## Install
 
-`link.sh` links this directory to `~/.pi/agent/extensions/hey-organize`. Run
-`/reload` in open sessions. It uses the `hey` binary and login that
-`pi/mcp.json` uses.
+`nix/modules/features/pi.nix` links this directory to
+`~/.pi/agent/extensions/hey-organize`. Run `/reload` in open sessions. It uses
+the `hey` binary and login that the hey MCP servers in `pi.nix` use.
 
 ## Test
 

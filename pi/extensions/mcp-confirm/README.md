@@ -11,7 +11,7 @@ are gated too. Without a UI (print mode), those calls are blocked.
 The hints are the server's claim, not verified. A tool without them counts as
 a write.
 
-`link.sh` links this directory to `~/.pi/agent/extensions/mcp-confirm`. Run
+`nix/modules/features/pi.nix` links this directory to `~/.pi/agent/extensions/mcp-confirm`. Run
 `/reload` in open sessions after linking.
 
 ## Slack

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { userInfo } from "node:os";
 
-// Same binary pi/mcp/<host>.json runs, so the tools and the MCP servers share one login.
+// Same binary the hey MCP servers in nix/modules/features/pi.nix run, so the tools and the MCP servers share one login.
 // The username differs per machine (tgeorge personal, tom.george work), so derive it.
 export const HEY_BIN = `/etc/profiles/per-user/${userInfo().username}/bin/hey`;
 export const MAX_IDS = 100;

@@ -6,7 +6,7 @@ available models.
 
 ## Install
 
-`link.sh` links this directory to `~/.pi/agent/extensions/subagent`. For just this
+`nix/modules/features/pi.nix` links this directory to `~/.pi/agent/extensions/subagent`. For just this
 extension (without relinking other dotfiles):
 
 ```sh

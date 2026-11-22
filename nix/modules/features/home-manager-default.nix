@@ -13,6 +13,7 @@
         editing
         fish
         langs
+        pi
         shellTools
       ];
     };

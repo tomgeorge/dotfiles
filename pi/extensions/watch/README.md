@@ -6,7 +6,7 @@ and the model is woken only when its condition holds, so waiting costs no tokens
 
 ## Install
 
-`link.sh` links this directory to `~/.pi/agent/extensions/watch`. For just this
+`nix/modules/features/pi.nix` links this directory to `~/.pi/agent/extensions/watch`. For just this
 extension:
 
 ```sh

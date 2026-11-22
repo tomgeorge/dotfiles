@@ -114,14 +114,13 @@
           nodejs
           oras
           pass
-          pi-coding-agent
           ripgrep
           rlwrap
           slides
           stow
           tmux
           tree-sitter
-          # uvx runs Python MCP servers (pi/mcp/) by a stable, non-mise path.
+          # uvx runs Python MCP servers (pi.nix) by a stable, non-mise path.
           uv
           yazi
           yq-go
