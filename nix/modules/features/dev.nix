@@ -154,8 +154,12 @@
           pkgs.go_1_27
         ];
 
-        # `go install` targets land here.
-        home.sessionPath = [ "$HOME/go/bin" ];
+        # `go install` targets land in go/bin; self-updating installers (axel)
+        # in .local/bin.
+        home.sessionPath = [
+          "$HOME/go/bin"
+          "$HOME/.local/bin"
+        ];
       };
   };
 }
