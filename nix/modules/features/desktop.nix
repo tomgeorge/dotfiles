@@ -11,10 +11,15 @@
         homebrew.casks = [
         ];
 
+        imports = [ inputs.self.modules.darwin.codesign ];
+
         environment.systemPackages = [
           # Lands in /Applications/Nix Apps; dinky adds itself as a login item on first run.
           (pkgs.callPackage ../../pkgs/dinky.nix { })
         ];
+        # A window manager needs Accessibility; a stable signature keeps the
+        # grant across rebuilds.
+        codesign.apps = [ "dinky.app" ];
 
         # Reads ~/.config/sketchybar, linked from dotfiles by link.sh.
         services.sketchybar.enable = true;
