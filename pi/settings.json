@@ -17,7 +17,6 @@
   ],
   "packages": [
     "npm:@gotgenes/pi-anthropic-auth",
-    "git:github.com/mikker/fut",
     "npm:pi-google-workspace"
   ],
   "extensionChangelogVersions": {

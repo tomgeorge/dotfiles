@@ -8,7 +8,6 @@
         inherit (config.user) userFullName userEmail gpgKeyId;
         hasGpgKey = gpgKeyId != "";
         hunk = inputs.hunk.packages.${pkgs.stdenv.hostPlatform.system}.default;
-        wt = pkgs.callPackage ../../pkgs/wt.nix { };
         # ketch 0.14.0's tests isolate config via XDG_CONFIG_HOME, which Go
         # ignores on macOS, so they write to the read-only sandbox $HOME and
         # fail. The binary itself is fine. Drop once nixpkgs fixes the package.
@@ -124,7 +123,6 @@
           tree-sitter
           # uvx runs Python MCP servers (pi/mcp/) by a stable, non-mise path.
           uv
-          wt
           yazi
           yq-go
         ];

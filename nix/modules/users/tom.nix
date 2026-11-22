@@ -43,7 +43,6 @@ in
     {
       homeManager.tom.imports = [
         hm.default
-        hm.fut
         hm.gpgTools
         hm.piCheckin
         # docker -> podman only on personal machines; work uses orbstack
@@ -56,7 +55,6 @@ in
       homeManager.tom-work.imports = [
         hm.default
         hm.devWork
-        hm.fut
       ];
       homeManager.tom-workstation.imports = [
         hm.headless

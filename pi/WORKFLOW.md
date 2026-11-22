@@ -31,8 +31,8 @@ This is a playbook for the Pi setup in this repository. Every tool here exists b
 ## Attention rules
 
 - **Run only as many coding agents as I can review.** Usually one writing code I'll merge, plus research I can ignore for an hour.
-- **Unblock before reviewing.** A blocked agent loses time every minute; a finished one loses nothing. In fut, `prefix u` opens Notifications (blocked agents first, Enter jumps there), and pressing the prefix twice jumps to the next waiting agent. `prefix a` lists all agents.
-- **Pull, don't push.** Check agents at natural breaks. fut's unread markers are passive on purpose; don't add desktop notifications for agents. The check-in is the one exception: it notifies only when something real is due.
+- **Unblock before reviewing.** A blocked agent loses time every minute; a finished one loses nothing. In Rex, the Activity sidebar sorted by priority lists blocked agents first; unfocused tabs show each agent's status.
+- **Pull, don't push.** Check agents at natural breaks. Rex's tab markers are passive on purpose; don't add desktop notifications for agents. The check-in is the one exception: it notifies only when something real is due.
 - **Loops are for checkable work** (ports, perf experiments, research, triage), not for code whose design I care about.
 
 ## What dogfooding taught (2026-10)
