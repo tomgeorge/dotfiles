@@ -21,7 +21,6 @@
       imports = with inputs.self.modules.homeManager; [
         headless
         apps
-        containersDesktop
         terminal
       ];
     };
