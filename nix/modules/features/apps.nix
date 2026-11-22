@@ -8,9 +8,17 @@
 {
   flake.modules = {
     homeManager.apps =
-      { pkgs, ... }:
+      { pkgs, lib, ... }:
       {
-        home.packages = [ inputs.hey-cli.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+        home.packages = [
+          inputs.hey-cli.packages.${pkgs.stdenv.hostPlatform.system}.default
+        ]
+        # Mac only for now: meerkat (NixOS) also imports this module.
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+          pkgs.google-chrome
+          pkgs.slack
+          pkgs.spotify
+        ];
       };
 
     darwin.apps =
@@ -37,7 +45,6 @@
           "hey-desktop"
           "mozilla-vpn"
           "rectangle"
-          "spotify"
           "todoist-app"
           "tomobar"
           "visual-studio-code"
