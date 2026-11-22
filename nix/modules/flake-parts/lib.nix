@@ -22,6 +22,7 @@
         modules = [
           inputs.self.modules.darwin.${name}
           inputs.self.modules.darwin.llm-agents-cache
+          inputs.self.modules.darwin.nix-gc
           { nixpkgs.hostPlatform = lib.mkDefault system; }
         ];
       };
@@ -44,6 +45,7 @@
         modules = [
           inputs.self.modules.nixos.${name}
           inputs.self.modules.nixos.llm-agents-cache
+          inputs.self.modules.nixos.nix-gc
           { nixpkgs.hostPlatform = lib.mkDefault system; }
         ];
       };
