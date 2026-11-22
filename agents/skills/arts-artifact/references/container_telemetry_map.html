@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Container Images Telemetry — Interactive Map</title>
+<style>
+  :root{
+    --imp:#16a34a; --imp-bg:#eafaf0;
+    --par:#d97706; --par-bg:#fef6e7;
+    --pln:#2563eb; --pln-bg:#eef3fe;
+    --blk:#dc2626; --blk-bg:#fdeeee;
+    --ctx:#64748b; --ctx-bg:#f1f5f9;
+    --ink:#0f172a; --sub:#475569; --mut:#94a3b8;
+    --line:#cbd5e1; --paper:#ffffff; --wash:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--wash);color:var(--ink);
+    font-family:"Poppins",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  header{padding:20px 26px 8px;}
+  h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.2px}
+  .meta{margin-top:5px;font-size:13px;color:var(--sub);max-width:1100px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:12px 26px 6px}
+  .legend{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--sub);
+    border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:6px 12px;cursor:pointer;
+    user-select:none;transition:.15s}
+  .chip:hover{border-color:var(--mut)}
+  .chip.off{opacity:.32}
+  .dot{width:12px;height:12px;border-radius:3px;border:2px solid}
+  .dot.imp{border-color:var(--imp);background:var(--imp-bg)}
+  .dot.par{border-color:var(--par);background:var(--par-bg)}
+  .dot.pln{border-color:var(--pln);background:var(--pln-bg)}
+  .dot.blk{border-color:var(--blk);background:var(--blk-bg)}
+  .dot.ctx{border-color:var(--ctx);background:var(--ctx-bg)}
+  .hint{margin-left:auto;font-size:12px;color:var(--mut)}
+  .btn{font-size:12px;border:1px solid var(--line);background:var(--paper);border-radius:8px;
+    padding:7px 12px;cursor:pointer;color:var(--sub)}
+  .btn:hover{border-color:var(--mut)}
+
+  .stage{position:relative;margin:8px auto 40px;}
+  #wrap{position:relative;margin:0 auto;}
+  #canvas{position:relative;width:1560px;height:1260px;transform-origin:top left;}
+  svg#edges{position:absolute;inset:0;width:1560px;height:1260px;overflow:visible;pointer-events:none}
+  .edge{fill:none;stroke:var(--line);stroke-width:2;transition:opacity .18s,stroke .18s}
+  .edge.dashed{stroke-dasharray:6 5}
+  .edge.hot{stroke:var(--ink);stroke-width:2.8}
+  .edge.dim{opacity:.06}
+
+  .colhead{position:absolute;font-size:12px;font-weight:700;letter-spacing:.6px;color:var(--mut)}
+
+  .node{position:absolute;border-radius:13px;background:var(--paper);border:1.5px solid var(--line);
+    padding:12px 14px;cursor:pointer;transition:opacity .18s,box-shadow .18s,transform .18s;
+    box-shadow:0 1px 2px rgba(15,23,42,.05);display:flex;flex-direction:column;justify-content:center}
+  .node:hover{box-shadow:0 8px 20px rgba(15,23,42,.11)}
+  .node .t{font-size:14px;font-weight:700;line-height:1.25}
+  .node .s{font-size:11.8px;color:var(--sub);margin-top:5px;line-height:1.4}
+  .node .s b{color:var(--ink);font-weight:600}
+  .node .tag{position:absolute;top:-10px;right:12px;font-size:9px;font-weight:700;letter-spacing:.3px;
+    text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1.5px solid;white-space:nowrap}
+  .node.dim{opacity:.12}
+  .node.hot{transform:translateY(-1px)}
+  .node.pin{box-shadow:0 0 0 3px rgba(37,99,235,.20),0 10px 26px rgba(15,23,42,.16)}
+  .node .more{position:absolute;bottom:7px;right:11px;font-size:10px;color:var(--mut)}
+
+  .n-imp{border-color:var(--imp);background:var(--imp-bg)}   .n-imp .tag{color:var(--imp);border-color:var(--imp);background:#fff}
+  .n-par{border-color:var(--par);background:var(--par-bg)}   .n-par .tag{color:var(--par);border-color:var(--par);background:#fff}
+  .n-pln{border-color:var(--pln);background:var(--pln-bg)}   .n-pln .tag{color:var(--pln);border-color:var(--pln);background:#fff}
+  .n-blk{border-color:var(--blk);background:var(--blk-bg)}   .n-blk .tag{color:var(--blk);border-color:var(--blk);background:#fff}
+  .n-ctx{border-color:var(--ctx);background:var(--ctx-bg)}   .n-ctx .tag{color:var(--ctx);border-color:var(--ctx);background:#fff}
+
+  .group{position:absolute;border:1.5px dashed #cbb8f0;border-radius:18px;background:rgba(124,92,216,.05);
+    transition:opacity .18s}
+  .group.storage{border-color:#b9c6e6;background:rgba(37,99,235,.045)}
+  .group.dim{opacity:.1}
+  .group .glab{position:absolute;top:-11px;left:18px;background:var(--wash);padding:0 9px;font-size:11.5px;
+    font-weight:700;color:#6b4fd8}
+  .group.storage .glab{color:#2f4a86}
+
+  .band{position:absolute;border-radius:16px;background:#fffbeb;border:1.5px solid #fde68a;padding:16px 20px}
+  .band h3{margin:0 0 12px;font-size:14.5px;color:#92400e}
+  .band .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 30px}
+  .band .d{font-size:12.5px;color:var(--sub);line-height:1.45}
+  .band .d b{color:var(--ink)}
+
+  #panel{position:fixed;left:0;top:0;width:360px;max-width:calc(100vw - 36px);
+    background:var(--paper);border:1px solid var(--line);border-radius:15px;box-shadow:0 14px 40px rgba(15,23,42,.20);
+    padding:18px 18px 34px;transform:translateY(14px);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  #panel.on{transform:none;opacity:1;pointer-events:auto}
+  #panel .pt{font-size:16px;font-weight:700;margin-right:70px}
+  #panel .badge{position:absolute;top:16px;right:16px;font-size:9.5px;font-weight:700;text-transform:uppercase;
+    padding:3px 10px;border-radius:999px;border:1.5px solid}
+  #panel .pd{font-size:13px;color:var(--sub);line-height:1.55;margin-top:10px}
+  #panel .lk{margin-top:13px;font-size:11.5px;color:var(--mut);line-height:1.6}
+  #panel .lk b{color:var(--sub)}
+  #panel .cls{position:absolute;bottom:12px;right:16px;font-size:11.5px;color:var(--mut);cursor:pointer}
+  @media(max-width:900px){ .hint{display:none} .band .grid{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Container Images Telemetry — Discovery Phase (FY27 Q3)</h1>
+  <div class="meta">Blue team · Lead: Konrad · PM: Dana · EM: Ivan. How customer image usage could be collected, stored, and surfaced — with Guardener expanded. Hover to focus, click any box for the full detail + its connections.</div>
+</header>
+<div class="toolbar">
+  <div class="legend" id="legend">
+    <span class="chip" data-state="imp"><span class="dot imp"></span>Implemented today</span>
+    <span class="chip" data-state="par"><span class="dot par"></span>Partial / staging-only</span>
+    <span class="chip" data-state="pln"><span class="dot pln"></span>Planned (not built)</span>
+    <span class="chip" data-state="blk"><span class="dot blk"></span>Blocked dependency — unanswered</span>
+    <span class="chip" data-state="ctx"><span class="dot ctx"></span>Context / gate</span>
+  </div>
+  <button class="btn" id="reset">Reset</button>
+  <span class="hint">Hover = focus · click = pin &amp; read · empty space = clear · legend = filter by status</span>
+</div>
+
+<div class="stage"><div id="wrap"><div id="canvas"><svg id="edges"></svg></div></div></div>
+
+<div id="panel">
+  <div class="pt" id="p-title"></div>
+  <div class="badge" id="p-badge"></div>
+  <div class="pd" id="p-detail"></div>
+  <div class="lk" id="p-links"></div>
+  <div class="cls" id="p-close">close ✕</div>
+</div>
+
+<script>
+const STATE_LABEL={imp:"Implemented",par:"Partial / staging",pln:"Planned",blk:"Blocked dep",ctx:"Context / gate"};
+const STATE_COLOR={imp:"var(--imp)",par:"var(--par)",pln:"var(--pln)",blk:"var(--blk)",ctx:"var(--ctx)"};
+
+const HEADS=[
+ {x:40,y:104,t:"CUSTOMER ENVIRONMENT"},
+ {x:384,y:104,t:"COLLECTION OPTIONS — THE DECISION"},
+ {x:700,y:104,t:"GUARDENER — CHAINGUARD GITHUB APP (EXPANDED)"},
+ {x:1240,y:104,t:"OUTPUT"},
+ {x:40,y:846,t:"PHASED ROLLOUT (from the Telemetry Strategy doc)"}
+];
+
+const GROUPS=[
+ {cls:"",x:686,y:130,w:492,h:474,label:"telemetry it emits (ai-cicd/guardener)",
+   members:["g_app","g_syft","g_bq","g_dfc","g_priv"]},
+ {cls:"storage",x:686,y:640,w:492,h:150,label:"shared backend storage",
+   members:["s_gcs","s_bq","s_sql"]}
+];
+
+const NODES=[
+ // ---- customer environment ----
+ {id:"repos",st:"imp",x:40,y:150,w:290,h:92,t:"Customer GitHub repos",s:"Declared image refs (FROM, <b>image:</b>)",more:"detail",
+   d:"Customer source on GitHub. Guardener reads <b>declared</b> image references — FROM lines and image: values in YAML. This is pre-sales / migration signal (what they build from), not what actually runs in production."},
+ {id:"reg",st:"imp",x:40,y:290,w:290,h:104,t:"3rd-party registries",s:"Artifactory · Nexus · ECR · GCP AR — <b>34% mirror here</b>",more:"detail",
+   d:"34% of customers mirror Chainguard images into their own registry. Once mirrored we have <b>zero</b> visibility into usage — the core blind spot this whole initiative exists to close. Different registries expose different pull-metric APIs (Artifactory has download counts; GCP AR gives raw request events)."},
+ {id:"run",st:"imp",x:40,y:442,w:290,h:92,t:"Runtime (K8s clusters)",s:"What's actually deployed &amp; pulled",more:"detail",
+   d:"Where images actually run — the data customers most want reported. Optum wants to see who's using golden images (and who's dropping off); Humana offered runtime access to quantify CVEs saved. No collection path for this exists yet."},
+ {id:"pull",st:"imp",x:40,y:582,w:290,h:92,t:"cgr.dev registry pulls",s:"registry_pulls_daily (BigQuery)",more:"detail",
+   d:"Pull data from our own registry already lands in BigQuery — the strategy doc's own SQL queries prod-enforce-fabc.customer_dashboard.<b>registry_pulls_daily</b>. Covers initial downloads from cgr.dev only, not mirrored or runtime usage."},
+ {id:"dem",st:"ctx",x:40,y:722,w:290,h:110,t:"Who's asking",s:"Optum/UHG (Dynatrace-style), Capital One, Home Depot, Scale AI, Capital Group",more:"detail",
+   d:"Demand drivers. Optum specifically asked for Dynatrace-style adoption dashboards; Capital One wants precise upstream→CG mappings and ROI/CVE reporting. Top CSM &amp; PS ask; flagged as a possible Assemble announcement."},
+
+ // ---- collection options ----
+ {id:"o_manual",st:"pln",x:384,y:150,w:272,h:100,t:"1 · Manual scrape",s:"chainctl upload · snapshots only",more:"detail",
+   d:"Customer runs chainctl to upload pull data (sold as a debugging / faster-support tool). Easiest to build and low friction, but only snapshots, and every registry needs a bespoke implementation. The doc's POC pick for an Assemble crawl-stage demo, starting with Artifactory."},
+ {id:"o_guard",st:"pln",x:384,y:294,w:272,h:100,t:"2 · Guardener app ★",s:"recommended v1 · declared images only",more:"detail",
+   d:"Recommended v1: piggyback ACID's Guardener GitHub app, which already reads customer repos. Gives repo-declared images (not prod), can't distinguish prod vs non-prod, and adoption is low because many regulated customers can't run AI tooling — so it covers only a portion of customers."},
+ {id:"o_partner",st:"pln",x:384,y:442,w:272,h:92,t:"3 · 3rd-party partners",s:"Datadog / Orca — API key",more:"detail",
+   d:"Integrate with Datadog / Orca via a customer API key. Authoritative runtime data, scheduled ingestion, low customer effort — but only works if they already use the tool, each integration is eng work, and a similar effort (Crystal Ball) stalled."},
+ {id:"o_wedge",st:"pln",x:384,y:582,w:272,h:92,t:"4 · Runtime wedge",s:"CG executable phones home",more:"detail",
+   d:"A Chainguard-provided executable bootstrapped into the customer's containers that streams logs/telemetry back. Richest data and enables proactive troubleshooting, but the highest trust / security barrier; would need on-by-default for new customers + data-localization care."},
+ {id:"consent",st:"ctx",x:384,y:722,w:272,h:110,t:"The consent gate",s:"why we've gone years without this",more:"detail",
+   d:"The real blocker isn't tech — it's trust. Customers are skeptical of data collection and many have AI / data-residency regulations. Free users can likely be auto-collected (with disclosure + anonymization); paid users need incentives: board-level ROI, next-image recommendations, and policy enforcement on their registries."},
+
+ // ---- guardener (expanded) ----
+ {id:"g_app",st:"imp",x:704,y:170,w:456,h:60,t:"Guardener GitHub app",s:"Actions migration · commit verification · syftscan — the proposed source",more:"detail",
+   d:"Guardener is Chainguard's single hardened GitHub app (ai-cicd/guardener), opted in per-repo via .chainguard/ files. It hosts Actions migration, commit verification, and syftscan. It's the proposed telemetry source for the v1 dashboard."},
+ {id:"g_syft",st:"par",x:704,y:256,w:220,h:120,t:"syftscan → SBOM",s:"clone → syft → declared OCI refs",more:"detail",tag:"staging only",
+   d:"syftscan clones opted-in repos (as the App), runs syft, and uploads an SBOM to GCS keyed by group/host/owner/repo/sha. A custom cataloger discovers declared OCI image refs (FROM + image:). <b>Deployed in staging only — prod disables the scanner today</b>, so the v1 data path isn't in production yet."},
+ {id:"g_bq",st:"imp",x:940,y:256,w:220,h:120,t:"install + event metrics",s:"who/when installed; missing-mapping events",more:"detail",
+   d:"An installation-metrics Cloud Run job writes one row per org per day to BigQuery (which orgs installed, when, suspensions). The Actions recommender also emits missing-mapping analytics events. Useful adoption signal, but <b>none of this is image-usage data</b>."},
+ {id:"g_dfc",st:"imp",x:704,y:398,w:456,h:82,t:"DFC — Chainguard Factory Agent",s:"chainctl agent dockerfile · separate pillar (not the GitHub app)",more:"detail",
+   d:"A second Guardener surface: chainctl agent dockerfile <build|optimize|upgrade|validate>, a gRPC service that migrates Dockerfiles using Claude via US-pinned Vertex AI. Not a telemetry source for this initiative, but it shares the Guardener datastore — useful context for the 'what is Guardener' picture."},
+ {id:"g_priv",st:"imp",x:704,y:498,w:456,h:88,t:"Privacy posture",s:"ephemeral clones · 90-day TTL · US-only · repo URLs = PII",more:"detail",
+   d:"Ephemeral clones deleted per job; SBOMs / events expire at 90 days; all compute US-only; repo URLs and org logins treated as PII (no raw emails persisted). Built this way precisely because customers distrust collection — directly relevant to whether they'll opt in."},
+
+ // ---- shared storage ----
+ {id:"s_gcs",st:"par",x:704,y:684,w:142,h:90,t:"GCS",s:"SBOMs (90d) · staging bucket",more:"detail",
+   d:"Google Cloud Storage holds syftscan SBOMs (keyed by commit, 90-day TTL, staging bucket only — no prod bucket) and migration-operation records (30-day TTL). Read access limited to engineering@chainguard.dev."},
+ {id:"s_bq",st:"imp",x:862,y:684,w:150,h:90,t:"BigQuery",s:"install/event metrics + registry_pulls_daily",more:"detail",
+   d:"BigQuery holds Guardener install snapshots + missing-mapping events (90-day TTL) and the existing registry_pulls_daily pull table. The most likely analytics backbone for a customer dashboard."},
+ {id:"s_sql",st:"imp",x:1028,y:684,w:132,h:90,t:"Cloud SQL",s:"entitlements + installation → group map",more:"detail",
+   d:"Shared datastore Cloud SQL: guardener_entitlements (repo visibility scope) and github_app_installations (GitHub org → Chainguard group). This is the tenant boundary — it answers 'which Chainguard group owns this GitHub org?'"},
+
+ // ---- output ----
+ {id:"d_acid",st:"blk",x:1240,y:150,w:280,h:96,t:"ACID: data feed",s:"CON-2062 — unanswered (Backlog)",more:"detail",
+   d:"CON-2062 — ACID must provide the GitHub-app data feed that powers the dashboard. Currently Backlog and unanswered (assignee Tyler Paxton). Ties to FEA-122 (map upstream images to Chainguard images in bulk)."},
+ {id:"d_exp",st:"blk",x:1240,y:286,w:280,h:96,t:"Experience: dashboard UI",s:"CON-2061 — unanswered (Backlog)",more:"detail",
+   d:"CON-2061 — Experience must build the dashboard UI. Currently Backlog and unanswered (assignee Ron Norman). If either this or CON-2062 comes back 'no', the GitHub-app path collapses."},
+ {id:"d_dash",st:"pln",x:1240,y:422,w:280,h:104,t:"Adoption / Usage Dashboard",s:"v1: map non-CG images → CG equivalents",more:"detail",
+   d:"The customer-facing dashboard. v1 surfaces a customer's non-Chainguard images with a deterministic mapping to Chainguard equivalents, plus which images are actually used and how often. Possible Assemble announcement. Not built."},
+ {id:"d_ins",st:"pln",x:1240,y:566,w:280,h:126,t:"Insights to surface",s:"mapping · pull frequency · CVEs/ROI · whitespace",more:"detail",
+   d:"Target insights: upstream→Chainguard mapping (name/tag/sha), pull frequency and which tags are used, CVEs and time saved (ROI), and migration 'whitespace' — where more images could be converted."},
+ {id:"d_policy",st:"pln",x:1240,y:722,w:280,h:110,t:"Policy insights (future)",s:"pulls that break guardrails in 3p repos",more:"detail",
+   d:"Future (Phase 4): show which mirrored pulls break a policy's guardrails — e.g. an EOL image already mirrored can still be pulled, making the policy meaningless. Actually enforcing policies on 3p registries is explicitly out of scope of the telemetry paper."},
+
+ // ---- phases strip ----
+ {id:"p1",st:"pln",x:40,y:866,w:352,h:118,t:"Phase 1",s:"GitHub-app dashboard + manual-scrape POC — <b>target: Assemble</b>",more:"detail",
+   d:"Integrate the Guardener app to see declared images and surface a dashboard mapping non-CG images to CG equivalents. In parallel, a manual Artifactory scrape POC (pull metrics). Target: announce at Assemble."},
+ {id:"p2",st:"pln",x:413,y:866,w:352,h:118,t:"Phase 2",s:"extend to more registries — target: end of Q3",more:"detail",
+   d:"Add the next registries (GCP Artifact Registry, Nexus, …), chosen by how often they're used and whether they expose a usable API. Note the data granularity differs per provider. Target: end of Q3."},
+ {id:"p3",st:"pln",x:786,y:866,w:352,h:118,t:"Phase 3",s:"automate scraping + recommendations — target: Q4",more:"detail",
+   d:"Automate the scraping (start with Artifactory) so customers do nothing. Add intelligent next-image recommendations and CVE comparisons; tie in the compliance dashboard. Target: Q4."},
+ {id:"p4",st:"pln",x:1159,y:866,w:352,h:118,t:"Phase 4",s:"policy insights on the dashboard — target: Q4",more:"detail",
+   d:"Add metrics showing which image pulls break a policy's guardrails, making Policy Gates meaningful for mirrored images. Enforcement itself remains out of scope. Target: Q4."}
+];
+
+const EDGES=[
+ ["repos","o_guard",1],["reg","o_manual",1],["reg","o_partner",1],["run","o_partner",1],["run","o_wedge",1],
+ ["pull","s_bq",0],["s_bq","d_dash",1],
+ ["consent","o_guard",1],["consent","o_partner",1],["consent","o_wedge",1],
+ ["o_guard","g_app",0],
+ ["g_app","g_syft",0],["g_app","g_bq",0],["g_app","g_dfc",0],["g_app","g_priv",0],
+ ["g_syft","s_gcs",0],["g_bq","s_bq",0],["g_app","s_sql",0],
+ ["g_app","d_acid",1],["d_acid","d_dash",1],["d_exp","d_dash",1],
+ ["o_manual","d_dash",1],["o_partner","d_dash",1],["o_wedge","d_dash",1],
+ ["d_dash","d_ins",1],["d_ins","d_policy",1],
+ ["d_dash","p1",1],["p1","p2",1],["p2","p3",1],["p3","p4",1]
+];
+
+const BAND={x:40,y:1010,w:1480,h:206};
+const DECS=[
+ ["1 · Which path first?","GitHub-app vs manual scrape vs partner — the strategy doc recommends two conflicting \"Phase 1\"s. Your project charge is literally to \"determine the path\"."],
+ ["2 · Will ACID + Experience commit?","CON-2061 &amp; CON-2062 are still unanswered in Backlog. A \"no\" from either collapses the GitHub-app path."],
+ ["3 · Is declared-only data enough?","Guardener has low adoption and can't see mirrored-registry or runtime pulls — which is exactly what Optum &amp; Capital One want."],
+ ["4 · Define \"telemetry\"","Build-time (declared images) vs runtime pulls are different resolutions of data. Pin the v1 metric set before scoping."],
+ ["5 · Privacy / prod-enablement","syftscan is staging-only today. Agree the data scope, consent story, and who turns the prod scanner on."],
+ ["Where you fit","You're the project lead with an initial 2-week discovery commit (Adam K after). This map is the decision surface for that spike."]
+];
+
+// ---------- build ----------
+const canvas=document.getElementById('canvas');
+const svg=document.getElementById('edges');
+const byId={}; NODES.forEach(n=>byId[n.id]=n);
+const adj={}; NODES.forEach(n=>adj[n.id]=new Set());
+EDGES.forEach(([a,b])=>{adj[a].add(b);adj[b].add(a);});
+
+const groupEls=[];
+GROUPS.forEach(gr=>{
+  const g=document.createElement('div');g.className='group '+gr.cls;
+  g.style.left=gr.x+'px';g.style.top=gr.y+'px';g.style.width=gr.w+'px';g.style.height=gr.h+'px';
+  g.innerHTML='<span class="glab">'+gr.label+'</span>';
+  canvas.appendChild(g);groupEls.push({el:g,members:new Set(gr.members)});
+});
+
+HEADS.forEach(h=>{const e=document.createElement('div');e.className='colhead';
+  e.style.left=h.x+'px';e.style.top=h.y+'px';e.textContent=h.t;canvas.appendChild(e);});
+
+const band=document.createElement('div');band.className='band';
+band.style.left=BAND.x+'px';band.style.top=BAND.y+'px';band.style.width=BAND.w+'px';band.style.height=BAND.h+'px';
+band.innerHTML='<h3>Lock these decisions before starting</h3><div class="grid">'+
+  DECS.map(d=>'<div class="d"><b>'+d[0]+'</b> — '+d[1]+'</div>').join('')+'</div>';
+canvas.appendChild(band);
+
+const el={};
+NODES.forEach(n=>{
+  const d=document.createElement('div');
+  d.className='node n-'+n.st;
+  d.style.left=n.x+'px';d.style.top=n.y+'px';d.style.width=n.w+'px';d.style.height=n.h+'px';
+  d.dataset.id=n.id;d.dataset.st=n.st;
+  d.innerHTML=(n.tag?'<span class="tag">'+n.tag+'</span>':'')+
+    '<div class="t">'+n.t+'</div><div class="s">'+n.s+'</div>'+
+    (n.more?'<span class="more">click ›</span>':'');
+  canvas.appendChild(d);el[n.id]=d;
+});
+
+function anchors(a,b){
+  const ax=a.x+a.w/2, ay=a.y+a.h/2, bx=b.x+b.w/2, by=b.y+b.h/2;
+  const dx=bx-ax, dy=by-ay; let p1,p2;
+  if(Math.abs(dx)>=Math.abs(dy)){ p1=[a.x+(dx>0?a.w:0), ay]; p2=[b.x+(dx>0?0:b.w), by]; }
+  else { p1=[ax, a.y+(dy>0?a.h:0)]; p2=[bx, b.y+(dy>0?0:b.h)]; }
+  return [p1,p2];
+}
+const edgeEls=[];
+EDGES.forEach(([a,b,dash])=>{
+  const [p1,p2]=anchors(byId[a],byId[b]);
+  const horiz=Math.abs(p2[0]-p1[0])>=Math.abs(p2[1]-p1[1]);
+  const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2;
+  const c1=horiz?[mx,p1[1]]:[p1[0],my];
+  const c2=horiz?[mx,p2[1]]:[p2[0],my];
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d','M'+p1[0]+','+p1[1]+' C'+c1[0]+','+c1[1]+' '+c2[0]+','+c2[1]+' '+p2[0]+','+p2[1]);
+  path.setAttribute('class','edge'+(dash?' dashed':''));
+  path.dataset.a=a;path.dataset.b=b;
+  svg.appendChild(path);edgeEls.push(path);
+});
+const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+defs.innerHTML='<marker id="mk" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0,0 L7,4 L0,8 Z" fill="#94a3b8"/></marker>';
+svg.appendChild(defs);
+edgeEls.forEach(p=>p.setAttribute('marker-end','url(#mk)'));
+
+// ---------- interaction ----------
+let pinned=null, filter=null;
+function relatedSet(id){const s=new Set([id]);adj[id].forEach(x=>s.add(x));return s;}
+function applyFocus(id){
+  const rel=relatedSet(id);
+  NODES.forEach(n=>{el[n.id].classList.toggle('dim',!rel.has(n.id));el[n.id].classList.toggle('hot',rel.has(n.id));});
+  el[id].classList.remove('dim');
+  edgeEls.forEach(p=>{const on=(p.dataset.a===id||p.dataset.b===id);
+    p.classList.toggle('hot',on);p.classList.toggle('dim',!on);});
+  groupEls.forEach(gp=>{let any=false;gp.members.forEach(m=>{if(rel.has(m))any=true;});gp.el.classList.toggle('dim',!any);});
+}
+function clearFocus(){
+  NODES.forEach(n=>el[n.id].classList.remove('dim','hot'));
+  edgeEls.forEach(p=>p.classList.remove('hot','dim'));
+  groupEls.forEach(gp=>gp.el.classList.remove('dim'));
+  if(filter) applyFilter();
+}
+function showPanel(n){
+  document.getElementById('p-title').textContent=n.t;
+  const b=document.getElementById('p-badge');
+  b.textContent=STATE_LABEL[n.st];b.style.color=STATE_COLOR[n.st];b.style.borderColor=STATE_COLOR[n.st];
+  document.getElementById('p-detail').innerHTML=n.d;
+  const ins=EDGES.filter(e=>e[1]===n.id).map(e=>byId[e[0]].t);
+  const outs=EDGES.filter(e=>e[0]===n.id).map(e=>byId[e[1]].t);
+  let lk='';
+  if(ins.length) lk+='<div><b>Feeds from:</b> '+ins.join(' · ')+'</div>';
+  if(outs.length) lk+='<div><b>Feeds into:</b> '+outs.join(' · ')+'</div>';
+  document.getElementById('p-links').innerHTML=lk;
+  const panel=document.getElementById('panel');
+  panel.classList.add('on');
+  // position the popup next to the clicked node, clamped to the viewport
+  const r=el[n.id].getBoundingClientRect();
+  const pw=panel.offsetWidth||360, ph=panel.offsetHeight||260, m=12;
+  let left=r.right+14;
+  if(left+pw>window.innerWidth-m) left=r.left-pw-14;   // flip to the left side
+  if(left<m) left=Math.max(m, Math.min(r.left, window.innerWidth-pw-m));
+  let top=r.top-4;
+  if(top+ph>window.innerHeight-m) top=window.innerHeight-ph-m;
+  if(top<m) top=m;
+  panel.style.left=left+'px';
+  panel.style.top=top+'px';
+}
+function hidePanel(){document.getElementById('panel').classList.remove('on');}
+
+NODES.forEach(n=>{
+  const d=el[n.id];
+  d.addEventListener('mouseenter',()=>{ if(!pinned) applyFocus(n.id); });
+  d.addEventListener('mouseleave',()=>{ if(!pinned) clearFocus(); });
+  d.addEventListener('click',(ev)=>{
+    ev.stopPropagation();
+    if(pinned===n.id){ pinned=null; el[n.id].classList.remove('pin'); clearFocus(); hidePanel(); return;}
+    if(pinned) el[pinned].classList.remove('pin');
+    pinned=n.id; el[n.id].classList.add('pin'); applyFocus(n.id); showPanel(n);
+  });
+});
+document.addEventListener('click',()=>{ if(pinned){el[pinned].classList.remove('pin');pinned=null;clearFocus();hidePanel();} });
+document.getElementById('p-close').addEventListener('click',(e)=>{
+  e.stopPropagation(); if(pinned){el[pinned].classList.remove('pin');pinned=null;} clearFocus();hidePanel();
+});
+
+function applyFilter(){
+  NODES.forEach(n=>{el[n.id].classList.toggle('dim',filter && n.st!==filter);el[n.id].classList.remove('hot');});
+  edgeEls.forEach(p=>p.classList.remove('hot','dim'));
+  groupEls.forEach(gp=>gp.el.classList.remove('dim'));
+}
+document.querySelectorAll('#legend .chip').forEach(c=>{
+  c.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const st=c.dataset.state;
+    document.querySelectorAll('#legend .chip').forEach(x=>x.classList.remove('off'));
+    if(filter===st){filter=null;clearFocus();return;}
+    filter=st;
+    document.querySelectorAll('#legend .chip').forEach(x=>{if(x.dataset.state!==st)x.classList.add('off');});
+    if(pinned){el[pinned].classList.remove('pin');pinned=null;hidePanel();}
+    applyFilter();
+  });
+});
+document.getElementById('reset').addEventListener('click',(e)=>{
+  e.stopPropagation();filter=null;
+  document.querySelectorAll('#legend .chip').forEach(x=>x.classList.remove('off'));
+  if(pinned){el[pinned].classList.remove('pin');pinned=null;}
+  clearFocus();hidePanel();
+});
+
+function fit(){
+  const pad=36, avail=document.documentElement.clientWidth-pad;
+  const s=Math.min(1, avail/1560);
+  canvas.style.transform='scale('+s+')';
+  const wrap=document.getElementById('wrap');
+  wrap.style.width=(1560*s)+'px'; wrap.style.height=(1260*s)+'px';
+}
+window.addEventListener('resize',fit); fit();
+</script>
+</body>
+</html>

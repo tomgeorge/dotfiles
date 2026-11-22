@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--__AUTHORMETA__-->
+<!--__DESCMETA__-->
+<!--__DATEMETA__-->
+<title>__TITLE__</title>
+<style>
+  /* Palette aligned to the arts library (env/chaindag.dev/cmd/arts) so the
+     artifact blends into the gallery's inline viewer; see references/arts-principles.md. */
+  :root{
+    color-scheme:light;
+    --bg:#ffffff; --card:#ffffff; --ink:#0d161c; --ink2:rgba(13,22,28,.8); --muted:rgba(13,22,28,.55);
+    --line:#ededed; --accent:#6226fb; --accent-wash:#f1ecfe;
+    --good:#0f8a3c; --good-wash:#e9f7ee; --bad:#d03b3b; --bad-wash:#fbecec;
+    --warn:#b7791f; --warn-wash:#fdf5e6; --code-bg:#f3f3f4;
+    --soft:#f8f6fe; --hover:#f8f6fe; --shadow:rgba(0,0,0,.05);
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#0b0e14; --card:#141922; --ink:#eef1f4; --ink2:rgba(238,241,244,.74); --muted:rgba(238,241,244,.45);
+    --line:#26303f; --accent:#a288ff; --accent-wash:#221d3a;
+    --good:#46c97e; --good-wash:#14301f; --bad:#ef6d6d; --bad-wash:#331a1a;
+    --warn:#e0ad4a; --warn-wash:#322a15; --code-bg:#232830;
+    --soft:#1b2130; --hover:#1b2130; --shadow:rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;font-size:16px}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 22px 80px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:21px;margin:38px 0 12px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:16px;margin:20px 0 6px}
+  p{margin:10px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{opacity:.7}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.9em;
+    font-family:ui-monospace,Menlo,monospace}
+  .lede{color:var(--ink2);font-size:17px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-wash);
+    border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-wash)}
+  .callout .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+  .callout.warn .k{color:var(--warn)}
+  .tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;
+    background:var(--accent-wash);color:var(--accent);vertical-align:middle}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  /* stat tiles — a KPI row for briefings/dashboards */
+  .stats{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+  .stat{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat .n{font-size:26px;font-weight:700;letter-spacing:-.01em}
+  .stat .l{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:4px}
+  .diagram{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+  .box{flex:1;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .box h4{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .node{border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin:6px 0;font-size:13px;background:var(--soft)}
+  .node.err{border-color:var(--bad);background:var(--bad-wash);color:var(--bad)}
+  .node.ok{border-color:var(--good);background:var(--good-wash);color:var(--good)}
+  .arrow{text-align:center;color:var(--muted);font-size:13px;margin:2px 0}
+  /* interactive diagram: hover a [data-node] to spotlight it + its relations, dim the rest */
+  .cgmap{position:relative}
+  .cgmap [data-node],.cgmap [data-edge]{transition:opacity .18s,box-shadow .18s}
+  .cgmap [data-node]{cursor:pointer}
+  .cgmap.focusing [data-node]{opacity:.15}
+  .cgmap.focusing [data-node].hot{opacity:1}
+  .cgmap.focusing [data-edge]{opacity:.08}
+  .cgmap.focusing [data-edge].hot{opacity:1}
+  .cgmap [data-node].pin{outline:2px solid var(--accent);outline-offset:3px}
+  .foot{color:var(--muted);font-size:13px;margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
+  #theme-toggle{position:fixed;top:14px;right:14px;z-index:60;width:38px;height:38px;border-radius:50%;
+    background:var(--card);border:1px solid var(--line);color:var(--ink2);font-size:16px;line-height:1;cursor:pointer;padding:0}
+</style>
+</head>
+<body>
+<button id="theme-toggle" title="Toggle light / dark" aria-label="Toggle light or dark mode">◐</button>
+<div class="wrap">
+  <h1>__TITLE__</h1>
+  <!--__LEDE__-->
+
+  <!--__CONTENT__-->
+</div>
+
+<script>
+// Interactive diagrams. Inside any .cgmap, hovering an element tagged
+// data-node="id" spotlights it and everything related (from data-rel="ids"
+// and any edge tagged data-edge="a b") and dims the rest; click pins it,
+// click it again or the background to unpin. Relations are reciprocal.
+document.querySelectorAll('.cgmap').forEach(function(map){
+  var nodes = [].slice.call(map.querySelectorAll('[data-node]'));
+  var edges = [].slice.call(map.querySelectorAll('[data-edge]'));
+  var idOf = function(n){ return n.getAttribute('data-node'); };
+  var rel = {};
+  nodes.forEach(function(n){ rel[idOf(n)] = new Set([idOf(n)]); });
+  function link(a, b){ if (rel[a]) rel[a].add(b); if (rel[b]) rel[b].add(a); }
+  nodes.forEach(function(n){
+    (n.getAttribute('data-rel') || '').split(/\s+/).filter(Boolean).forEach(function(r){ link(idOf(n), r); });
+  });
+  edges.forEach(function(e){
+    var p = (e.getAttribute('data-edge') || '').split(/\s+/).filter(Boolean);
+    if (p.length === 2) link(p[0], p[1]);
+  });
+  var pinned = null;
+  function focus(x){
+    map.classList.add('focusing');
+    var r = rel[x] || new Set([x]);
+    nodes.forEach(function(n){ n.classList.toggle('hot', r.has(idOf(n))); });
+    edges.forEach(function(e){
+      var p = (e.getAttribute('data-edge') || '').split(/\s+/);
+      e.classList.toggle('hot', p.indexOf(x) >= 0);
+    });
+  }
+  function clear(){
+    map.classList.remove('focusing');
+    nodes.forEach(function(n){ n.classList.remove('hot'); });
+    edges.forEach(function(e){ e.classList.remove('hot'); });
+  }
+  nodes.forEach(function(n){
+    n.addEventListener('mouseenter', function(){ if (!pinned) focus(idOf(n)); });
+    n.addEventListener('mouseleave', function(){ if (!pinned) clear(); });
+    n.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var x = idOf(n);
+      if (pinned === x){ pinned = null; n.classList.remove('pin'); clear(); return; }
+      var prev = map.querySelector('[data-node].pin'); if (prev) prev.classList.remove('pin');
+      pinned = x; n.classList.add('pin'); focus(x);
+    });
+  });
+  map.addEventListener('click', function(ev){
+    if (ev.target === map && pinned){
+      var p = map.querySelector('[data-node].pin'); if (p) p.classList.remove('pin');
+      pinned = null; clear();
+    }
+  });
+});
+</script>
+<script>
+// Manual light/dark toggle. Defaults to light; the choice is remembered.
+(function(){
+  var root = document.documentElement;
+  try { var saved = localStorage.getItem('arts-artifact-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.getElementById('theme-toggle').addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('arts-artifact-theme', next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
