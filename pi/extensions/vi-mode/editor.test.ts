@@ -116,6 +116,19 @@ test("an unknown key closes and the border shows the missed path briefly", (t) =
   assert.equal(s.renders(), 1);
 });
 
+test("Enter submits from either mode and leaves NORMAL; an empty Enter keeps the mode", () => {
+  const s = setup();
+  s.type("enter");
+  assert.match(s.editor.border(), / INSERT /);
+  s.type("h", "i", "enter");
+  // The fake submits an empty prompt too; Pi doesn't.
+  assert.deepEqual(s.submitted.map((x) => x.text), ["", "hi"]);
+  assert.match(s.editor.border(), / NORMAL /);
+  s.type("i", "y", "o", "escape", "enter");
+  assert.deepEqual(s.submitted.map((x) => x.text), ["", "hi", "yo"]);
+  assert.match(s.editor.border(), / NORMAL /);
+});
+
 test("other keys inside the leader close it and don't leak", () => {
   const s = setup();
   s.type("x", "escape", " ", "enter");

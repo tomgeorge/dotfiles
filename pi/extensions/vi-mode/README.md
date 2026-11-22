@@ -40,7 +40,7 @@ Commands take counts (`3w`, `2dd`, `d3w`; `2d3w` deletes six words).
 | `i` `a` `I` `A` `o` `O` | Enter INSERT |
 | `u`, ctrl+r | Undo, redo |
 | Esc | Clear a half-typed command; otherwise Pi's Esc (abort a running turn) |
-| Enter | Submit, then back to INSERT |
+| Enter | Submit (in either mode), then NORMAL |
 
 Text objects, after `d`, `c` or `y`:
 

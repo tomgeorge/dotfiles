@@ -133,9 +133,25 @@ export class ViEditor extends CustomEditor {
       this.bridge.setCursor({ line, col: prevCol(this.bridge.lines()[line], col) });
       return;
     }
+    if (matchesKey(data, "enter")) {
+      this.submit(data);
+      return;
+    }
     super.handleInput(data);
-    // Submitting clears the undo stack; the next session starts from there.
-    if (matchesKey(data, "enter") && this.getText() === "") this.insertDepth = this.bridge.undoDepth();
+  }
+
+  // Enter from either mode. A submit clears the prompt (and its undo stack);
+  // the next prompt starts in NORMAL. Otherwise (autocomplete took the Enter,
+  // or the prompt was empty) the mode stays as it was.
+  private submit(data: string): void {
+    this.engine.cancel();
+    const hadText = this.getText() !== "";
+    super.handleInput(data);
+    if (hadText && this.getText() === "") {
+      this.mode = "normal";
+      this.engine.forgetColumn();
+    }
+    this.clamp();
   }
 
   private normalKey(data: string): void {
@@ -145,11 +161,7 @@ export class ViEditor extends CustomEditor {
       return;
     }
     if (matchesKey(data, "enter")) {
-      this.engine.cancel();
-      super.handleInput(data);
-      // Submitted: the next prompt starts out typing.
-      if (this.getText() === "") this.enterInsert();
-      else this.clamp();
+      this.submit(data);
       return;
     }
     const key = matchesKey(data, "ctrl+r") ? "<C-r>" : matchesKey(data, "backspace") ? "h" : printable(data);
