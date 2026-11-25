@@ -2,7 +2,6 @@
   lib,
   stdenv,
   fetchurl,
-  autoPatchelfHook,
 }:
 
 # schpet/linear-cli's Linux release, a Deno-compiled binary. The Mac gets the
@@ -16,10 +15,11 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-r/tZRnLC8iDO9o+nz+uBOUXEAQeJpLjMLA5GRo/reHA=";
   };
 
-  # Links against libgcc_s as well as glibc.
-  nativeBuildInputs = [ autoPatchelfHook ];
-  buildInputs = [ stdenv.cc.cc.lib ];
-
+  # Not patchelf'd: Deno finds its bundled program through a trailer at the
+  # end of the file, and patchelf appends data after it ("Could not find
+  # standalone binary section"). The binary uses the host's
+  # /lib64/ld-linux-x86-64.so.2 and libgcc_s, which Chainguard OS provides.
+  dontPatchELF = true;
   dontConfigure = true;
   dontBuild = true;
   # Deno appends the bundled program to the ELF; stripping would cut it off.
