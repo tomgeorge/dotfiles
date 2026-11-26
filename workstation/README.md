@@ -6,7 +6,7 @@ project) run Chainguard OS with a Nix-managed home:
 | Node | Kind | Size | Home config | Rex host on the Mac | For |
 | --- | --- | --- | --- | --- | --- |
 | `work-amd64` | pet | `standard` (8 vCPU, 32G) | `homeConfigurations.work-amd64` | `workstation` | general work, long-running agents |
-| `unblok` | custom node | `standard` | `homeConfigurations.unblok` | `unblok` | unblok only: git, gh, linear-cli, Rex |
+| `unblok` | custom node | `standard` | `homeConfigurations.unblok` | `unblok` | unblok only: git, gh, linear-cli, pi, Rex |
 
 Both live 120 days. A node's root disk is rebuilt on every start; only `/home`
 survives.
@@ -74,7 +74,7 @@ without rerunning their commands. After a restart or a recreate, open the
 - **Tailscale sign-in.** A node with a new name needs one sign-in. `cg work`
   prints the URL. Tailscale state is kept in `/home/.state/<instance>`, so a
   recreate of the same node needs no new sign-in.
-- **Logins on `unblok`.** Run `gh auth login` and `claude` once. Git's
+- **Logins on `unblok`.** Run `gh auth login`, `claude`, and `pi` (then `/login`) once. Git's
   credential helper comes from the home config, so skip `gh auth setup-git`,
   which fails because home-manager owns `~/.config/git/config`.
 

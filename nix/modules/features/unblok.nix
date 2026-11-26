@@ -1,6 +1,6 @@
 {
   flake.modules = {
-    # The unblok workstation: only what unblok shells out to.
+    # The unblok workstation: only what unblok shells out to. pi comes from hm.pi.
     homeManager.unblok =
       { config, pkgs, ... }:
       {
@@ -28,6 +28,9 @@
 
         home.packages = [
           pkgs.gh
+          # pi installs its settings.packages with npm; pi-anthropic-auth among
+          # them keeps the review agents on the Anthropic subscription.
+          pkgs.nodejs
           (pkgs.callPackage ../../pkgs/linear-cli.nix { })
         ];
 

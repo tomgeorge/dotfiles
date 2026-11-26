@@ -65,6 +65,7 @@ in
       ];
       homeManager.tom-unblok.imports = [
         hm.base
+        hm.pi
         hm.rex
         hm.unblok
       ];
