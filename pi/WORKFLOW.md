@@ -8,11 +8,13 @@ This is a playbook for the Pi setup in this repository. Every tool here exists b
 |---|---|---|
 | Small, clear change | Plain prompt. Start with "First run the tests"; say "use red/green TDD" | Models already know both shorthands |
 | Unclear what to build | "grill me" (the grilling skill) | Find the gap before any code exists |
-| Read-only research or review on the side | `subagent` | A clean context; nothing written |
+| Read-only research or review on the side | Ask for a scout (`agent_spawn`, pi-rex-agents) | A clean context in a Rex pane I can open; nothing written |
+| A side question that shouldn't derail the session | `/btw <question>` (pi-rex-btw) | A separate chat in a float, seeded with a snapshot of this one |
+| A long command to run in the background | Ask for a shell job (`shell_job`, pi-rex-shell) | A pane I can watch and type into; the exit code and output come back |
 | A finish line you can check, but an uncertain path (flaky test, perf target, migration step) | `/goal <objective> --check <cmd> [--max N]` | The check decides "done", not the model |
 | Code needs tests that would catch real breakage | List mutants in `<ext>/mutants.json`, then `/goal … --check node pi/extensions/test-support/mutate.ts <ext>` | "Tests pass" is met by an empty file; "every named mutant is killed" isn't |
 | Multi-session work (big feature, long investigation) | `/execplan <task>`, then `/handoff continue <plan>` when context fills | The plan file is the memory |
-| Work that splits into independent, checkable pieces | `/crew <goal>` | A planner plus isolated workers; the harness merges |
+| Work that splits into independent, checkable pieces | `/rex-crew <goal>` | A planner plus `crew-worker` agents in their own worktrees; the planner verifies and merges |
 | Hard decision, error recurring, about to declare a big task done | The agent calls `advisor` (set the model once with `/advisor`) | A second model, ideally from another vendor, sees the full transcript |
 | Code is written; check it before I read it | "review this well" or `/review-loop [target]` | Three clean-context reviewers; findings must reproduce as failing tests. A PR with no local checkout gets one round, posted as my review: request changes, or approve if clean |
 | Context getting long or drifting | `/handoff <next goal>` | A fresh, focused session instead of lossy compaction |
@@ -50,7 +52,8 @@ Running these tools on their own code, `.agent/plans/dogfood-agent-tools.md` fou
 ## Where things live
 
 - Instructions: `pi/AGENTS.md`. Every line should trace back to an observed failure.
-- Prompts: `pi/prompts/`: `review-loop`, `execplan`, `retro`, `checkin`.
+- Prompts: `pi/prompts/`: `review-loop`, `rex-crew`, `execplan`, `retro`, `checkin`.
+- Agent definitions for pi-rex-agents: `pi/agents/`: `scout`, `reviewer`, `crew-worker`.
 - Extensions: `pi/extensions/`: `subagent`, `crew`, `goal`, `advisor`, `handoff`, `watch`, `mcp-confirm`. Shared test helpers (a fake `ExtensionAPI` and the mutation gate) are in `pi/extensions/test-support/`.
 - Session mining: `pi/retro/collect.ts`. Digests are written to `~/.local/state/pi-retro/`.
 - Check-in: `pi/checkin/run.sh`, scheduled by `nix/modules/features/pi-checkin.nix`. State and results are in `~/.local/state/pi-checkin/`.

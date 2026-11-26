@@ -49,6 +49,10 @@ in
           "npm:@gotgenes/pi-anthropic-auth@3.4.3"
           "npm:pi-google-workspace@1.0.1"
           "git:github.com/samber/cc-skills-golang@bb1d43d98a3f8ab639a0042f90d0ec524e39a477"
+          # Rex-backed agents, side chats, and shell jobs. They need pi running inside Rex.
+          "git:github.com/maxpaulus43/pi-rex-agents@ab7e5d71f002d34ff4dc331a20df5e6d65317d84"
+          "git:github.com/maxpaulus43/pi-rex-btw@689b42dcc4ad29d97aa0c34bd03b614cd55e9e6b"
+          "git:github.com/maxpaulus43/pi-rex-shell@197d6d474b24e2488737bea4d7bb9490afa86486"
         ];
 
         settings = {
@@ -112,6 +116,8 @@ in
             home.file = {
               ".pi/agent/AGENTS.md".source = live "pi/AGENTS.md";
               ".pi/agent/prompts".source = live "pi/prompts";
+              # Agent definitions for pi-rex-agents; same names override its bundled ones.
+              ".pi/agent/agents".source = live "pi/agents";
               ".pi/agent/retro".source = live "pi/retro";
               ".pi/agent/leader.json".source = live "pi/leader.json";
 

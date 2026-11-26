@@ -4,7 +4,7 @@ argument-hint: "[here | PR | branch | worktree path | crew [slug] | A..B] [extra
 ---
 Run a review-fix loop on target "${1:-here}". ${@:2}
 
-I'm asking you to delegate reviews to subagents for this whole task. Use the models named below; don't ask me to pick.
+I'm asking you to delegate reviews to `reviewer` agents (`agent_spawn`) for this whole task. Use the models named below; don't ask me to pick.
 
 ## 0. Set up
 Work out three things: `DIR`, the checkout where the change lives; `BASE`, the commit the change is measured against; and the change's intent.
@@ -17,10 +17,11 @@ Work out three things: `DIR`, the checkout where the change lives; `BASE`, the c
   - On any other branch, `BASE=$(git merge-base $DEFAULT HEAD)`.
   - If there's nothing to review, say so and stop.
 - **`crew` or `crew <slug>`:** a crew's integration branch.
-  - Read the newest JSON file in `$(git rev-parse --git-common-dir)/pi-crew/`, or `<slug>.json`.
-  - `DIR` is its `config.integrationPath`, and `BASE` is its `config.baseSha`.
-  - The intent is its `config.goal` plus `summary`.
-  - If the crew is still `active`, ask me first, because its workers may still be merging.
+  - Read the newest ledger in `$(git rev-parse --git-common-dir)/pi-crew/`, or `<slug>.md`.
+  - `DIR` is its integration worktree, and `BASE` is its base commit.
+  - The intent is its goal plus its summary.
+  - If the crew's status is still `active`, ask me first, because its workers may still be merging.
+  - Older crews left `<slug>.json` ledgers instead: use `config.integrationPath`, `config.baseSha`, `config.goal`, `summary`, and `status`.
 - **A PR number or URL:**
   - Run `gh pr view <pr> --json number,title,body,url,baseRefName,baseRefOid,headRefName,headRefOid`. A bare number only resolves inside a clone of the PR's repo; outside one, ask me for the URL.
   - If the current directory is a clone of the PR's repo and `git worktree list` shows `headRefName` checked out, `DIR` is that worktree and `BASE=$(git merge-base origin/<baseRefName> HEAD)`, run in `DIR`. Continue with the loop below.
@@ -42,14 +43,20 @@ Then:
 - Write a 2–4 sentence statement of the change's intent. Take it from the PR title and body, the crew goal, or what I asked for earlier in this conversation, plus my message here. That intent is the yardstick for every decision below. If you can't tell what the change is meant to do, ask me.
 
 ## 1. Review: all four in parallel, each with a clean context
-Make four `subagent` calls in a single turn:
+Reviewers can't run git, so write the change to a file outside `DIR`. Once per review, run `R=$(mktemp -d)`. Round 1's diff is `git -C "$DIR" diff $BASE > $R/round-1.diff`; later rounds' diffs come from step 3's snapshot (see step 4). Keep the files until the review is done.
+
+Make four `agent_spawn` calls in a single turn:
+- agent: `reviewer`
+- model: from the table below
 - cwd: `DIR`
-- tools: `read`, `grep`, `find`, `ls`, `git`
+- name: `review-<letter>-r<round>`, such as `review-a-r1`. Names must be unique in this session, so add a suffix if one is taken.
 
 Give each reviewer:
 - the intent statement;
-- `BASE`;
-- the list of changed files from `git diff --stat $BASE` and `git status --porcelain`, both run in `DIR`. Name untracked new files explicitly, because `git diff` doesn't show them.
+- `BASE`, and the path of the diff file;
+- the list of changed files from `git diff --stat $BASE` and `git status --porcelain`, both run in `DIR`. Name untracked new files explicitly, because the diff doesn't show them.
+
+Each review arrives as its own message when that reviewer finishes. Wait until all four have arrived before you triage. Don't poll with `agent_list`; end your turn while you wait. If a reviewer asks a question, answer it with `agent_send`.
 
 Don't give them your reasoning or earlier rounds' discussion. They should judge the code fresh.
 
@@ -61,7 +68,7 @@ Don't give them your reasoning or earlier rounds' discussion. They should judge 
 | D | `anthropic/claude-opus-5-5` | Simplicity and idiom: concerns complected together (Rich Hickey, "Simple Made Easy"), unidiomatic Go or TypeScript, departures from the codebase's conventions, hand-rolled code the repo's existing dependencies or the standard library already provide, dead code. |
 
 Reviewers asked to "find problems" invent them: in studies, models rejected 25–75% of correct code, and asking them to explain and fix made it worse. So don't presume a problem exists. Tell every reviewer:
-- Use `git diff $BASE` to see the change, including uncommitted work, and read the new files directly.
+- Read the diff file to see the change, including uncommitted work, and read the new files directly.
 - Read the surrounding code before judging it.
 - **The bar (A, B, C):** report a finding only if it breaks correctness, security, or a stated requirement. Style, alternative designs, and "more tests would be nice" are not findings. (Unreadable tests are C's exception: they are a finding when a failure wouldn't tell the reader what broke.)
 - **"If the change is correct and meets the stated requirements, say so and report no findings."** Write `No findings.` in that case. That is a good outcome, not a failed review.
@@ -99,6 +106,7 @@ You make the call, not the reviewers. Don't accept a finding just because a revi
 Add every rejected and deferred finding to the "already decided" list.
 
 ## 3. Fix and verify
+- Before the first fix of each round, snapshot `DIR` so the next round can review only the fixes: `SNAP=$(git -C "$DIR" stash create)`, or `git -C "$DIR" rev-parse HEAD` if that prints nothing. It doesn't touch the worktree. Also save the list of untracked files from `git -C "$DIR" status --porcelain`.
 - Fix each accepted finding until its failing test passes (green). Change only what the finding names, minimally, in the existing style. Don't add abstractions, defensive checks, or options that no finding asked for.
 - Simplicity fixes are behavior-preserving refactors. Green checks are not proof on their own: walk the "Watch for behavior drift" list in `~/.agents/skills/simple-code/SKILL.md` (step 4), and check transaction boundaries, locking, cancellation, error contracts, ordering, and nil vs. empty. When you pull a pure core out of I/O, add table tests for the core.
 - You may skip a fix that seems unsafe or would need a wider change. List it as unresolved instead of forcing it.
@@ -107,7 +115,7 @@ Add every rejected and deferred finding to the "already decided" list.
 
 ## 4. Loop or stop
 - **Stop** when a round produces no accepted high or medium findings and the checks pass. That's "the reviewers call it good."
-- **Otherwise** start another round from step 1, with fresh subagent calls and the "already decided" list. Rounds 2 and later review **only this round's fix diff** (`git diff` of your changes since the previous round) against the accepted findings, not the whole change again. A full re-review just generates new findings forever.
+- **Otherwise** start another round from step 1, with fresh reviewer agents and the "already decided" list. Rounds 2 and later review **only this round's fix diff** (`git -C "$DIR" diff $SNAP > $R/round-N.diff`, plus any untracked files the fixes created or changed, named explicitly) against the accepted findings, not the whole change again. A full re-review just generates new findings forever.
 - In those rounds, D checks that each accepted simplicity fix actually removed the coupling it named, and A checks the fix diff for behavior drift. Accepted simplicity findings still open after the last round are listed as unresolved; don't call that result clean.
 - **Hard limit:** 3 rounds. If high or medium findings remain after round 3, stop.
 - If the same issue survives two fix attempts, stop and escalate it to me instead of looping.
@@ -123,7 +131,6 @@ Keep it short.
 - **Overturn rate:** findings raised vs accepted. If most were rejected, say so; the reviewers are overcorrecting on this code.
 - **Unresolved:** anything still open, with your recommendation.
 - **Checks:** the commands run and their final status.
-- **Spend:** the total subagent cost reported by the jobs.
 
 ## Review-only mode: a PR with no local checkout
 One round of review, no fixes, then a review posted to the PR from my GitHub account (`gh` is authenticated as me): request changes if blocking findings survive, otherwise approve, with any non-blocking simplicity notes included. Steps 1 and 2 apply with the changes below; steps 3 and 4 don't.
@@ -144,7 +151,7 @@ One round of review, no fixes, then a review posted to the PR from my GitHub acc
 - Write the intent statement from the PR title and body plus my message.
 
 ### Review
-Run step 1 as written, with `DIR` the throwaway checkout. Have reviewers use `git diff $BASE $HEAD`; there is no uncommitted work.
+Run step 1 as written, with `DIR` the throwaway checkout. Write the diff file with `git -C "$DIR" diff $BASE $HEAD`; there is no uncommitted work.
 
 ### Triage
 Run step 2, but you can't execute tests, so reason instead. Accept a high or medium finding only if you can name the exact input or scenario that fails and trace it through the code in `DIR`. Otherwise reject it as unverified. Also reject anything already raised in the PR's existing comments or reviews. Triage D's findings as in step 2; accepted ones are **non-blocking** unless my message asks for simplicity to block.
@@ -176,4 +183,4 @@ Post one review:
 - **Target:** the PR URL, `BASE`, and `HEAD`.
 - **Posted:** the verdict, the review URL, and each finding posted with its reviewer.
 - **Rejected:** each finding with its one-line reason (including "unverified" and "already raised"), so I can overrule you and add it myself.
-- **Overturn rate** and **Spend**, as in step 5.
+- **Overturn rate**, as in step 5.

@@ -58,11 +58,14 @@ Use `ketch` for external research — web pages, OSS code, library docs.
 ## Long work
 For work likely to take more than one session, such as a large feature, a migration, or a multi-hour investigation, suggest `/execplan` before starting. Its plan file under `.agent/plans/` is the source of truth, and the work can resume from it after `/handoff`.
 
+## Agents
+Start agents with `agent_spawn` only when I ask for or approve delegation. Use the model I name; if I didn't name one, use the agent's default.
+
 ## Review loop
 When I say "review this well", "review it well", "do a proper review", or something similar, run the review-fix loop:
 - Read `~/.pi/agent/prompts/review-loop.md` and follow it exactly.
 - Choose the target from what I said and the recent conversation: a PR, a branch, a path, `crew`, or `here` for work just produced in this session. Pass any extra focus I mention to the reviewers.
-- That phrase counts as my approval to delegate to the subagents and models the file names.
+- That phrase counts as my approval to delegate to the agents and models the file names.
 - If the target is ambiguous, ask one question.
 
 ## Work
