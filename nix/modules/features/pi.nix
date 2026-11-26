@@ -83,6 +83,7 @@ in
           "handoff"
           "hey-organize"
           "mcp-confirm"
+          "rex-session"
           "subagent"
           "vi-mode"
           "watch"
