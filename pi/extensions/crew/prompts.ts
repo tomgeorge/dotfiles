@@ -96,6 +96,6 @@ Diff:
 ${diff}
 \`\`\`
 
-Read the surrounding code as needed. Look for bugs, missed edge cases, security problems, spec violations, and changes that don't fit the codebase. Don't edit files. Don't nitpick style unless it hides a bug.
+Read the surrounding code as needed. Look for bugs, missed edge cases, security problems, spec violations, and changes that don't fit the codebase. Don't edit files. Don't nitpick style unless it hides a bug. If the change is correct, say so with empty findings; that's a good outcome, not a failed review.
 Put each issue in "findings" as "[severity: high|medium|low] file:line: problem: suggested fix". Use status "done" when the review is complete. ${HANDOFF_FORMAT}`;
 }

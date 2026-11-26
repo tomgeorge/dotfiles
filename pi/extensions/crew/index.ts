@@ -503,7 +503,7 @@ export default function (pi: ExtensionAPI, deps: { runWorker?: typeof runWorker;
   pi.registerTool({
     name: "crew_wake",
     label: "Crew wake",
-    description: "Schedule a check-in message to yourself (Devin-style) with the current ledger, e.g. to revisit a slow task. Handoffs wake you anyway; use this for time-based follow-ups.",
+    description: "Schedule a check-in message to yourself with the current ledger, e.g. to revisit a slow task. Handoffs wake you anyway; use this for time-based follow-ups.",
     parameters: Type.Object({
       minutes: Type.Integer({ minimum: 1, maximum: 240 }),
       note: Type.String({ minLength: 1, description: "What to look at when you wake" }),

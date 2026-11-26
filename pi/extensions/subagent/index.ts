@@ -198,7 +198,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
-    description: "Run one read-only task in a fresh pi process. Absolute cwd and tools; no parent conversation is copied. Give an exact provider/model when the user named one; otherwise omit both and the user picks one before the job starts. Only read, grep, find, ls, and git (read-only subcommands: log, show, diff, blame, grep, merge-base, rev-parse, branch/tag listing, etc.) are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
+    description: "Run one read-only task in a fresh pi process. Absolute cwd and tools; no parent conversation is copied. Give an exact provider/model when the user named one; otherwise omit both and the user picks one before the job starts. Only read, grep, find, ls, and read-only git are allowed. Several calls may run in parallel, up to a per-session concurrency limit (default 5); each has a 20-minute timeout. Output capped at 2000 lines / 50 KiB with full output saved to a temporary file when truncated. Extensions and skills are disabled in the child; extension-only providers are unsupported.",
     promptGuidelines: ["Use subagent only when the user requests or approves delegation. Include all necessary task context. Use the provider/model the user chose; if they didn't choose one, omit provider and model so they can pick. Never guess a model."],
     parameters: Type.Object({
       task: Type.String({ minLength: 1 }),
