@@ -45,7 +45,7 @@ Use `ketch` for external research: `search` (add `--scrape` for page content), `
 For work likely to take more than one session (a large feature, a migration, a multi-hour investigation), suggest `/execplan` before starting. Its plan under `.agent/plans/` is the source of truth, and work resumes from it after `/handoff`.
 
 ## Delegation
-Delegate to agents (`agent_spawn`, `subagent`, `/crew`) only when I ask for or approve it. Use the model I name; otherwise follow the tool's own rule (`agent_spawn` uses the agent's default, `subagent` lets me pick).
+Start read-only scouts (`agent_spawn` with `scout`) whenever they help. Delegate anything else (other agents, `subagent`, `/crew`) only when I ask for or approve it. Use the model I name; otherwise follow the tool's own rule (`agent_spawn` uses the agent's default, `subagent` lets me pick).
 
 ## Review loop
 When I say "review this well", "do a proper review", or similar, read `~/.pi/agent/prompts/review-loop.md` and follow it.

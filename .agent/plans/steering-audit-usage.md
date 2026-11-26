@@ -70,6 +70,6 @@ scout, reviewer and crew-worker: 0 `agent_spawn` calls so far. They're new (11-2
 - **hey skill (written by `hey skill install`):** clear and current with CLI 1.13.1. Its Authentication section is written for Codex's macOS sandbox; under pi it's harmless noise. Nothing to send upstream that matters.
 - **rex skill (written by `rex skill setup`):** a stub that runs `rex __internal skill`. Fine. It's installed in both `agents/skills/rex` and `claude/skills/rex`; pi shows it once.
 - **terminal-browser:** upstream skill, linked from the installed app. Clear; one wordy paragraph about running `terminal-browser action done` after the last action could be one sentence. Nothing that conflicts with ours.
-- **pi-rex-agents:** its bundled `worker` definition says "Spawn scouts with agent_spawn for broad research", which conflicts with our rule that delegation needs approval. Our `crew-worker` doesn't inherit it, but a plain `agent_spawn` with the default `worker` agent would. Consider overriding `worker` in `pi/agents/`.
+- **pi-rex-agents:** its bundled `worker` definition spawns scouts on its own. That's fine: scouts don't need approval (Tom, 2026-11-26).
 - **pi-google-workspace:** its tool list is in every system prompt for 4 calls in two months. Narrowing it is a config choice like the golang one.
 - **Apple Notes in pi:** weekly-review needs Apple Notes, but pi's MCP config has no Apple Notes server, so in pi it stops at the connectivity check. Either add a server or keep running weekly reviews in Claude.
