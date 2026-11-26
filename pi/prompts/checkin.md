@@ -4,10 +4,10 @@ argument-hint: "[extra focus]"
 ---
 Do a quick, read-only check-in on my mail, tasks, and calendar. $@
 
-The point is to fight list numbness: surface the **few** things that need me in the next day, not the whole list. Silence is the best outcome.
+Surface the **few** things that need me in the next day, not the whole list. Silence is the best outcome.
 
 ## Gather (read-only)
-Use the HEY, Todoist, and Fantastical MCP tools through codemode, batching the calls with `Promise.allSettled`. Only read; never move, label, complete, or reschedule anything. Headless runs (`pi/checkin/run.sh`) have no shell or write tools, and MCP write calls are blocked.
+Use the HEY, Todoist, and Fantastical MCP tools through codemode, batched with `Promise.allSettled`. Never move, label, complete, or reschedule anything. Headless runs (`pi/checkin/run.sh`) have no shell or write tools, and MCP write calls are blocked.
 - **Calendar:** events from now through tomorrow evening.
 - **Todoist:** tasks that are overdue, due today, or due tomorrow, and P1 tasks due in the next 7 days. The `limit` must be ≤ 100.
 - **HEY:** Imbox postings since the last check-in (see state below), and anything bubbled up for today.

@@ -37,7 +37,7 @@ Trust what you observe over what the worker claims. For each handoff:
 - Now and then, dispatch a green-pass task: run the full checks on the integration branch, fix what fails, and report.
 
 ## Escalate
-Ask me only after two failed attempts at the same task, a conflict a repair task couldn't fix, or ambiguous or contradictory requirements. Give the reason, evidence, options, and your recommendation. Keep unblocked work running first. Never ask "should I continue?"
+Ask me only after two failed attempts at the same task, a conflict a repair task couldn't fix, or ambiguous or contradictory requirements. Give the reason, evidence, options, and your recommendation, and keep unblocked tasks running while you wait. Never ask "should I continue?"
 
 ## Finish
 - Run the full checks in `INTEG`. Don't finish until they pass and leave the worktree clean (`git -C INTEG status --porcelain` is empty).

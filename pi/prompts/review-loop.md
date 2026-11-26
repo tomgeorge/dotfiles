@@ -21,7 +21,7 @@ Work out three things: `DIR`, the checkout where the change lives; `BASE`, the c
   - `DIR` is its integration worktree, and `BASE` is its base commit.
   - The intent is its goal plus its summary.
   - If the crew's status is still `active`, ask me first, because its workers may still be merging.
-  - Older crews left `<slug>.json` ledgers instead: use `config.integrationPath`, `config.baseSha`, `config.goal`, `summary`, and `status`.
+  - `/crew` (the crew extension) writes `<slug>.json` ledgers instead: use `config.integrationPath`, `config.baseSha`, `config.goal`, `summary`, and `status`.
 - **A PR number or URL:**
   - Run `gh pr view <pr> --json number,title,body,url,baseRefName,baseRefOid,headRefName,headRefOid`. A bare number only resolves inside a clone of the PR's repo; outside one, ask me for the URL.
   - If the current directory is a clone of the PR's repo and `git worktree list` shows `headRefName` checked out, `DIR` is that worktree and `BASE=$(git merge-base origin/<baseRefName> HEAD)`, run in `DIR`. Continue with the loop below.
@@ -37,7 +37,7 @@ Work out three things: `DIR`, the checkout where the change lives; `BASE`, the c
   - `BASE=$(git merge-base $DEFAULT <branch>)`.
 
 Then:
-- Run every git command and check with `git -C "$DIR"` or `cd "$DIR" &&`. Make every edit with paths under `DIR`. Your own working directory may be a different checkout, so never edit there by mistake.
+- Run every git command and check in `DIR` (`git -C "$DIR"` or `cd "$DIR" &&`), and edit only paths under `DIR`. Your own working directory may be a different checkout.
 - Find the project's checks: tests, lint, typecheck and formatter. Look in AGENTS.md, the README, the Makefile, package.json and similar files. Run them once in `DIR`. If they already fail before any fixes, tell me before you continue.
 - **Go:** if the project doesn't already cover them, also run `gofmt -l`, `go vet` and `go test -race` on the changed packages, and `golangci-lint run --new-from-rev=$BASE` if the repo configures it. Lint hits in changed code are mechanical idiom findings; triage them yourself, don't send them to reviewers.
 - Write a 2–4 sentence statement of the change's intent. Take it from the PR title and body, the crew goal, or what I asked for earlier in this conversation, plus my message here. That intent is the yardstick for every decision below. If you can't tell what the change is meant to do, ask me.
@@ -67,11 +67,9 @@ Don't give them your reasoning or earlier rounds' discussion. They should judge 
 | C | `anthropic/claude-sonnet-5-5` | Tests: missing or weak tests, behavior changes without tests, and tests a reader can't follow (unnamed magic expected values, one long script instead of named cases, assertion boilerplate hiding intent). |
 | D | `anthropic/claude-opus-5-5` | Simplicity and idiom: concerns complected together (Rich Hickey, "Simple Made Easy"), unidiomatic Go or TypeScript, departures from the codebase's conventions, hand-rolled code the repo's existing dependencies or the standard library already provide, dead code. |
 
-Reviewers asked to "find problems" invent them: in studies, models rejected 25–75% of correct code, and asking them to explain and fix made it worse. So don't presume a problem exists. Tell every reviewer:
-- Read the diff file to see the change, including uncommitted work, and read the new files directly.
-- Read the surrounding code before judging it.
+Reviewers told to find problems invent them, so don't presume one exists. The `reviewer` definition already tells them to read surrounding code and that `No findings.` is a good outcome. Also tell every reviewer:
+- The diff file includes uncommitted work; read untracked new files directly.
 - **The bar (A, B, C):** report a finding only if it breaks correctness, security, or a stated requirement. Style, alternative designs, and "more tests would be nice" are not findings. (Unreadable tests are C's exception: they are a finding when a failure wouldn't tell the reader what broke.)
-- **"If the change is correct and meets the stated requirements, say so and report no findings."** Write `No findings.` in that case. That is a good outcome, not a failed review.
 - **Evidence:** every high or medium finding must include a concrete failing input, counterexample, or a test that would fail. A finding without one can be at most low.
 - Report one finding per line, as `[high|medium|low] path:line: problem. Evidence: ...`. Don't propose fixes; the fix comes later, after the evidence holds up.
 - In rounds 2 and later, also send the "already decided" list (see below), with the instruction: "Don't re-raise these unless the code changed in a way that makes them newly relevant."
