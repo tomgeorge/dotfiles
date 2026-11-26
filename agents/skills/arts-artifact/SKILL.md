@@ -5,98 +5,30 @@ description: Build a self-contained, arts-styled interactive HTML artifact from 
 
 # arts artifact
 
-Produce one self-contained HTML file — an artifact in the arts style — that
-drops into the arts library and renders inline there. You supply the substance
-(and, for a map, the layout); the skill supplies the arts look and the working
-interactions. No quiz (that's the separate arts-report skill).
-
-## When to use
-
-Use when the user wants a standalone HTML artifact built in the arts style: a
-report or briefing, a one-pager, an explainer, a diagram, or an interactive map
-of a system/decision/plan. Infer the artifact **kind** from the prompt — the
-user describes the subject and shape ("a map of…", "a one-pager on…", "an
-explainer that…"); pick the shape that fits. If the shape is genuinely unclear,
-ask one question; otherwise choose and proceed.
-
-Do not use for: a report that must end in a graded quiz (use arts-report), or a
-change to an existing non-arts page.
+Produce one self-contained HTML file in the arts style that renders inline in the arts library. You supply the substance (and, for a map, the layout); the skill's template and example supply the look and the interactions. Don't use it to change an existing non-arts page.
 
 ## Pick the shape
+Infer it from the request; ask one question only if it's unclear. If the relationships between things are the point, build a map; if a narrative is, build a document. `references/arts-principles.md` describes both.
+- **Document:** a report, briefing, one-pager or memo, or an explainer built around an inline `.cgmap` flow diagram. You write a content fragment, and a script wraps it.
+- **Canvas:** an interactive decision, relationship or system map (positioned nodes, arrowed edges, a detail panel, a status legend), or a full-bleed dashboard. You hand-author the whole file from the worked example.
 
-Two shapes, described in `references/arts-principles.md`:
-
-- **Document shape** — report/briefing/one-pager/memo, or an explainer whose
-  centrepiece is an inline `.cgmap` flow diagram. Author a content fragment and
-  wrap it with the build script.
-- **Canvas shape** — an interactive decision/relationship/system map (positioned
-  nodes, arrowed edges, a detail panel, a status legend), or a full-bleed
-  dashboard. Hand-author the whole file from the worked example.
-
-When in doubt: if the *relationships between things* are the point, build a map;
-if a *narrative* is the point, build a document.
-
-## Workflow — document shape
-
-1. **Understand the subject.** Read the relevant code / docs / conversation.
-   Don't write from assumptions.
-2. **Write the content fragment** (HTML, no wrapper) following
-   `references/authoring.md`: the arts CSS classes, tables over long lists,
-   depth on subtle mechanisms, and an inline `.cgmap` diagram when a flow or
-   relationship is worth showing.
-3. **Build.** Wrap it with the script, which stamps the arts shell + head meta:
+## Document
+1. Read the code, docs or conversation the artifact is about.
+2. Write the content fragment (HTML, no wrapper) following `references/authoring.md`: its CSS classes, tables over long lists, depth on subtle mechanisms, and an inline `.cgmap` diagram when a flow or relationship is worth showing.
+3. Build it. The script adds the arts shell and head metadata, writes to the OS temp dir, and prints the path:
    ```bash
    python3 scripts/build_artifact.py --title "..." --lede "..." \
      --author "..." --description "..." --date YYYY-MM-DD \
      --content /tmp/artifact-body.html
    ```
-4. **Print only the path.** Don't paste the HTML.
+4. Print only the path, not the HTML.
 
-## Workflow — interactive map
-
-Follow `references/interactive-map.md`, adapting the worked example
-`references/container_telemetry_map.html`:
-
-1. **Model the domain** into the map's data arrays (`NODES` with statuses,
-   `EDGES`, `HEADS`, `GROUPS`, optional decision `BAND`). Write real, specific
-   per-node detail — the detail panel is where a map earns its value.
-2. **Lay out** coordinates in columns under the section heads; group related
-   nodes; size the canvas to contain them.
-3. **Reuse the example's engine** (rendering, edge-routing, hover-focus,
-   click-to-pin panel, legend filter, reset, fit-to-width) verbatim; swap in your
-   data and status set.
-4. **Restyle neutrals to arts** and keep the semantic status colors; add the
-   head `<title>` + `<meta name="author">`/`description`/`date` by hand.
-5. **Write the file** and print its path; verify it opens standalone with no
-   console errors and that hover / click / filter / reset all work.
+## Interactive map
+Follow `references/interactive-map.md`: read the worked example `references/container_telemetry_map.html` in full, keep its rendering and interaction engine verbatim, and replace its data, statuses and neutrals. Write real, specific detail for each node; the detail panel is where a map earns its value. Add `<title>` and the `author`, `description` and `date` meta tags by hand. Check that the file opens standalone with no console errors, and that hover, click, filter and reset work.
 
 ## Rules
-
-- Always one **self-contained** HTML file: inline CSS/JS, no CDNs, no external
-  fonts or network fetches; it must open from `file://` and inside the arts
-  iframe. See `references/arts-principles.md`.
-- Always emit the head metadata arts catalogs by (`<title>`, author,
-  description, date). The build script does this for documents; add it by hand
-  for maps.
-- Match the arts palette and support light + dark. Reserve the blurple accent for
-  links and focus/pin, never as a status color.
-- No quiz. Never fabricate data to fill a map or a table — if a fact is unknown,
-  mark it as unknown (a "blocked / unanswered" status exists for exactly this).
-- Write artifacts to the OS temp dir (or the folder/bucket arts watches); never
-  into the repo.
-
-## Files
-
-- `scripts/build_artifact.py` — wraps a content fragment in the arts document
-  shell with head meta; writes the file and prints its path.
-- `assets/artifact-template.html` — the arts document shell: palette (light/dark),
-  theme toggle, title/lede/head-meta placeholders, and the inline `.cgmap`
-  diagram engine.
-- `references/arts-principles.md` — self-contained rule, head metadata, palette,
-  fonts, and how to choose the artifact shape.
-- `references/authoring.md` — the content fragment: structure, CSS classes, and
-  the inline interactive diagram.
-- `references/interactive-map.md` — how to build an interactive map from the
-  worked example.
-- `references/container_telemetry_map.html` — a complete interactive map
-  to read and adapt.
+- One self-contained file: inline CSS and JS, no CDNs, external fonts or network fetches. It must work from `file://` and inside the arts iframe.
+- Always include the head metadata arts catalogs by (`<title>`, author, description, date).
+- Match the arts palette in light and dark. The blurple accent is for links and focus or pin only, never a status.
+- Never invent data to fill a map or table. Mark unknowns as unknown; the "blocked / unanswered" status exists for this.
+- Write to the OS temp dir (or the folder arts watches), never into the repo.

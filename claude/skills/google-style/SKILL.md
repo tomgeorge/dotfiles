@@ -3,33 +3,14 @@ name: google-style
 description: Apply Google's developer documentation style conventions (https://developers.google.com/style) when writing or editing docs, READMEs, API references, user guides, changelogs, or error messages. Also use when the user asks about writing style, tone, formatting, capitalization, inclusive language, or how to structure technical content.
 ---
 
-# Technical Writing
+# Google developer documentation style
 
-Write clear, consistent technical documentation based on Google's developer
-documentation style guide.
+Apply the conventions of Google's developer documentation style guide (https://developers.google.com/style). Project-specific guidelines win: for Chainguard docs, https://github.com/chainguard-dev/edu/wiki/Style-Guide. For sentence-level rules (active voice, concision, positive form), use the `writing-clearly-and-concisely` skill.
 
-## Core Principles
-
-- **Clarity over cleverness**: Prioritize understandable prose over elegant
-  writing
-- **Consistency matters**: Apply rules uniformly throughout a document
-- **Audience-first**: Write for developers with varying English proficiency
-
-## Voice and Tone
-
-**Use second person**: Address the reader directly with "you."
-
-Good: "You can configure the server by editing `config.yaml`."
-Bad: "We can configure the server by editing `config.yaml`."
-
-**Use active voice**: Make clear who performs the action.
-
-Good: "The function returns an error code."
-Bad: "An error code is returned by the function."
-
-**Be conversational but professional**: Write naturally without slang, jargon,
-or excessive formality. Use common contractions like "you're," "don't," and
-"it's" to maintain an informal tone.
+## Voice and tone
+- Address the reader as "you", not "we".
+- Use the active voice, so it's clear who acts.
+- Be conversational but professional: no slang, and use common contractions ("you're", "don't", "it's").
 
 ## What to Avoid
 
@@ -143,14 +124,3 @@ or excessive formality. Use common contractions like "you're," "don't," and
 - Avoid "click here" or "this page"
 - Good: "See the [authentication guide](...)."
 - Bad: "Click [here](...) for more information."
-
-## Reference Hierarchy
-
-When style questions arise, consult in order:
-
-1. Project-specific guidelines, such as for the Chainguard docs at https://github.com/chainguard-dev/edu/wiki/Style-Guide
-2. Google Developer Documentation Style Guide, on which this skill is based
-3. Strunk's *Elements of Style* — invoke the `writing-clearly-and-concisely` skill for prose-level rules (active voice, concision, positive form)
-4. Merriam-Webster (spelling)
-5. Chicago Manual of Style (general)
-6. Microsoft Writing Style Guide (technical)

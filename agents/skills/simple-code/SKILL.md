@@ -5,13 +5,13 @@ description: Audit and refactor code toward simplicity (Rich Hickey's "Simple Ma
 
 # Simple code
 
-Make code simpler without changing what it does. "Simple" here means Hickey's sense: one concern per piece, nothing *complected*, i.e. braided together. It doesn't mean "familiar" or "short." Judge code against [RUBRIC.md](RUBRIC.md). Read it before auditing.
+Make code simpler without changing what it does. "Simple" is Hickey's sense: one concern per piece, nothing *complected* (braided together); not "familiar" or "short". Read [RUBRIC.md](RUBRIC.md) before auditing and judge the code against it.
 
-The output is a behavior-preserving refactor that the project's own checks prove, and a short report. Bug fixes are allowed only when you can show the bug with a failing test, and you list each one separately.
+The output is a behavior-preserving refactor, proved by the project's own checks, and a short report. Fix a bug only when a failing test shows it, and list each fix separately.
 
 ## 1. Scope and baseline
 - Pin down the target: a path, a directory, or "the X code." If it's a whole tree, list its units, such as one directory or module each, and their sizes.
-- Read the project's `AGENTS.md`, README, and config files. Follow its conventions even where the rubric prefers something else. The codebase's idiom wins over a generic one.
+- Follow the project's conventions (`AGENTS.md`, README, config) even where the rubric prefers something else.
 - Find every check and run it once: tests, linter, formatter, typecheck, and any mutation or coverage gate. Write down what already fails **before** you touch anything, so you can tell your regressions from existing failures.
 - **No typecheck?** If the code is TypeScript run by type stripping (Node, Bun, Deno) with no `tsconfig`, type errors are invisible. Build a throwaway config outside the repo, such as `/tmp/tsconfig.check.json` with `strict`, `noEmit`, `erasableSyntaxOnly` and `verbatimModuleSyntax`, plus `paths` pointing at the installed dependencies. Run `tsc -p` on it. Type errors it finds are real findings. Don't commit the config unless asked.
 - **Go:** the baseline is `gofmt -l .` (or the project's formatter), `go vet ./...`, and `go test -race ./...`. Add `staticcheck ./...` or `golangci-lint run` when the project configures them or they're installed. Use the project's `Makefile` or `Taskfile` targets when they exist.
@@ -23,19 +23,18 @@ For each unit, list findings against the rubric. Give each one a `path:line`, th
 3. Duplication, dead code, and unclear names.
 4. Everything else.
 
-Drop anything that is taste, churn, or a rewrite of code that is already simple. Small, honest code that breaks a "rule" is fine. Say so, and leave it alone.
+Drop taste, churn, and rewrites of code that's already simple. Small, honest code that breaks a "rule" is fine; say so and leave it alone.
 
 If the user asked a question ("is this clean?"), answer it with the audit and stop. If they asked you to fix it ("make it so", "clean it up"), go on.
 
 ## 3. Refactor, one unit at a time
-- Make the smallest change that removes each finding. Keep the surrounding style, and don't reformat lines you didn't change.
+- Make the smallest change that removes each finding. Don't add dependencies, abstractions nobody asked for, or options "for later."
 - Run the checks after every unit. They must stay green.
-- Don't add dependencies, abstractions nobody asked for, or options "for later."
 - Change tests only to follow a refactor, such as a renamed export or a moved helper. Never weaken an assertion.
 - **Mutation gates:** a gate like `mutants.json` holds `from`/`to` text replacements against the source. If you move or rewrite code a mutant targets, update its `from` and `to` so it still expresses **the same fault**. Never delete a mutant to make the gate pass.
 - Commit per unit if the user allows commits, with the subject in the imperative and the body giving the why.
 
-**Large scope:** if the target spans several independent directories, split it into one task per directory and run them in parallel. Use a crew (`/crew`) or other workers if available. Budget about one worker per directory, and tell each one to read this skill. Never run two workers on the same files.
+**Large scope:** if the target spans several independent directories, split it into one task per directory and run them in parallel. Use a crew (`/rex-crew` in Rex, `/crew` elsewhere) if the user approves delegation. Budget about one worker per directory, and tell each to read this skill. Never run two workers on the same files.
 
 ## 4. Watch for behavior drift
 These are the refactors that looked safe and weren't. Check each one against the old code.

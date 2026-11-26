@@ -6,35 +6,20 @@ argument-hint: <pr-url-or-number>
 
 # Approve PR
 
-Approve the PR and attach the rocket-frog image as the approval comment.
-
-## Steps
-
-1. Resolve the PR. Accept a URL, `owner/repo#123`, a number (current repo), or
-   nothing (PR for the current branch). Confirm it is open:
+1. Resolve the PR from a URL, `owner/repo#123`, a number (current repo), or nothing (the current branch's PR):
 
    ```bash
    gh pr view <pr> --json url,state,author,title --jq '{url,state,author:.author.login,title}'
    ```
 
-   If it is closed/merged, or the author is the current user (`gh api user --jq .login`),
-   stop and tell the user — GitHub rejects self-approval.
+   Stop and tell the user if it isn't open, or if they wrote it (`gh api user --jq .login`), since GitHub rejects self-approval.
 
-2. Approve with the image as the review body:
+2. Approve it with the image as the body. Put any text the user supplied on a line above the image:
 
    ```bash
    gh pr review <pr> --approve --body '![rocket-frog](https://github.com/user-attachments/assets/eacbe96a-fe74-4b61-9fc8-a56a46f898fc)'
    ```
 
-   If the user supplies extra text, put it on a line above the image.
-
 3. Report the PR URL. Don't merge or do anything else.
 
-## Notes
-
-- The image is a GitHub `user-attachments` asset uploaded from a private repo,
-  so it renders only for viewers with access to that context (fine for org
-  repos; it may show as a broken link on public or external repos).
-- A local copy lives at `rocket-frog.png` next to this file. If the link stops
-  rendering, re-upload it by dragging it into any GitHub comment box and replace
-  the URL above.
+The image renders only for viewers with access to the private repo it was uploaded from, so it may look broken on public repos. If the link stops working, `rocket-frog.png` next to this file is the original: tell the user to re-upload it to a GitHub comment and update the URL here and in `~/.pi/agent/prompts/review-loop.md`.
