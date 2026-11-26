@@ -51,7 +51,8 @@ in
           "git:github.com/samber/cc-skills-golang@bb1d43d98a3f8ab639a0042f90d0ec524e39a477"
           # Rex-backed agents, side chats, and shell jobs. They need pi running inside Rex.
           "git:github.com/maxpaulus43/pi-rex-agents@ab7e5d71f002d34ff4dc331a20df5e6d65317d84"
-          "git:github.com/maxpaulus43/pi-rex-btw@689b42dcc4ad29d97aa0c34bd03b614cd55e9e6b"
+          # Fork until maxpaulus43/pi-rex-btw#3 merges: upstream /btw passes a block ID as the Rex session.
+          "git:github.com/tomgeorge/pi-rex-btw@f68ff18b1b1d85051e3fa30bac3d57e964703153"
           "git:github.com/maxpaulus43/pi-rex-shell@197d6d474b24e2488737bea4d7bb9490afa86486"
         ];
 
